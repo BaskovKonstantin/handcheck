@@ -4,5 +4,14 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8810:8810"
+    env_file:
+      - .env
     environment:
       PORT: "8810"
+      DB_PATH: /data/handcheck.sqlite
+      DEMO_MODE: "1"
+    volumes:
+      - handcheck-data:/data
+
+volumes:
+  handcheck-data:

@@ -1,0 +1,17 @@
+{
+  "name": "handcheck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HandCheck — skills-first IT hiring template (FSP special track)",
+  "main": "app/server.js",
+  "scripts": {
+    "start": "node app/server.js",
+    "dev": "node --watch app/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

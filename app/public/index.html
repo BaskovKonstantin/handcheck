@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <p class="eyebrow">HandCheck · шаблон</p>
+      <h1>Навык задаёт категорию,<br />работодатель идёт к кандидату</h1>
+      <p class="lede">
+        Опрос и тест → специализация × грейд → приглашение с вилкой ЗП.
+        Шаблон для итераций через Grok Bot по ТЗ ФСП спец. трек.
+      </p>
+      <div class="actions">
+        <a class="btn" href="/candidate.html">Кабинет кандидата</a>
+        <a class="btn secondary" href="/employer.html">Кабинет работодателя</a>
+      </div>
+      <p class="meta" id="health">Проверка API…</p>
+    </main>
+    <script>
+      fetch("/api/health")
+        .then((r) => r.json())
+        .then((j) => {
+          document.getElementById("health").textContent =
+            "API ok · " + j.service + " " + j.version;
+        })
+        .catch(() => {
+          document.getElementById("health").textContent = "API недоступен";
+        });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+name: Deploy HandCheck to konBas
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: handcheck-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy on konBas
+    runs-on: [self-hosted, handcheck, konbas]
+    steps:
+      - name: Pull and rebuild
+        working-directory: /srv/homeserver/apps/handcheck
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          docker compose up -d --build
+          sleep 3
+          curl -fsS http://127.0.0.1:8810/api/health
+          docker compose ps
+          echo "Deploy OK: $(git rev-parse --short HEAD)"

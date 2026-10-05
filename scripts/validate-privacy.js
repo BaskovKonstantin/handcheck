@@ -102,6 +102,24 @@ async function main() {
   const start = await annaAgent.post(`/api/calls/${callId}/start`);
   assert.equal(start.status, 400, "P6");
   console.log("P6 pass");
+
+  const badStart = await cafeAgent.post("/api/calls/not-a-uuid/start");
+  assert.equal(badStart.status, 400, "P7 status");
+  assert.equal(badStart.body.error, "invalid_id", "P7 error");
+  const badConsent = await cafeAgent.post("/api/calls/not-a-uuid/consent").send({ accepted: true });
+  assert.equal(badConsent.status, 400, "P7 consent");
+  console.log("P7 pass (call id UUID guard)");
+
+  const oversize = 81 * 1024 * 1024;
+  const t413 = Date.now();
+  const tooBig = await cafeAgent
+    .post(`/api/calls/${callId}/recording`)
+    .set("Content-Length", String(oversize))
+    .send(Buffer.alloc(0));
+  assert.equal(tooBig.status, 413, "P8 status");
+  assert.ok(Date.now() - t413 < 3000, `P8 should reject fast, took ${Date.now() - t413}ms`);
+  console.log("P8 pass (recording Content-Length 413)");
+
   console.log("validate-privacy: all pass");
 }
 

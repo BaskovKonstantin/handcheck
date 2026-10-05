@@ -3,6 +3,7 @@
 const { getDb } = require("../db");
 const config = require("../config");
 const { httpError } = require("./errors");
+const { isRequestSecure } = require("../lib/request-secure");
 
 function parseCookies(req) {
   const header = req.headers.cookie || "";
@@ -56,21 +57,21 @@ function requireConfirmedEmail(req, _res, next) {
   next();
 }
 
-function cookieSuffix() {
-  return config.COOKIE_SECURE ? "; Secure" : "";
+function cookieSuffix(req) {
+  return isRequestSecure(req) ? "; Secure" : "";
 }
 
-function setSessionCookie(res, sessionId) {
+function setSessionCookie(res, sessionId, req) {
   res.setHeader(
     "Set-Cookie",
-    `${config.COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${cookieSuffix()}`
+    `${config.COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${cookieSuffix(req)}`
   );
 }
 
-function clearSessionCookie(res) {
+function clearSessionCookie(res, req) {
   res.setHeader(
     "Set-Cookie",
-    `${config.COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${cookieSuffix()}`
+    `${config.COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${cookieSuffix(req)}`
   );
 }
 
@@ -82,4 +83,5 @@ module.exports = {
   clearSessionCookie,
   parseCookies,
   loadSession,
+  isRequestSecure,
 };

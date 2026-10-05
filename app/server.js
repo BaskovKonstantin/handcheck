@@ -17,9 +17,7 @@ function createApp() {
 
   const app = express();
   app.disable("x-powered-by");
-  if (config.COOKIE_SECURE) {
-    app.set("trust proxy", 1);
-  }
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "256kb" }));
   app.use(attachUser);
 

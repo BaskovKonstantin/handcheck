@@ -93,7 +93,7 @@ router.post("/login", (req, res, next) => {
       user.id,
       expires
     );
-    setSessionCookie(res, sid);
+    setSessionCookie(res, sid, req);
     res.json({
       ok: true,
       user: {
@@ -113,7 +113,7 @@ router.post("/logout", requireAuth, (req, res) => {
   if (req.session?.id) {
     db.prepare("DELETE FROM sessions WHERE id = ?").run(req.session.id);
   }
-  clearSessionCookie(res);
+  clearSessionCookie(res, req);
   res.json({ ok: true });
 });
 

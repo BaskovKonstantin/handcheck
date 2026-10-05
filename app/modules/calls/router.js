@@ -11,11 +11,17 @@ const { httpError } = require("../../middleware/errors");
 const config = require("../../config");
 const { queueAnalyzeCall } = require("./analyze-call");
 const { isUuid } = require("../../lib/uuid");
+const { rejectOversizedBody } = require("../../middleware/reject-oversized-body");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail);
 
 const RECORDING_LIMIT = 80 * 1024 * 1024;
+
+router.param("id", (req, res, next, id) => {
+  if (!isUuid(id)) return next(httpError(400, "invalid_id"));
+  next();
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -114,9 +120,12 @@ router.post("/:id/end", (req, res, next) => {
   res.json({ ok: true });
 });
 
-router.post("/:id/recording", handleMulterUpload, (req, res, next) => {
+router.post(
+  "/:id/recording",
+  rejectOversizedBody(RECORDING_LIMIT),
+  handleMulterUpload,
+  (req, res, next) => {
   const callId = req.params.id;
-  if (!isUuid(callId)) return next(httpError(400, "invalid_id"));
   const side = req.body?.side;
   if (!["candidate", "employer"].includes(side)) return next(httpError(400, "invalid_side"));
   if (!req.file?.buffer) return next(httpError(400, "file_required"));
@@ -142,7 +151,8 @@ router.post("/:id/recording", handleMulterUpload, (req, res, next) => {
   fs.writeFileSync(filePath, req.file.buffer);
   db.prepare("UPDATE calls SET recording_path = ? WHERE id = ?").run(dir, call.id);
   res.json({ ok: true });
-});
+  }
+);
 
 router.post("/:id/transcript-chunk", (req, res, next) => {
   const text = String(req.body?.text || "").trim();

@@ -40,3 +40,26 @@ docker compose up -d --build
 ```
 
 SQLite persists in volume `/data`.
+
+## Operations (konBas)
+
+From the server itself, use the loopback health URL — the public hostname often **hairpin-times out** when curled from konBas:
+
+```bash
+curl -fsS http://127.0.0.1:8810/api/health
+```
+
+Deploy workflow (`.github/workflows/deploy.yml`) uses the same check after `docker compose up`.
+
+### Large call recordings (>80 MB)
+
+The app rejects uploads when `Content-Length` exceeds 80 MB **before** multer buffers the body, so clients get **413** quickly even behind Caddy.
+
+Optional Caddy hardening (not applied in this repo; add on the operator host if desired):
+
+```caddy
+# inside handcheck.baski.pro site block
+request_body {
+  max_size 85MB
+}
+```

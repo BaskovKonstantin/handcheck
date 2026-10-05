@@ -36,6 +36,20 @@ async function main() {
   assert.ok(!body.includes("phone"), "P1 failed");
   console.log("P1 pass");
 
+  const otherEmp = db.prepare("SELECT id FROM users WHERE email = 'other@demo.local'").get().id;
+  const otherAgent = request.agent(app);
+  await otherAgent.post("/api/auth/login").send({
+    email: "other@demo.local",
+    password: "demo-demo-demo",
+  });
+  const t0 = Date.now();
+  const contactsDenied = await otherAgent.get(
+    `/api/employer/candidates/${annaId}/contacts`
+  );
+  assert.equal(contactsDenied.status, 403, "P1b status");
+  assert.ok(Date.now() - t0 < 3000, `P1b contacts must fail fast, took ${Date.now() - t0}ms`);
+  console.log("P1b pass (contacts 403 fast)");
+
   const invId = (
     await cafeAgent.post("/api/employer/invitations").send({
       needId: need.id,
@@ -58,7 +72,6 @@ async function main() {
   assert.ok(contacts.body.phone && contacts.body.contact_email, "P2 failed");
   console.log("P2 pass");
 
-  const otherEmp = db.prepare("SELECT id FROM users WHERE email = 'other@demo.local'").get().id;
   const inv2 = newId();
   db.prepare(
     `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)

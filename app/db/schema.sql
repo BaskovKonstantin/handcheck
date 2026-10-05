@@ -189,3 +189,5 @@ CREATE TABLE IF NOT EXISTS call_analyses (
 CREATE INDEX IF NOT EXISTS idx_attempts_battery ON attempts(battery_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_candidate ON invitations(candidate_user_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_employer_candidate_status
+  ON invitations(employer_user_id, candidate_user_id, status);

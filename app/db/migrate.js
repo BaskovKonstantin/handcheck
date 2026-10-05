@@ -11,6 +11,9 @@ function migrate(dbPath) {
   }
   const db = new Database(dbPath);
   db.pragma("foreign_keys = ON");
+  db.pragma("journal_mode = WAL");
+  db.pragma("busy_timeout = 5000");
+  db.pragma("synchronous = NORMAL");
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   db.exec(schema);
   return db;

@@ -56,17 +56,21 @@ function requireConfirmedEmail(req, _res, next) {
   next();
 }
 
+function cookieSuffix() {
+  return config.COOKIE_SECURE ? "; Secure" : "";
+}
+
 function setSessionCookie(res, sessionId) {
   res.setHeader(
     "Set-Cookie",
-    `${config.COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`
+    `${config.COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${cookieSuffix()}`
   );
 }
 
 function clearSessionCookie(res) {
   res.setHeader(
     "Set-Cookie",
-    `${config.COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+    `${config.COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${cookieSuffix()}`
   );
 }
 

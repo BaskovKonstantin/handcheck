@@ -40,13 +40,24 @@ function resolveSessionSecret() {
   return secret;
 }
 
+const APP_BASE_URL = process.env.APP_BASE_URL || "http://127.0.0.1:8810";
+
+function cookieSecureFromAppUrl(baseUrl) {
+  try {
+    return new URL(baseUrl).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   PORT: Number(process.env.PORT || 8810),
   DB_PATH,
   DATA_DIR,
   SESSION_SECRET: resolveSessionSecret(),
   GRADE_COOLDOWN_DAYS: Number(process.env.GRADE_COOLDOWN_DAYS || 90),
-  APP_BASE_URL: process.env.APP_BASE_URL || "http://127.0.0.1:8810",
+  APP_BASE_URL,
+  COOKIE_SECURE: cookieSecureFromAppUrl(APP_BASE_URL),
   DEMO_MODE: envBool("DEMO_MODE", false),
   DEMO_PASSWORD: process.env.DEMO_PASSWORD || "demo-demo-demo",
   LLM_BASE_URL: process.env.LLM_BASE_URL || "",

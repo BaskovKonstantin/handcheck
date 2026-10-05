@@ -90,17 +90,17 @@ router.get("/invitations", (req, res) => {
 });
 
 router.get("/candidates/:candidateId/contacts", (req, res, next) => {
-  const db = getDb();
-  const inv = db
+  const row = getDb()
     .prepare(
-      `SELECT * FROM invitations WHERE employer_user_id = ? AND candidate_user_id = ? AND status = 'accepted' LIMIT 1`
+      `SELECT cp.phone, cp.contact_email
+       FROM invitations i
+       INNER JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       WHERE i.employer_user_id = ? AND i.candidate_user_id = ? AND i.status = 'accepted'
+       LIMIT 1`
     )
     .get(req.user.id, req.params.candidateId);
-  if (!inv) return next(httpError(403, "forbidden"));
-  const p = db
-    .prepare("SELECT phone, contact_email FROM candidate_profiles WHERE user_id = ?")
-    .get(req.params.candidateId);
-  res.json({ phone: p.phone, contact_email: p.contact_email });
+  if (!row) return next(httpError(403, "forbidden"));
+  res.json({ phone: row.phone, contact_email: row.contact_email });
 });
 
 module.exports = router;

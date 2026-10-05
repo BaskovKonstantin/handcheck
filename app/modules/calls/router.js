@@ -10,14 +10,27 @@ const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { httpError } = require("../../middleware/errors");
 const config = require("../../config");
 const { queueAnalyzeCall } = require("./analyze-call");
+const { isUuid } = require("../../lib/uuid");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail);
 
+const RECORDING_LIMIT = 80 * 1024 * 1024;
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 80 * 1024 * 1024 },
+  limits: { fileSize: RECORDING_LIMIT },
 });
+
+function handleMulterUpload(req, res, next) {
+  upload.single("file")(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return next(httpError(413, "file_too_large"));
+    }
+    return next(httpError(400, "upload_failed"));
+  });
+}
 
 function getInvitationAccess(userId, invitationId) {
   const db = getDb();
@@ -101,19 +114,31 @@ router.post("/:id/end", (req, res, next) => {
   res.json({ ok: true });
 });
 
-router.post("/:id/recording", upload.single("file"), (req, res, next) => {
+router.post("/:id/recording", handleMulterUpload, (req, res, next) => {
+  const callId = req.params.id;
+  if (!isUuid(callId)) return next(httpError(400, "invalid_id"));
   const side = req.body?.side;
   if (!["candidate", "employer"].includes(side)) return next(httpError(400, "invalid_side"));
+  if (!req.file?.buffer) return next(httpError(400, "file_required"));
   const db = getDb();
-  const call = db.prepare("SELECT * FROM calls WHERE id = ?").get(req.params.id);
+  const call = db.prepare("SELECT id, invitation_id FROM calls WHERE id = ?").get(callId);
   if (!call) return next(httpError(404, "not_found"));
-  const inv = db.prepare("SELECT * FROM invitations WHERE id = ?").get(call.invitation_id);
-  if (![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
+  const inv = db.prepare("SELECT candidate_user_id, employer_user_id FROM invitations WHERE id = ?").get(
+    call.invitation_id
+  );
+  if (!inv || ![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
     return next(httpError(403, "forbidden"));
   }
-  const dir = path.join(config.CALLS_DIR, call.id);
+  const callsRoot = path.resolve(config.CALLS_DIR);
+  const dir = path.resolve(callsRoot, callId);
+  if (!dir.startsWith(callsRoot + path.sep) && dir !== callsRoot) {
+    return next(httpError(400, "invalid_path"));
+  }
   fs.mkdirSync(dir, { recursive: true });
   const filePath = path.join(dir, `${side}.webm`);
+  if (path.resolve(filePath) !== filePath || !filePath.endsWith(`${side}.webm`)) {
+    return next(httpError(400, "invalid_path"));
+  }
   fs.writeFileSync(filePath, req.file.buffer);
   db.prepare("UPDATE calls SET recording_path = ? WHERE id = ?").run(dir, call.id);
   res.json({ ok: true });

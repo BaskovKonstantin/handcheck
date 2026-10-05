@@ -26,12 +26,6 @@ jobs:
             exit 1
           fi
 
-          # Refuse accidental destructive compose flags in this script.
-          forbidden='docker compose down -v|docker volume rm|compose down --volumes'
-          if grep -qE "$forbidden" .github/workflows/deploy.yml 2>/dev/null; then
-            : # self-check only in repo; on server this file is from main after pull
-          fi
-
           git fetch origin main
           git reset --hard origin/main
 

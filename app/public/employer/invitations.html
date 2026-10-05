@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Приглашения — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <h1>Исходящие приглашения</h1>
+      <div id="list"></div>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      HandCheck.employerNav();
+      HandCheck.api("/api/employer/invitations").then((d) => {
+        document.getElementById("list").innerHTML =
+          d.items
+            .map((i) => `<div class="panel">${i.candidateName} — ${i.status} (₽${i.salaryFrom}–${i.salaryTo})</div>`)
+            .join("") || '<p class="empty">Пока нет</p>';
+      });
+    </script>
+  </body>
+</html>

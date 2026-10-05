@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Список — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <h1>Список</h1>
+      <p>
+        <label>Стек <input id="stack" placeholder="node" /></label>
+        <label>ФСП <select id="fsp"><option value="">—</option><option value="1">да</option><option value="0">нет</option></select></label>
+        <button class="btn-ghost" id="apply">Применить</button>
+      </p>
+      <div id="rows"></div>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      HandCheck.employerNav();
+      const params = new URLSearchParams(location.search);
+      document.getElementById("stack").value = params.get("stack") || "";
+      document.getElementById("fsp").value = params.get("fsp") || "";
+      async function load() {
+        const needs = await HandCheck.api("/api/employer/needs");
+        const needId = needs.items[0]?.id;
+        const qs = location.search || "";
+        const data = await HandCheck.api(`/api/employer/needs/${needId}/matches${qs}`);
+        document.getElementById("rows").innerHTML = data.items
+          .map(
+            (r) =>
+              `<a class="row-link" href="#">${r.categoryLabel}<br><small>${r.explanation.join(
+                " · "
+              )}</small></a>`
+          )
+          .join("");
+      }
+      document.getElementById("apply").onclick = () => {
+        const p = new URLSearchParams();
+        if (document.getElementById("stack").value) p.set("stack", document.getElementById("stack").value);
+        if (document.getElementById("fsp").value) p.set("fsp", document.getElementById("fsp").value);
+        history.replaceState({}, "", `/employer/list?${p}`);
+        load();
+      };
+      load();
+    </script>
+  </body>
+</html>

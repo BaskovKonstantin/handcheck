@@ -1,33 +1,37 @@
 # HandCheck
 
-Skills-first IT hiring template under FSP 2026 special-track TZ.
+Skills-first IT hiring (FSP 2026 special track). Category from test battery; employers invite with salary band; contacts hidden until accept.
 
 **Live:** https://handcheck.baski.pro
 
-## Docs for agents / implementers
+## Docs
 
 | Doc | Purpose |
 |-----|---------|
-| [AGENTS.md](./AGENTS.md) | Rules for coding agents |
-| [docs/TZ.md](./docs/TZ.md) | Condensed TZ + jury weights |
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Repo structure, domains, phases |
-| [docs/DATA-MODEL.md](./docs/DATA-MODEL.md) | Schema + privacy |
-| [docs/VALIDATION.md](./docs/VALIDATION.md) | Self-evaluation procedure |
-
-## What works now (Phase 0)
-
-- Landing + candidate/employer stubs
-- API: `/api/health`, `/api/meta`, in-memory stubs
-- Docker + auto-deploy on push to `main`
+| [docs/IMPLEMENTATION-PLAN-rev5.md](./docs/IMPLEMENTATION-PLAN-rev5.md) | Canonical rev.5 spec |
+| [docs/design.md](./docs/design.md) | Palette clay/forest, motion |
+| [docs/UX.md](./docs/UX.md) | Routes and copy |
+| [AGENTS.md](./AGENTS.md) | Agent rules |
 
 ## Local
 
 ```bash
+cp .env.example .env
 npm install
 npm start
 ```
 
-http://127.0.0.1:8810
+Demo logins (when `DEMO_MODE=1`, password from `.env.example`):
+
+- `anna@demo.local` / `boris@demo.local` — candidates
+- `cafe@demo.local` — employer (café need)
+
+## Quality gates
+
+```bash
+npm test
+npm run validate
+```
 
 ## Docker
 
@@ -35,6 +39,4 @@ http://127.0.0.1:8810
 docker compose up -d --build
 ```
 
-## Implementation order
-
-Phase 1 auth/db → Phase 2 assessment/category → Phase 3 matching/invitations → Phase 4 polish → Phase 5 optional.
+SQLite persists in volume `/data`.

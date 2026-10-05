@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Потребность — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <h1>Потребность</h1>
+      <div class="panel" id="form">Загрузка…</div>
+      <button class="btn-primary" id="save" disabled>Сохранить</button>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      HandCheck.employerNav();
+      let snapshot = "";
+      HandCheck.api("/api/employer/needs").then((d) => {
+        const n = d.items[0] || {};
+        document.getElementById("form").innerHTML = `
+          <label>Название <input id="title" value="${n.title || ""}" /></label>
+          <label>Домен <textarea id="domain">${n.domainText || ""}</textarea></label>`;
+        snapshot = JSON.stringify({ title: n.title, domain: n.domainText });
+        document.querySelectorAll("input,textarea").forEach((el) => {
+          el.addEventListener("input", () => {
+            const cur = JSON.stringify({
+              title: document.getElementById("title").value,
+              domain: document.getElementById("domain").value,
+            });
+            document.getElementById("save").disabled = cur === snapshot;
+          });
+        });
+      });
+      document.getElementById("save").onclick = async () => {
+        const needs = await HandCheck.api("/api/employer/needs");
+        const id = needs.items[0].id;
+        await HandCheck.api(`/api/employer/needs/${id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            title: document.getElementById("title").value,
+            domainText: document.getElementById("domain").value,
+          }),
+        });
+        location.reload();
+      };
+    </script>
+  </body>
+</html>

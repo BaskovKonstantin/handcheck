@@ -7,28 +7,44 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <p class="eyebrow">HandCheck · шаблон</p>
-      <h1>Навык задаёт категорию,<br />работодатель идёт к кандидату</h1>
-      <p class="lede">
-        Опрос и тест → специализация × грейд → приглашение с вилкой ЗП.
-        Шаблон для итераций через Grok Bot по ТЗ ФСП спец. трек.
+    <header id="site-header"></header>
+    <main class="column">
+      <h1 class="hero-title">Категория по навыку. Приглашение с вилкой.</h1>
+      <p class="hero-lede">
+        Профиль и тест задают категорию. Работодатель приглашает с вилкой зарплаты — без рейтингов и
+        без публичных контактов до согласия.
       </p>
-      <div class="actions">
-        <a class="btn" href="/candidate.html">Кабинет кандидата</a>
-        <a class="btn secondary" href="/employer.html">Кабинет работодателя</a>
+      <div class="stats" id="stats"></div>
+      <div class="steps">
+        <div class="step-card"><strong>1.</strong> Профиль и бэкграунд</div>
+        <div class="step-card"><strong>2.</strong> Короткие ответы и рабочая задача</div>
+        <div class="step-card"><strong>3.</strong> Приглашения от компаний</div>
       </div>
-      <p class="meta" id="health">Проверка API…</p>
+      <p style="margin-top: 2rem">
+        <a class="btn-primary" href="/auth">Начать</a>
+      </p>
     </main>
+    <script src="/app.js"></script>
     <script>
-      fetch("/api/health")
+      document.getElementById("site-header").innerHTML = `
+        <div class="site-header">
+          <a class="logo" href="/">HandCheck</a>
+          <nav class="site-nav">
+            <a href="/auth?role=candidate">Кандидатам</a>
+            <a href="/auth?role=employer">Работодателям</a>
+            <a href="/auth">Войти</a>
+            <a class="btn-primary" href="/auth">Начать</a>
+          </nav>
+        </div>`;
+      fetch("/api/stats")
         .then((r) => r.json())
-        .then((j) => {
-          document.getElementById("health").textContent =
-            "API ok · " + j.service + " " + j.version;
-        })
-        .catch(() => {
-          document.getElementById("health").textContent = "API недоступен";
+        .then((s) => {
+          const fmt = (v, demo) =>
+            demo ? `${v || 2} <span class="stat-label">в демо</span>` : String(v);
+          document.getElementById("stats").innerHTML = `
+            <div class="stat"><div class="stat-value">${fmt(s.categories, s.categoriesDemo)}</div><div class="stat-label">категорий подтверждено</div></div>
+            <div class="stat"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты</div></div>
+            <div class="stat"><div class="stat-value">${fmt(s.invitations, s.invitationsDemo)}</div><div class="stat-label">приглашений</div></div>`;
         });
     </script>
   </body>

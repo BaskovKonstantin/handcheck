@@ -1,23 +1,33 @@
 # HandCheck
 
-Шаблон skills-first платформы подбора IT (ТЗ ФСП спец. трек).
+Skills-first IT hiring template under FSP 2026 special-track TZ.
 
 **Live:** https://handcheck.baski.pro
 
-## Что есть сейчас
+## Docs for agents / implementers
 
-- Лендинг + два кабинета-заглушки (кандидат / работодатель)
-- API: `/api/health`, `/api/meta`, `/api/candidates`, `/api/invitations` (in-memory)
-- Docker Compose + автодеплой на konBas при push в `main`
+| Doc | Purpose |
+|-----|---------|
+| [AGENTS.md](./AGENTS.md) | Rules for coding agents |
+| [docs/TZ.md](./docs/TZ.md) | Condensed TZ + jury weights |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Repo structure, domains, phases |
+| [docs/DATA-MODEL.md](./docs/DATA-MODEL.md) | Schema + privacy |
+| [docs/VALIDATION.md](./docs/VALIDATION.md) | Self-evaluation procedure |
 
-## Локально
+## What works now (Phase 0)
+
+- Landing + candidate/employer stubs
+- API: `/api/health`, `/api/meta`, in-memory stubs
+- Docker + auto-deploy on push to `main`
+
+## Local
 
 ```bash
 npm install
 npm start
 ```
 
-Откройте http://127.0.0.1:8810
+http://127.0.0.1:8810
 
 ## Docker
 
@@ -25,6 +35,6 @@ npm start
 docker compose up -d --build
 ```
 
-## Для агентов
+## Implementation order
 
-См. [AGENTS.md](./AGENTS.md).
+Phase 1 auth/db → Phase 2 assessment/category → Phase 3 matching/invitations → Phase 4 polish → Phase 5 optional.

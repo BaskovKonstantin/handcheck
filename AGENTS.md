@@ -1,33 +1,45 @@
 # HandCheck — workspace for Grok Bot / coding agents
 
-## Product
+## Read first (in order)
 
-Skills-first IT hiring template for FSP special track:
-survey + test → category (specialization × grade) → employer invites with salary range.
-Contacts stay hidden until candidate accepts.
+1. [`docs/TZ.md`](./docs/TZ.md) — что требует ТЗ ФСП и веса жюри  
+2. [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — структура репо, домены, фазы  
+3. [`docs/DATA-MODEL.md`](./docs/DATA-MODEL.md) — таблицы и privacy  
+4. [`docs/VALIDATION.md`](./docs/VALIDATION.md) — как доказывать качество  
 
 Live: https://handcheck.baski.pro
 
-## Stack (current template)
+## Product one-liner
 
-- Node 20 + Express (`app/server.js`)
-- Static stubs in `app/public/`
+Опрос + тест → категория (специализация × грейд) → работодатель сам приглашает с вилкой ЗП.  
+Контакты скрыты до accept. Не job-board scraper.
+
+## Stack (locked)
+
+- Node 20 + Express (`app/server.js` → модули в `app/modules/*`)
+- SQLite (`better-sqlite3`) when persistence starts
+- Static UI in `app/public/`
 - Docker Compose on konBas (`127.0.0.1:8810`)
-- Caddy `handcheck.baski.pro` → `127.0.0.1:8810`
-- Deploy: GitHub Actions self-hosted runner labels `handcheck`, `konbas` on push to `main`
+- Caddy `handcheck.baski.pro`
+- Deploy: push `main` → self-hosted runner labels `handcheck`, `konbas`
 
-## How to extend (preferred order)
+## How to implement
 
-1. Keep API under `/api/*` and pages under `app/public/`
-2. Replace in-memory `state` with SQLite or Postgres when persistence is needed
-3. Do not put secrets in the repo; use `.env` on the server only
-4. Prefer small PRs / commits; CI redeploys `main` automatically
+1. Work **one phase** from ARCHITECTURE (1 → 2 → 3 before 5).  
+2. Keep business logic in `app/modules/*`, not in HTML.  
+3. API under `/api/*`; update `openapi.yaml` when routes stabilize.  
+4. Small commits; CI redeploys `main`.  
+5. After Phase 3: verify full demo on production URL.  
+6. No secrets in git — `.env` on server only.
 
 ## Do not
 
-- Build a job-board scraper
-- Rank candidates by résumé prestige
-- Commit tokens, SSH keys, or production `.env`
+- Build vacancy scrapers / HH mirrors as core product  
+- Rank by résumé prestige instead of test category  
+- LLM-generate unique uncalibrated tests per candidate as the only method  
+- Force-downgrade grade without candidate choosing a lower attempt  
+- Expose candidate contacts before invite accept  
+- Commit tokens, SSH keys, production `.env`
 
 ## Local run
 
@@ -37,8 +49,8 @@ npm start
 # http://127.0.0.1:8810
 ```
 
-## Related OpenBas wiki
+## Related OpenBas wiki (operator machine)
 
+- `knowledge-vault/entities/handcheck.md`
 - `knowledge-vault/entities/fsp-spec-track-hackathon-2026.md`
 - `knowledge-vault/concepts/programmer-skill-testing-approaches.md`
-- `knowledge-vault/sources/fsp-ready-tech-startups-2026-10-05.md`

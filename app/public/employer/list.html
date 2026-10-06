@@ -4,17 +4,33 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Список — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Список</h1>
-      <p>
-        <label>Стек <input id="stack" placeholder="node" /></label>
-        <label>ФСП <select id="fsp"><option value="">—</option><option value="1">да</option><option value="0">нет</option></select></label>
-        <button class="btn-ghost" id="apply">Применить</button>
-      </p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Список</h1>
+          <p class="lede">Все подходящие категории по потребности — без рейтинга и фото.</p>
+        </div>
+      </header>
+      <form class="filter-bar" id="filters" onsubmit="return false">
+        <label>Стек <input id="stack" placeholder="node" autocomplete="off" /></label>
+        <label
+          >ФСП
+          <select id="fsp">
+            <option value="">—</option>
+            <option value="1">да</option>
+            <option value="0">нет</option>
+          </select></label
+        >
+        <div class="filter-actions">
+          <button class="btn-primary btn-sm" type="button" id="apply">Применить</button>
+        </div>
+      </form>
       <div id="rows"></div>
     </main>
     <script src="/app.js"></script>
@@ -23,46 +39,81 @@
       const params = new URLSearchParams(location.search);
       document.getElementById("stack").value = params.get("stack") || "";
       document.getElementById("fsp").value = params.get("fsp") || "";
-      async function load() {
-        await HandCheck.employerNav();
-        const needs = await HandCheck.api("/api/employer/needs");
-        const needId = needs.items[0]?.id;
-        if (!needId) {
-          rowsEl.innerHTML = HandCheck.emptyState("Нет потребности", "Сначала опишите потребность.", "/employer/need", "К потребности");
-          return;
-        }
-        const qs = location.search || "";
-        const data = await HandCheck.api(`/api/employer/needs/${needId}/matches${qs}`);
-        if (!data.items.length) {
-          rowsEl.innerHTML = HandCheck.emptyState(
-            "Подходящих кандидатов нет",
-            "Проверьте фильтры или откройте колоду — возможно, все уже в приглашениях.",
-            "/employer/invitations",
-            "К приглашениям"
-          );
-          return;
-        }
-        rowsEl.innerHTML = data.items
-          .map((r) => {
-            const invited =
-              r.reviewStatus === "invited"
-                ? '<span class="status-pill accepted">Приглашён</span> · '
-                : "";
-            return `<div class="row-link row-link-static"><strong>${r.categoryLabel}</strong> ${invited}<br><small>${r.explanation.join(
-              " · "
-            )}</small></div>`;
-          })
-          .join("");
+
+      let loadSeq = 0;
+      let cachedNeedId = null;
+
+      function showSkeleton() {
+        rowsEl.innerHTML = HandCheck.skeletonBlocks(4);
       }
+
+      async function loadRows() {
+        const seq = ++loadSeq;
+        showSkeleton();
+        try {
+          if (!cachedNeedId) {
+            const needs = await HandCheck.api("/api/employer/needs");
+            cachedNeedId = needs.items[0]?.id || null;
+          }
+          if (seq !== loadSeq) return;
+          if (!cachedNeedId) {
+            rowsEl.innerHTML = HandCheck.emptyState(
+              "Нет потребности",
+              "Сначала опишите потребность.",
+              "/employer/need",
+              "К потребности"
+            );
+            return;
+          }
+          const qs = location.search || "";
+          const data = await HandCheck.api(`/api/employer/needs/${cachedNeedId}/matches${qs}`);
+          if (seq !== loadSeq) return;
+          if (!data.items?.length) {
+            rowsEl.innerHTML = HandCheck.emptyState(
+              "Подходящих кандидатов нет",
+              "Проверьте фильтры или откройте колоду — возможно, все уже в приглашениях.",
+              "/employer/invitations",
+              "К приглашениям"
+            );
+            return;
+          }
+          rowsEl.innerHTML = data.items
+            .map((r) => {
+              const invited =
+                r.reviewStatus === "invited"
+                  ? '<span class="status-pill accepted">Приглашён</span>'
+                  : "";
+              const explain = (r.explanation || []).join(" · ");
+              return `<div class="list-row-card row-link-static">
+                <div>
+                  <strong>${r.categoryLabel}</strong>
+                  ${invited}
+                  <p class="invite-meta" style="margin:0.35rem 0 0">${explain}</p>
+                </div>
+                <a class="btn-ghost btn-sm" href="/employer/deck">В колоду</a>
+              </div>`;
+            })
+            .join("");
+        } catch {
+          if (seq !== loadSeq) return;
+          rowsEl.innerHTML = HandCheck.loadErrorState(
+            "Не удалось загрузить список",
+            "Проверьте соединение или повторите запрос.",
+            () => loadRows()
+          );
+        }
+      }
+
       document.getElementById("apply").onclick = () => {
         const p = new URLSearchParams();
         if (document.getElementById("stack").value) p.set("stack", document.getElementById("stack").value);
         if (document.getElementById("fsp").value) p.set("fsp", document.getElementById("fsp").value);
         const q = p.toString();
         history.replaceState({}, "", q ? `/employer/list?${q}` : "/employer/list");
-        load();
+        loadRows();
       };
-      HandCheck.loadPanel(rowsEl, load);
+
+      HandCheck.employerNav().then(() => loadRows());
     </script>
   </body>
 </html>

@@ -4,14 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Приглашения — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <header class="page-header">
-        <h1>Приглашения</h1>
-        <p class="lede">Вилка зарплаты и текст оффера. Контакты компании — только после принятия.</p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Приглашения</h1>
+          <p class="lede">Вилка зарплаты и текст оффера. Контакты компании — только после принятия.</p>
+        </div>
       </header>
       <div id="list"><p class="loading">Загрузка…</p></div>
     </main>
@@ -19,7 +23,7 @@
     <script>
       const list = document.getElementById("list");
       async function load() {
-        await HandCheck.candidateNav();
+        list.innerHTML = HandCheck.skeletonBlocks(2);
         const d = await HandCheck.api("/api/candidate/invitations");
           if (!d.items.length) {
             list.innerHTML = HandCheck.emptyState(
@@ -45,9 +49,13 @@
                   : i.status === "accepted"
                     ? `<a class="btn-primary" href="/call/${i.id}">Перейти к звонку</a>`
                     : "";
-              return `<article class="invite-card">
-              <h3>${i.companyName}</h3>
-              <p class="invite-meta"><span class="salary-band">₽${i.salaryFrom.toLocaleString("ru")} – ₽${i.salaryTo.toLocaleString("ru")}</span> · <span class="status-pill ${i.status}">${HandCheck.invitationStatusLabel(i.status)}</span></p>
+              const stCls = HandCheck.invitationStatusClass(i.status);
+              return `<article class="invite-card invite-card-expressive">
+              <div class="invite-card-top">
+                <h3>${i.companyName}</h3>
+                <span class="status-pill ${stCls}">${HandCheck.invitationStatusLabel(i.status)}</span>
+              </div>
+              <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
               <p>${i.offerText}</p>${contacts}${actions}</article>`;
             })
             .join("");
@@ -60,7 +68,7 @@
             };
           });
       }
-      HandCheck.loadPanel(list, load);
+      HandCheck.candidateNav().then(() => load());
     </script>
   </body>
 </html>

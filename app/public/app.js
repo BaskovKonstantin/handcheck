@@ -101,7 +101,10 @@ const CALL_STATUS_LABEL = {
   ended: "Завершён",
 };
 
-const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M8.5 10h2.2v4.1h3.1V10H16v11h-2.2v-4.4h-3.1V21H8.5V10zm9.2 0H20c2.4 0 3.8 1.3 3.8 3.4 0 1.5-.7 2.5-1.9 3l2.1 4.6h-2.5l-1.8-4h-1.5v4h-2.2V10zm2.2 2v2.4h1.1c.8 0 1.2-.4 1.2-1.1s-.4-1.1-1.2-1.1h-1.1z" fill="#fff"/><path d="M23.5 9.2l1.4 1.4-5.2 5.2-2.1-2.1 1.4-1.4 0.7 0.7 3.8-3.8z" fill="#E5F0EA" opacity="0.9"/></svg></span>`;
+const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M8 16.5l4.5 4.5L24 9.5" stroke="#fff" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+
+let cabinetNavMounted = false;
+let cabinetMeEmail = "";
 
 const NAV_ICONS = {
   today: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4V6zm2 2v10h12V8H6zm2 9h2v-2H8v2zm0-4h2v-2H8v2zm4 4h2v-2h-2v2zm0-4h2v-2h-2v2zm4 4h2v-2h-2v2z" fill="currentColor"/></svg>',
@@ -142,7 +145,14 @@ function navLinkHtml(l, compact) {
   return `<a href="${l.href}" class="${cls}">${icon}<span>${l.label}</span></a>`;
 }
 
-function ensureCabinetChrome(links, role) {
+function bindLogout(btn) {
+  btn?.addEventListener("click", async () => {
+    await api("/api/auth/logout", { method: "POST" });
+    window.location.href = "/auth";
+  });
+}
+
+function ensureCabinetChrome(links, role, meEmail) {
   document.body.classList.add("has-cabinet-chrome", `cabinet-${role}`);
   let aside = document.getElementById("cabinet-aside");
   if (!aside) {
@@ -152,7 +162,18 @@ function ensureCabinetChrome(links, role) {
     aside.setAttribute("aria-label", "Разделы кабинета");
     document.body.insertBefore(aside, document.body.querySelector("main"));
   }
-  aside.innerHTML = `<div class="cabinet-aside-inner">${links.map((l) => navLinkHtml(l, false)).join("")}</div>`;
+  const navLinks = links.map((l) => navLinkHtml(l, false)).join("");
+  aside.innerHTML = `
+    <div class="cabinet-aside-brand">
+      <a class="logo cabinet-aside-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
+      <p class="cabinet-aside-tagline">Категория по навыку</p>
+    </div>
+    <div class="cabinet-aside-inner">${navLinks}</div>
+    <div class="cabinet-user-card">
+      <span class="cabinet-email" title="${meEmail}">${meEmail}</span>
+      <button type="button" class="btn-ghost btn-sm" id="logout-btn-aside">Выход</button>
+    </div>`;
+  bindLogout(document.getElementById("logout-btn-aside"));
 
   let tabs = document.getElementById("cabinet-tabs");
   if (!tabs) {
@@ -172,31 +193,30 @@ function ensureCabinetChrome(links, role) {
 async function mountCabinetShell(links, role) {
   const el = document.getElementById("site-header");
   if (!el) return;
-  let me = { email: "" };
-  try {
-    me = await api("/api/me");
-  } catch {
-    window.location.href = "/auth";
-    return;
+  let me = { email: cabinetMeEmail };
+  if (!cabinetNavMounted) {
+    try {
+      me = await api("/api/me");
+      cabinetMeEmail = me.email || "";
+    } catch {
+      window.location.href = "/auth";
+      return;
+    }
   }
-  const nav = links.map((l) => navLinkHtml(l, false)).join("");
   el.innerHTML = `
-    <header class="cabinet-header cabinet-header-v3">
+    <header class="cabinet-header cabinet-header-v3 cabinet-header-r6">
       <div class="cabinet-header-inner">
-        <a class="logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
-        <nav class="cabinet-nav-scroll" aria-label="Кабинет">${nav}</nav>
-        <div class="cabinet-user">
+        <a class="logo cabinet-header-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
+        <div class="cabinet-user cabinet-user-inline">
           <span class="cabinet-email" title="${me.email}">${me.email}</span>
-          <button type="button" class="btn-ghost btn-sm" id="logout-btn">Выход</button>
+          <button type="button" class="btn-ghost btn-sm" id="logout-btn-header">Выход</button>
         </div>
       </div>
       <div class="cabinet-header-glow" aria-hidden="true"></div>
     </header>`;
-  document.getElementById("logout-btn")?.addEventListener("click", async () => {
-    await api("/api/auth/logout", { method: "POST" });
-    window.location.href = "/auth";
-  });
-  ensureCabinetChrome(links, role);
+  bindLogout(document.getElementById("logout-btn-header"));
+  ensureCabinetChrome(links, role, me.email);
+  cabinetNavMounted = true;
 }
 
 const CANDIDATE_LINKS = [
@@ -230,6 +250,35 @@ function setLoading(el, on) {
   if (on) {
     el.innerHTML = '<p class="loading"><span class="loading-dot"></span>Загрузка…</p>';
   }
+}
+
+function skeletonBlocks(count = 3) {
+  return Array.from({ length: count })
+    .map(
+      () =>
+        `<div class="skeleton-card" aria-hidden="true"><div class="skeleton-line skeleton-line-lg"></div><div class="skeleton-line"></div><div class="skeleton-line skeleton-line-sm"></div></div>`
+    )
+    .join("");
+}
+
+function invitationStatusClass(status) {
+  if (status === "accepted") return "accepted";
+  if (status === "declined") return "declined";
+  if (status === "sent" || status === "viewed") return "sent";
+  return "";
+}
+
+function callStatusClass(status) {
+  if (status === "ended") return "ended";
+  if (status === "live") return "live";
+  return "ready";
+}
+
+function formatSalaryRange(from, to) {
+  const f = Number(from);
+  const t = Number(to);
+  if (!Number.isFinite(f) || !Number.isFinite(t)) return "—";
+  return `₽${f.toLocaleString("ru")} – ₽${t.toLocaleString("ru")}`;
 }
 
 const EMPTY_ILLUSTRATION = `<svg class="empty-illus" viewBox="0 0 120 80" aria-hidden="true"><ellipse cx="60" cy="68" rx="48" ry="6" fill="currentColor" opacity="0.08"/><rect x="28" y="18" width="64" height="44" rx="10" fill="currentColor" opacity="0.06" stroke="currentColor" stroke-width="1.5" opacity="0.2"/><path d="M40 32h40M40 42h28" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.25"/></svg>`;
@@ -330,6 +379,7 @@ window.HandCheck = {
   candidateNav,
   employerNav,
   setLoading,
+  skeletonBlocks,
   emptyState,
   emptyStateActions,
   getDeckEmptyState,
@@ -338,6 +388,9 @@ window.HandCheck = {
   toast,
   initials,
   invitationStatusLabel: (s) => INVITATION_STATUS_LABEL[s] || s,
+  invitationStatusClass,
   callStatusLabel: (s) => CALL_STATUS_LABEL[s] || s,
+  callStatusClass,
+  formatSalaryRange,
   LOGO_MARK,
 };

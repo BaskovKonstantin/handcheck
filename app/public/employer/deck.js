@@ -66,7 +66,7 @@ function renderCard(data) {
   const phrases = (data.card.taskPhrases || [])
     .map((t) => `<li>${t}</li>`)
     .join("");
-  const explain = (data.card.explanation || []).join(" ");
+  const explain = (data.card.explanation || []).join(". ");
 
   cardEl.hidden = false;
   cardEl.className = "deck-card enter deck-card-swipe";
@@ -97,6 +97,8 @@ async function loadCard() {
     cardEl.innerHTML = "";
     cardEl.className = "deck-card";
     actions.hidden = true;
+    const roundActions = document.getElementById("deck-actions-round");
+    if (roundActions) roundActions.hidden = true;
     empty.hidden = true;
     setDeckVisible(false);
     let invited = 0;
@@ -117,6 +119,8 @@ async function loadCard() {
   empty.hidden = true;
   setDeckVisible(true);
   actions.hidden = false;
+  const roundActions = document.getElementById("deck-actions-round");
+  if (roundActions) roundActions.hidden = false;
   candidateId = data.candidateId;
   renderCard(data);
 }
@@ -127,6 +131,10 @@ function animateExit(cls) {
   cardEl.classList.add(cls);
   return new Promise((r) => setTimeout(r, 320));
 }
+
+document.getElementById("invite-open-round")?.addEventListener("click", () => {
+  document.getElementById("invite-open")?.click();
+});
 
 document.querySelectorAll("[data-decision]").forEach((btn) => {
   btn.addEventListener("click", async () => {

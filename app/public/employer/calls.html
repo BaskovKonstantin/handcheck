@@ -4,55 +4,112 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Звонки — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <header class="page-header">
-        <h1>Звонки</h1>
-        <p class="lede">После завершения — три фразы внутреннего разбора только для вас.</p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Звонки</h1>
+          <p class="lede">После завершения — три фразы внутреннего разбора только для вас.</p>
+        </div>
       </header>
-      <div id="list"><p class="loading">Загрузка…</p></div>
+      <div id="list"></div>
     </main>
     <script src="/app.js"></script>
     <script>
-      HandCheck.employerNav();
       const list = document.getElementById("list");
-      HandCheck.api("/api/employer/calls")
-        .then(async (d) => {
-          if (!d.items.length) {
-            list.innerHTML = HandCheck.emptyState(
-              "Звонков пока нет",
-              "Примите приглашение кандидатом, чтобы открыть комнату.",
-              "/employer/invitations",
-              "К приглашениям"
-            );
-            return;
-          }
-          const parts = [];
-          for (const c of d.items) {
-            let analysis = "";
-            if (c.callStatus === "ended" && c.callId) {
-              try {
-                const a = await HandCheck.api(`/api/calls/${c.callId}/analysis`);
-                analysis = `<p class="contacts-block">${a.summary_text}</p>`;
-              } catch {
-                analysis = '<p class="invite-meta">Разбор готовится…</p>';
-              }
+
+      function formatTs(iso) {
+        if (!iso) return "—";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "—";
+        return d.toLocaleString("ru-RU", {
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      }
+
+      function shortRef(id) {
+        if (!id) return "";
+        return `#${String(id).replace(/-/g, "").slice(-6).toUpperCase()}`;
+      }
+
+      async function render() {
+        list.innerHTML = HandCheck.skeletonBlocks(3);
+        const d = await HandCheck.api("/api/employer/calls");
+        if (!d.items.length) {
+          list.innerHTML = HandCheck.emptyState(
+            "Звонков пока нет",
+            "Примите приглашение кандидатом, чтобы открыть комнату.",
+            "/employer/invitations",
+            "К приглашениям"
+          );
+          return;
+        }
+        const sorted = [...d.items].sort((a, b) => {
+          const ka = a.endedAt || a.startedAt || a.invitationAt || "";
+          const kb = b.endedAt || b.startedAt || b.invitationAt || "";
+          return kb.localeCompare(ka);
+        });
+        const groups = new Map();
+        for (const c of sorted) {
+          const key = c.candidateName || "—";
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(c);
+        }
+        const analyses = await Promise.all(
+          sorted.map(async (c) => {
+            if (c.callStatus !== "ended" || !c.callId) return { id: c.callId, text: "" };
+            try {
+              const a = await HandCheck.api(`/api/calls/${c.callId}/analysis`);
+              return { id: c.callId, text: a.summary_text };
+            } catch {
+              return { id: c.callId, text: "" };
             }
-            parts.push(`<article class="invite-card">
-              <h3>${c.candidateName}</h3>
-              <p class="invite-meta">${c.needTitle} · ${HandCheck.callStatusLabel(c.callStatus)}</p>
-              <a class="btn-primary" href="${c.roomUrl}">Комната</a>
-              ${analysis}
+          })
+        );
+        const analysisByCall = new Map(analyses.filter((a) => a.id).map((a) => [a.id, a.text]));
+
+        const html = [];
+        for (const [name, calls] of groups.entries()) {
+          const monogram = HandCheck.initials(name);
+          html.push(`<section class="call-group"><h2 class="call-group-title">
+            <span class="avatar-monogram" style="width:2.25rem;height:2.25rem;font-size:0.85rem">${monogram}</span>
+            ${name} <span class="invite-meta">(${calls.length})</span></h2>`);
+          for (const c of calls) {
+            const when = formatTs(c.endedAt || c.startedAt || c.invitationAt);
+            const statusCls = HandCheck.callStatusClass(c.callStatus);
+            const analysis = analysisByCall.get(c.callId);
+            const analysisBlock = analysis
+              ? `<p class="contacts-block">${analysis}</p>`
+              : c.callStatus === "ended"
+                ? '<p class="invite-meta">Разбор готовится…</p>'
+                : "";
+            html.push(`<article class="invite-card call-entry">
+              <div class="call-entry-meta">
+                <span class="status-pill ${statusCls}">${HandCheck.callStatusLabel(c.callStatus)}</span>
+                <span>${when}</span>
+                <span class="call-ref">${shortRef(c.invitationId)}</span>
+              </div>
+              <p class="invite-meta" style="margin-top:0">${c.needTitle}</p>
+              <a class="btn-primary btn-sm" href="${c.roomUrl}">Комната</a>
+              ${analysisBlock}
             </article>`);
           }
-          list.innerHTML = parts.join("");
-        })
-        .catch(() => {
-          list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
-        });
+          html.push("</section>");
+        }
+        list.innerHTML = html.join("");
+      }
+
+      HandCheck.employerNav().then(render).catch(() => {
+        list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
+      });
     </script>
   </body>
 </html>

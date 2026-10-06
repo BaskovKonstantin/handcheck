@@ -111,21 +111,24 @@ router.get("/invitations", (req, res) => {
 router.get("/calls", (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT i.id AS invitation_id, i.candidate_user_id, cp.display_name,
-              c.id AS call_id, c.status AS call_status, n.title AS need_title
+      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, i.candidate_user_id, cp.display_name,
+              c.id AS call_id, c.status AS call_status, c.started_at, c.ended_at, n.title AS need_title
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
        JOIN employer_needs n ON n.id = i.need_id
        LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.employer_user_id = ? AND i.status = 'accepted'
-       ORDER BY i.created_at DESC`
+       ORDER BY COALESCE(c.ended_at, c.started_at, i.created_at) DESC`
     )
     .all(req.user.id);
   res.json({
     items: rows.map((r) => ({
       invitationId: r.invitation_id,
+      invitationAt: r.invitation_at,
       callId: r.call_id,
       callStatus: r.call_status || "ready",
+      startedAt: r.started_at,
+      endedAt: r.ended_at,
       candidateName: r.display_name,
       needTitle: r.need_title,
       roomUrl: `/call/${r.invitation_id}`,

@@ -82,6 +82,23 @@ describe("invitation contacts API", () => {
     assert.ok(erow.candidateContactEmail);
   });
 
+  it("employer calls list includes timestamps for disambiguation", async () => {
+    const cafe = request.agent(app);
+    await cafe.post("/api/auth/login").send({
+      email: "cafe@demo.local",
+      password: "demo-demo-demo",
+    });
+    const res = await cafe.get("/api/employer/calls");
+    assert.equal(res.status, 200);
+    assert.ok(Array.isArray(res.body.items));
+    if (res.body.items.length) {
+      const row = res.body.items[0];
+      assert.ok("invitationAt" in row);
+      assert.ok("invitationId" in row);
+      assert.ok("endedAt" in row || row.endedAt === null);
+    }
+  });
+
   it("returns field error for invalid salary range", async () => {
     const cafe = request.agent(app);
     await cafe.post("/api/auth/login").send({

@@ -191,7 +191,11 @@ describe("round27 findings", () => {
       email: "cafe@demo.local",
       password: "demo-demo-demo",
     });
-    const webm = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x02, 0x03, 0x04]);
+    const webm = Buffer.alloc(5200, 0xab);
+    webm[0] = 0x1a;
+    webm[1] = 0x45;
+    webm[2] = 0xdf;
+    webm[3] = 0xa3;
     const up = await cafeAgent
       .post(`/api/calls/${callId}/recording`)
       .attach("file", webm, { filename: "employer.webm", contentType: "video/webm" });

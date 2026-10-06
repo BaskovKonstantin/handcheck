@@ -49,7 +49,11 @@ describe("round28 findings", () => {
   it("P0-2: codec-suffixed WebM mimetype is accepted", async () => {
     const { assertWebmUpload, normalizeWebmMime } = require("../app/lib/webm");
     assert.equal(normalizeWebmMime("video/webm;codecs=vp9,opus"), "video/webm");
-    const webm = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x01]);
+    const webm = Buffer.alloc(5200, 0xab);
+    webm[0] = 0x1a;
+    webm[1] = 0x45;
+    webm[2] = 0xdf;
+    webm[3] = 0xa3;
     assert.ok(
       assertWebmUpload({
         buffer: webm,

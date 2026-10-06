@@ -1,24 +1,12 @@
 # HandCheck session notes
 
-## Round 27 fixes (branch cursor/round27-findings-9bcf)
+## Round 33 fixes (branch cursor/round33-findings-f12b)
 
-- Call room: `call-room-webrtc.js` — WebRTC over `/ws/calls/:callId`, MediaRecorder upload, Web Speech transcript chunks, honest recording labels, camera before `/start`, end propagation via WS + polling + `broadcastCallEnded`.
-- P1 end flow: redirect to ended `/call/:id`, RU errors on `/end` failure.
-- Need titles: collapse whitespace, ё→е in `normalizeNeedTitle`.
-- JSON 404 for unknown `/api/*` and candidate sub-router fallthrough.
-- MCP employer `list_invitations` / `list_calls` parity with REST.
-- Audit log client label via `formatClientDescriptor` (em dash).
-- Candidate calls: auto-expand ended section when no active calls.
-- Mobile stat tiles: 3-up compact for today + employer invitations.
-
-## Round 31 fixes (branch cursor/round31-findings-b461)
-
-- WebRTC: HELLO renegotiation, connectionState-gated UI, chunk recording upload, /end before upload, fix-webm duration.
-- Assessment: explicit question open, 60s server enforcement, typing vs paste telemetry allowlist, 152-FZ notices.
-- MCP/REST call parity, candidate recording access fix, layout polish.
-
-## Round 28 fixes (branch cursor/round28-webrtc-fixes-5553)
-
-- Signaling: relay WS messages as UTF-8 text (fixes Blob JSON.parse in browsers); reject ended calls; replace duplicate tab per user.
-- Recording: WebM mimetype with codecs; capped MediaRecorder bitrate for 60 min / 80 MB; upload errors surfaced in RU.
-- Call room: waiting state until both consented + live; «Выйти» without 409; transcript `{ text, at }` + SR restart; hero «Звонок: …»; layout 1280/390; ended view missing-recording note.
+- **P0-1 recordings:** removed keepalive on large chunk/final uploads; continuation WebM chunks accepted; no minimalWebm stub; merge strips duplicate EBML; playable-only `hasRecording` / `recordingSides` (≥4 KB); upload before `/end` to avoid race with broadcast ENDED.
+- **P1-1 timeout UI:** direct timeout submit (not disabled `.click()`); reload auto-submit when deadline passed; empty submit after 60s server timeout path.
+- **P1-2:** PATCH draft rejected after quick/work deadline.
+- **P1-3:** `bootPublicPage` for `/privacy`; no auth redirect when role is null; links on landing/auth.
+- **P1-4:** transactional battery start returns existing open battery.
+- **P1-5:** WebRTC signalingState guards + ignore duplicate ENDED.
+- **P1-6:** login wait timeouts increased in cabinet browser tests.
+- **P2:** typing batches / excludes paste chars; mobile test layout; lowercase ended pill; sidebar full-height background; test completion after last answer; honest recording upload label.

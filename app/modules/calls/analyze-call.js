@@ -1,17 +1,12 @@
 "use strict";
 
-const fs = require("fs");
-const path = require("path");
 const { getDb } = require("../../db");
 const { buildCallAnalysisSummary } = require("../../lib/call-analysis-summary");
 
+const { hasAnyPlayableRecording } = require("../../lib/call-recording");
+
 function hasRecordingFile(call) {
-  const dir = call.recording_path;
-  if (!dir) return false;
-  return (
-    fs.existsSync(path.join(dir, "employer.webm")) ||
-    fs.existsSync(path.join(dir, "candidate.webm"))
-  );
+  return hasAnyPlayableRecording(call.recording_path);
 }
 
 function analyzeCall(callId) {

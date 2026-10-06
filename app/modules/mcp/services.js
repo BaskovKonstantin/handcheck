@@ -25,6 +25,7 @@ const { validateNeedBody, employerNeedTitleTaken } = require("../../lib/need-val
 const { validateAnswerText } = require("../../lib/assessment-answer");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { publicCandidateDisplayName, sanitizeStoredDisplayName } = require("../../lib/public-candidate-name");
+const { listPlayableRecordingSides } = require("../../lib/call-recording");
 
 function mcpError(message, code = "invalid_request") {
   const err = new Error(message);
@@ -324,14 +325,7 @@ function respondInvitation(userId, invitationId, decision) {
 }
 
 function callRecordingSidesFromPath(recordingPath) {
-  if (!recordingPath) return [];
-  const fs = require("fs");
-  const path = require("path");
-  const sides = [];
-  for (const side of ["candidate", "employer"]) {
-    if (fs.existsSync(path.join(recordingPath, `${side}.webm`))) sides.push(side);
-  }
-  return sides;
+  return listPlayableRecordingSides(recordingPath);
 }
 
 function listCandidateCalls(userId) {

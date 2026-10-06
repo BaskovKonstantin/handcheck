@@ -1927,6 +1927,10 @@ body.has-cabinet-chrome main {
   border-color: transparent;
 }
 
+.status-pill.ended:not(.status-pill-asis) {
+  text-transform: lowercase;
+}
+
 .status-pill.ended {
   background: var(--forest-soft);
   color: var(--forest);
@@ -2601,18 +2605,26 @@ body.deck-page main.column {
 @media (max-width: 480px) {
   .battery-steps {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.35rem;
-    max-height: 4.5rem;
-    overflow: hidden;
-  }
-
-  .battery-step-label {
-    display: none;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+    scroll-snap-type: x proximity;
   }
 
   .battery-step {
-    padding: 0.2rem 0.35rem;
+    flex: 0 0 auto;
+    min-width: 2.4rem;
+    padding: 0.25rem 0.4rem;
+    scroll-snap-align: center;
+  }
+
+  .battery-step-label {
+    font-size: 0.6rem;
+  }
+
+  body.has-cabinet-chrome .cabinet-content #panel {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -2992,8 +3004,17 @@ body.has-cabinet-chrome {
 }
 
 @media (min-width: 900px) {
+  body.has-cabinet-chrome {
+    background: linear-gradient(
+      90deg,
+      var(--card) 15rem,
+      var(--paper) 15rem
+    );
+  }
+
   .cabinet-aside {
     min-height: 100vh;
+    height: 100%;
   }
 }
 

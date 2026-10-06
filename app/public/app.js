@@ -570,8 +570,31 @@ async function refreshCabinetMeEmail(expectedRole) {
     setCachedMeEmail(cabinetMeEmail);
     updateCabinetEmails(cabinetMeEmail);
   } catch {
-    window.location.href = "/auth";
+    if (expectedRole) {
+      window.location.href = "/auth";
+    }
   }
+}
+
+function bootPublicPage(loadFn) {
+  const el = document.getElementById("site-header");
+  if (el) {
+    paintCabinetHeader(el, "");
+    el.innerHTML = `<div class="site-header site-header-landing cabinet-header-v3">
+      <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>HandCheck</a>
+      <nav class="site-header-nav">
+        <a href="/auth">Войти</a>
+        <a class="btn-primary" href="/auth">Начать</a>
+      </nav>
+    </div>`;
+  }
+  try {
+    const result = loadFn?.();
+    if (result && typeof result.then === "function") result.catch(() => {});
+  } catch {
+    /* ignore */
+  }
+  void refreshCabinetMeEmail(null);
 }
 
 async function mountCabinetShell(links, role) {
@@ -850,6 +873,7 @@ window.HandCheck = {
   candidateNav,
   employerNav,
   bootCabinetPage,
+  bootPublicPage,
   nextCabinetPageLoad,
   isStaleCabinetPageLoad,
   setLoading,

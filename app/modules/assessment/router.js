@@ -21,6 +21,7 @@ const {
   assertAttemptOpened,
   deadlineAtIso,
   getCurrentAttemptId,
+  isPastDeadline,
 } = require("../../lib/assessment-timing");
 const { recordDraftTelemetry } = require("../../lib/assessment-telemetry");
 const { submitAttemptAnswer } = require("../../lib/assessment-submit");
@@ -66,10 +67,56 @@ router.post("/battery/start", (req, res, next) => {
         retakeAt: retake.toISOString(),
       });
     }
-    const formKey = Math.random() < 0.5 ? "A" : "B";
-    const { quick, work } = getPublishedBatteryTasks(specialization, grade, formKey);
-    try {
+    const startBattery = db.transaction(() => {
+      const existingOpen = db
+        .prepare(
+          `SELECT id, form_key FROM batteries WHERE candidate_user_id = ? AND specialization = ? AND completed_at IS NULL ORDER BY started_at DESC LIMIT 1`
+        )
+        .get(req.user.id, specialization);
+      if (existingOpen) {
+        const attempts = db
+          .prepare(`SELECT COUNT(*) AS c FROM attempts WHERE battery_id = ?`)
+          .get(existingOpen.id).c;
+        return {
+          existing: true,
+          batteryId: existingOpen.id,
+          formKey: existingOpen.form_key,
+          taskCount: attempts,
+        };
+      }
+      const formKey = Math.random() < 0.5 ? "A" : "B";
+      const { quick, work } = getPublishedBatteryTasks(specialization, grade, formKey);
       assertBatteryComplete(quick, work);
+      const batteryId = newId();
+      const now = new Date().toISOString();
+      db.prepare(
+        `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at, assessment_consent_at, privacy_policy_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        batteryId,
+        req.user.id,
+        specialization,
+        grade,
+        formKey,
+        now,
+        now,
+        PRIVACY_POLICY_VERSION
+      );
+      recordDataConsent(db, req.user.id, "assessment", { batteryId });
+      const ins = db.prepare(
+        `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, opened_at)
+         VALUES (?, ?, ?, ?, ?, NULL)`
+      );
+      const order = [...quick, work];
+      for (const t of order) {
+        const attemptId = newId();
+        ins.run(attemptId, req.user.id, t.id, batteryId, formKey);
+      }
+      return { existing: false, batteryId, formKey, taskCount: order.length };
+    });
+    let created;
+    try {
+      created = startBattery();
     } catch (e) {
       if (e.code === "battery_incomplete") {
         throw httpError(409, "battery_incomplete", {
@@ -78,32 +125,19 @@ router.post("/battery/start", (req, res, next) => {
       }
       throw e;
     }
-    const batteryId = newId();
-    const now = new Date().toISOString();
-    db.prepare(
-      `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at, assessment_consent_at, privacy_policy_version)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      batteryId,
-      req.user.id,
-      specialization,
-      grade,
-      formKey,
-      now,
-      now,
-      PRIVACY_POLICY_VERSION
-    );
-    recordDataConsent(getDb(), req.user.id, "assessment", { batteryId });
-    const ins = db.prepare(
-      `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, opened_at)
-       VALUES (?, ?, ?, ?, ?, NULL)`
-    );
-    const order = [...quick, work];
-    for (const t of order) {
-      const attemptId = newId();
-      ins.run(attemptId, req.user.id, t.id, batteryId, formKey);
+    if (created.existing) {
+      return res.status(200).json({
+        batteryId: created.batteryId,
+        formKey: created.formKey,
+        taskCount: created.taskCount,
+        existing: true,
+      });
     }
-    res.status(201).json({ batteryId, formKey, taskCount: order.length });
+    res.status(201).json({
+      batteryId: created.batteryId,
+      formKey: created.formKey,
+      taskCount: created.taskCount,
+    });
   } catch (e) {
     next(e);
   }
@@ -213,6 +247,23 @@ router.patch("/tasks/:attemptId/draft", (req, res, next) => {
       return next(httpError(409, "task_not_opened", { message: e.details?.message }));
     }
     return next(e);
+  }
+  const openedRow = db
+    .prepare(`SELECT opened_at FROM attempts WHERE id = ?`)
+    .get(a.id);
+  if (a.type === "quick" && isPastDeadline(openedRow?.opened_at, "quick")) {
+    return next(
+      httpError(409, "deadline_passed", {
+        message: "Время на ответ истекло — черновик не обновлён.",
+      })
+    );
+  }
+  if (a.type === "work" && isPastDeadline(openedRow?.opened_at, "work")) {
+    return next(
+      httpError(409, "deadline_passed", {
+        message: "Срок на мини-проект истёк — черновик не обновлён.",
+      })
+    );
   }
   const parsed = validateAnswerText(req.body?.answerText, a.type);
   if (!parsed.ok && parsed.fields.answerText?.includes("длинный")) {

@@ -22,8 +22,20 @@ router.use(requireAuth, requireConfirmedEmail);
 
 const RECORDING_LIMIT = 80 * 1024 * 1024;
 const RECORDING_GRACE_MS = 45 * 1000;
-const { assertWebmUpload } = require("../../lib/webm");
-const { appendChunk, writeFinalRecording, callDir } = require("../../lib/recording-store");
+const RECORDING_CHUNK_SIDE_LIMIT = RECORDING_LIMIT;
+const { assertWebmUpload, assertRecordingChunkUpload } = require("../../lib/webm");
+const {
+  appendChunk,
+  writeFinalRecording,
+  callDir,
+  listChunkFiles,
+  totalChunkBytes,
+} = require("../../lib/recording-store");
+const {
+  listPlayableRecordingSides,
+  isPlayableRecordingFile,
+  recordingFilePath,
+} = require("../../lib/call-recording");
 const { recordDataConsent, PRIVACY_POLICY_VERSION, privacyNoticeShort } = require("../../lib/privacy-policy");
 
 router.param("id", (req, res, next, id) => {
@@ -59,14 +71,7 @@ function getInvitationAccess(userId, invitationId) {
 }
 
 function callRecordingSides(call) {
-  const root = call?.recording_path;
-  if (!root) return [];
-  const sides = [];
-  for (const side of ["candidate", "employer"]) {
-    const filePath = path.join(root, `${side}.webm`);
-    if (fs.existsSync(filePath)) sides.push(side);
-  }
-  return sides;
+  return listPlayableRecordingSides(call?.recording_path);
 }
 
 function callDurationLabel(startedAt, endedAt) {
@@ -231,11 +236,10 @@ router.post(
   (req, res, next) => {
     const callId = req.params.id;
     if (!req.file?.buffer) return next(httpError(400, "file_required"));
-    if (!assertWebmUpload(req.file)) {
-      return next(httpError(400, "invalid_recording"));
-    }
     const db = getDb();
-    const call = db.prepare("SELECT id, invitation_id, status FROM calls WHERE id = ?").get(callId);
+    const call = db
+      .prepare("SELECT id, invitation_id, status, ended_at FROM calls WHERE id = ?")
+      .get(callId);
     if (!call) return next(httpError(404, "not_found"));
     const inv = db.prepare("SELECT candidate_user_id, employer_user_id FROM invitations WHERE id = ?").get(
       call.invitation_id
@@ -243,15 +247,32 @@ router.post(
     if (!inv || ![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
       return next(httpError(403, "forbidden"));
     }
-    if (call.status !== "live" && call.status !== "ended") {
-      return next(httpError(409, "call_not_live"));
-    }
     const side =
       req.user.id === inv.candidate_user_id
         ? "candidate"
         : req.user.id === inv.employer_user_id
           ? "employer"
           : null;
+    const hasChunks = listChunkFiles(callId, side).length > 0;
+    if (!assertRecordingChunkUpload(req.file, hasChunks)) {
+      return next(httpError(400, "invalid_recording"));
+    }
+    if (call.status === "ended") {
+      const endedAt = call.ended_at ? new Date(call.ended_at).getTime() : 0;
+      if (Date.now() - endedAt > RECORDING_GRACE_MS) {
+        return next(httpError(409, "call_ended", { message: "Звонок уже завершён" }));
+      }
+    } else if (call.status !== "live") {
+      return next(httpError(409, "call_not_live"));
+    }
+    const projected = totalChunkBytes(callId, side) + req.file.buffer.length;
+    if (projected > RECORDING_CHUNK_SIDE_LIMIT) {
+      return next(
+        httpError(413, "file_too_large", {
+          message: "Суммарный размер фрагментов записи превышает лимит 80 МБ",
+        })
+      );
+    }
     try {
       appendChunk(callId, side, req.file.buffer);
       const dir = callDir(callId);
@@ -285,15 +306,19 @@ router.post(
         ? "employer"
         : null;
   if (!side) return next(httpError(403, "forbidden"));
-  const chunkSideDir = path.join(callDir(callId), "chunks", side);
-  const hasChunks = fs.existsSync(chunkSideDir) && fs.readdirSync(chunkSideDir).length > 0;
+  const chunkFiles = listChunkFiles(callId, side);
+  const hasChunks = chunkFiles.length > 0;
   if (!req.file?.buffer?.length && !hasChunks) return next(httpError(400, "file_required"));
-  if (req.file?.buffer?.length && !assertWebmUpload(req.file)) {
-    return next(
-      httpError(400, "invalid_recording", {
-        fields: { file: "Нужен файл записи в формате WebM" },
-      })
-    );
+  if (req.file?.buffer?.length) {
+    const tailOk =
+      assertWebmUpload(req.file) || (hasChunks && assertRecordingChunkUpload(req.file, true));
+    if (!tailOk) {
+      return next(
+        httpError(400, "invalid_recording", {
+          fields: { file: "Нужен файл записи в формате WebM" },
+        })
+      );
+    }
   }
   if (call.status === "ended") {
     const endedAt = call.ended_at ? new Date(call.ended_at).getTime() : 0;
@@ -317,7 +342,19 @@ router.post(
   }
   const durationMs = Number(req.body?.durationMs || req.body?.duration_ms || 0);
   try {
-    writeFinalRecording(callId, side, req.file?.buffer || Buffer.alloc(0), durationMs);
+    const written = writeFinalRecording(
+      callId,
+      side,
+      req.file?.buffer || Buffer.alloc(0),
+      durationMs
+    );
+    if (!written && !listPlayableRecordingSides(dir).length) {
+      return next(
+        httpError(400, "invalid_recording", {
+          message: "Запись слишком короткая или повреждена",
+        })
+      );
+    }
   } catch {
     return next(httpError(400, "invalid_path"));
   }
@@ -395,8 +432,8 @@ router.get("/:id/recording", (req, res, next) => {
   if (req.user.id === inv.candidate_user_id && side !== "candidate") {
     return next(httpError(403, "forbidden"));
   }
-  const filePath = path.join(call.recording_path || "", `${side}.webm`);
-  if (!fs.existsSync(filePath)) return next(httpError(404, "not_found"));
+  const filePath = recordingFilePath(call.recording_path, side);
+  if (!isPlayableRecordingFile(filePath)) return next(httpError(404, "not_found"));
   res.sendFile(filePath);
 });
 

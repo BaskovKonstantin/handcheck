@@ -276,11 +276,22 @@
           telemetryQueue.push({ attemptId, event_type, payload });
           if (telemetryQueue.length >= 4) postTelemetry(telemetryQueue.splice(0));
         };
+        let pendingPasteChars = 0;
         ta.addEventListener("paste", (ev) => {
           const clip = ev.clipboardData?.getData("text") || "";
-          enqueueEvent("paste", { length: clip.length, chars: clip.length });
+          const chars = clip.length;
+          pendingPasteChars += chars;
+          enqueueEvent("paste", { length: chars, chars });
         });
         let typedChars = 0;
+        let typingPending = 0;
+        let typingFlushTimer = null;
+        const flushTyping = () => {
+          if (typingPending <= 0) return;
+          const batch = typingPending;
+          typingPending = 0;
+          enqueueEvent("typing", { chars: batch });
+        };
         ta.addEventListener("input", () => {
           const len = ta.value.length;
           if (!firstInputSent && len > 0) {
@@ -288,9 +299,18 @@
             enqueueEvent("first_input", { length: len });
           }
           if (len > typedChars) {
-            const delta = len - typedChars;
+            let delta = len - typedChars;
             typedChars = len;
-            enqueueEvent("typing", { chars: delta });
+            if (pendingPasteChars > 0) {
+              const fromPaste = Math.min(delta, pendingPasteChars);
+              pendingPasteChars -= fromPaste;
+              delta -= fromPaste;
+            }
+            if (delta > 0) {
+              typingPending += delta;
+              clearTimeout(typingFlushTimer);
+              typingFlushTimer = setTimeout(flushTyping, 2000);
+            }
           }
         });
         ta.addEventListener("focus", () => enqueueEvent("focus", null));
@@ -299,20 +319,79 @@
         const deadlineMs = t.deadlineAt ? new Date(t.deadlineAt).getTime() : null;
         const timerVal = document.getElementById("timer-val");
         let tickTimer = null;
+        const submitBtn = document.getElementById("submit");
+        const errEl = document.getElementById("err");
+        const submitAnswer = async (fromTimeout = false) => {
+          if (submitting) return;
+          errEl.hidden = true;
+          const attemptsLeft = attempts.filter((a) => !a.submitted).length;
+          if (!fromTimeout && attemptsLeft === 1) {
+            const ok = window.confirm("Это последний ответ в тесте. Отправить и завершить тест?");
+            if (!ok) return;
+          }
+          submitting = true;
+          if (draftTimer) clearInterval(draftTimer);
+          if (tickTimer) clearInterval(tickTimer);
+          clearTimeout(typingFlushTimer);
+          flushTyping();
+          ta.readOnly = true;
+          submitBtn.disabled = true;
+          await postTelemetry(telemetryQueue.splice(0));
+          try {
+            await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
+              method: "POST",
+              body: JSON.stringify({ answerText: ta.value }),
+            });
+            localStorage.removeItem(draftKey);
+            if (attemptsLeft === 1) {
+              const cat = await HandCheck.api("/api/candidate/category").catch(() => ({ label: null }));
+              panel.innerHTML =
+                batteryStepIndicator(QUICK_COUNT + 1) +
+                HandCheck.emptyState(
+                  "Тест завершён",
+                  cat.label
+                    ? `Ваша категория: ${cat.label}. Обновление на экране «Сегодня».`
+                    : "Категория обновится на экране «Сегодня».",
+                  "/candidate/today",
+                  "Открыть сегодня"
+                );
+              return;
+            }
+            await init();
+          } catch (e) {
+            if (e.data?.error === "quick_time_expired") {
+              errEl.hidden = false;
+              errEl.textContent = HandCheck.formatApiError(e);
+              errEl.classList.add("timeout-notice");
+              localStorage.removeItem(draftKey);
+              setTimeout(() => init(), 1200);
+              return;
+            }
+            errEl.hidden = false;
+            errEl.textContent = HandCheck.formatApiError(e);
+            submitting = false;
+            if (!fromTimeout) {
+              ta.readOnly = false;
+              submitBtn.disabled = false;
+            }
+          }
+        };
+        submitBtn.onclick = () => submitAnswer(false);
         const syncDeadlineUi = () => {
           if (!deadlineMs) return;
           const left = deadlineMs - Date.now();
           timerVal.textContent = formatCountdown(left);
           if (t.type === "quick" && left <= 0 && !submitting) {
-            submitting = true;
-            document.getElementById("submit").disabled = true;
-            ta.readOnly = true;
-            document.getElementById("submit").click();
+            void submitAnswer(true);
           }
         };
         if (deadlineMs) {
           syncDeadlineUi();
-          tickTimer = setInterval(syncDeadlineUi, 250);
+          if (t.type === "quick" && deadlineMs <= Date.now()) {
+            void submitAnswer(true);
+          } else {
+            tickTimer = setInterval(syncDeadlineUi, 250);
+          }
         }
         const persistDraft = async () => {
           if (submitting) return;
@@ -336,40 +415,6 @@
             persistDraft();
           }, 10000);
         }
-        document.getElementById("submit").onclick = async () => {
-          const err = document.getElementById("err");
-          err.hidden = true;
-          const attemptsLeft = attempts.filter((a) => !a.submitted).length;
-          if (attemptsLeft === 1) {
-            const ok = window.confirm("Это последний ответ в тесте. Отправить и завершить тест?");
-            if (!ok) return;
-          }
-          submitting = true;
-          if (draftTimer) clearInterval(draftTimer);
-          if (tickTimer) clearInterval(tickTimer);
-          await postTelemetry(telemetryQueue.splice(0));
-          try {
-            await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
-              method: "POST",
-              body: JSON.stringify({ answerText: ta.value }),
-            });
-            localStorage.removeItem(draftKey);
-            await init();
-          } catch (e) {
-            if (e.data?.error === "quick_time_expired") {
-              err.hidden = false;
-              err.textContent = HandCheck.formatApiError(e);
-              err.classList.add("timeout-notice");
-              localStorage.removeItem(draftKey);
-              setTimeout(() => init(), 1200);
-              return;
-            }
-            err.hidden = false;
-            err.textContent = HandCheck.formatApiError(e);
-          } finally {
-            submitting = false;
-          }
-        };
       }
 
       HandCheck.bootCabinetPage("candidate", () =>

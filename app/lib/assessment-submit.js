@@ -8,6 +8,7 @@ const {
   isPastDeadline,
   assertCurrentAttempt,
   assertAttemptOpened,
+  QUICK_DEADLINE_MS,
 } = require("./assessment-timing");
 const { recordDraftTelemetry } = require("./assessment-telemetry");
 
@@ -31,12 +32,19 @@ function submitAttemptAnswer(db, userId, attemptRow, answerText, meta = {}) {
     throw err;
   }
 
+  const incomingTrim = String(answerText ?? "").trim();
+  const quickWindowClosed =
+    refreshed.type === "quick" &&
+    refreshed.opened_at &&
+    Date.now() > new Date(refreshed.opened_at).getTime() + QUICK_DEADLINE_MS;
   const quickExpired =
-    refreshed.type === "quick" && isPastDeadline(refreshed.opened_at, "quick");
+    refreshed.type === "quick" &&
+    (isPastDeadline(refreshed.opened_at, "quick") || (quickWindowClosed && !incomingTrim));
   const workExpired =
     refreshed.type === "work" && isPastDeadline(refreshed.opened_at, "work");
 
   const incoming = String(answerText ?? "");
+  // incomingTrim computed above for quickExpired empty-at-deadline
   const draftBefore = String(refreshed.answer_text || "");
   const scoredText = quickExpired ? draftBefore : incoming;
   const lateExtra =

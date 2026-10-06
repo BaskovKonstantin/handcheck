@@ -8,6 +8,7 @@ const { createInvitation } = require("./actions");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { httpError } = require("../../middleware/errors");
 const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
+const { hasAnyPlayableRecording } = require("../../lib/call-recording");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -103,7 +104,7 @@ router.get("/calls", (req, res) => {
       needTitle: r.need_title,
       salaryFrom: r.salary_from,
       salaryTo: r.salary_to,
-      hasRecording: Boolean(r.recording_path),
+      hasRecording: hasAnyPlayableRecording(r.recording_path),
       roomUrl: `/call/${r.invitation_id}`,
       analysisUrl: r.call_id ? `/api/calls/${r.call_id}/analysis` : null,
     })),

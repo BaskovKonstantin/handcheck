@@ -92,8 +92,7 @@ document.getElementById("invite-send").onclick = async () => {
     await loadCard();
   } catch (e) {
     err.hidden = false;
-    err.textContent =
-      e.status === 400 ? "Проверьте вилку и поля" : "Не удалось отправить приглашение";
+    err.textContent = HandCheck.formatApiError(e);
   }
 };
 

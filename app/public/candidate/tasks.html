@@ -8,49 +8,106 @@
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Батарея</h1>
-      <div class="panel">
-        <button class="btn-primary" id="start">Начать backend × middle</button>
-        <div id="task" hidden></div>
-        <textarea id="answer" rows="6" hidden></textarea>
-        <button class="btn-ghost" id="submit" hidden>Отправить</button>
-      </div>
+      <header class="page-header">
+        <h1>Батарея заданий</h1>
+        <p class="lede">4 коротких ответа и одна рабочая задача. Результат — категория, не балл.</p>
+      </header>
+      <div id="panel" class="panel"><p class="loading">Загрузка…</p></div>
     </main>
     <script src="/app.js"></script>
     <script>
       HandCheck.candidateNav();
+      const panel = document.getElementById("panel");
       let attemptId = null;
-      document.getElementById("start").onclick = async () => {
-        await HandCheck.api("/api/assessment/battery/start", {
-          method: "POST",
-          body: JSON.stringify({ specialization: "backend", grade: "middle" }),
-        });
+
+      async function init() {
         const cur = await HandCheck.api("/api/assessment/battery/current");
-        attemptId = cur.battery.attempts.find((a) => !a.submitted)?.id;
-        document.getElementById("task").hidden = false;
-        document.getElementById("answer").hidden = false;
-        document.getElementById("submit").hidden = false;
+        if (!cur.battery) {
+          panel.innerHTML = `
+            <p class="invite-meta">Выберите специализацию и грейд для новой попытки.</p>
+            <label>Специализация <select id="spec"><option value="backend">backend</option><option value="frontend">frontend</option><option value="qa">qa</option></select></label>
+            <label>Грейд <select id="grade"><option value="middle">middle</option><option value="junior">junior</option><option value="senior">senior</option></select></label>
+            <button class="btn-primary" id="start">Начать батарею</button>
+            <p class="field-error" id="err" hidden></p>`;
+          document.getElementById("start").onclick = async () => {
+            const err = document.getElementById("err");
+            err.hidden = true;
+            try {
+              await HandCheck.api("/api/assessment/battery/start", {
+                method: "POST",
+                body: JSON.stringify({
+                  specialization: document.getElementById("spec").value,
+                  grade: document.getElementById("grade").value,
+                }),
+              });
+              await init();
+            } catch (e) {
+              err.hidden = false;
+              err.textContent =
+                e.status === 409 ? "Пересдача этой специализации пока недоступна (cooldown)." : HandCheck.formatApiError(e);
+            }
+          };
+          return;
+        }
+        const next = cur.battery.attempts.find((a) => !a.submitted);
+        if (!next) {
+          panel.innerHTML = HandCheck.emptyState(
+            "Батарея завершена",
+            "Категория обновится на экране «Сегодня».",
+            "/candidate/today",
+            "Открыть сегодня"
+          );
+          return;
+        }
+        attemptId = next.id;
         const t = await HandCheck.api(`/api/assessment/tasks/${attemptId}`);
-        document.getElementById("task").textContent = t.prompt;
-      };
-      const draftKey = () => (attemptId ? `handcheck:draft:v1:${attemptId}` : null);
-      document.getElementById("answer").addEventListener("blur", async () => {
-        const text = document.getElementById("answer").value;
-        if (!attemptId) return;
-        localStorage.setItem(draftKey(), JSON.stringify({ text, at: Date.now() }));
-        await HandCheck.api(`/api/assessment/tasks/${attemptId}/draft`, {
-          method: "PATCH",
-          body: JSON.stringify({ answerText: text }),
+        const draftKey = `handcheck:draft:v1:${attemptId}`;
+        const saved = localStorage.getItem(draftKey);
+        let restored = "";
+        if (saved) {
+          try {
+            const p = JSON.parse(saved);
+            restored = p.text || "";
+          } catch {
+            restored = "";
+          }
+        }
+        panel.innerHTML = `
+          <p class="invite-meta">${cur.battery.specialization} · ${cur.battery.claimedGrade} · форма ${cur.battery.formKey}</p>
+          <p>${t.prompt}</p>
+          <textarea id="answer" rows="8">${restored}</textarea>
+          <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
+          <button class="btn-primary" id="submit">Отправить ответ</button>
+          <p class="field-error" id="err" hidden></p>`;
+        if (restored) document.getElementById("draft-note").hidden = false;
+        const ta = document.getElementById("answer");
+        ta.addEventListener("blur", async () => {
+          const text = ta.value;
+          localStorage.setItem(draftKey, JSON.stringify({ text, at: Date.now() }));
+          await HandCheck.api(`/api/assessment/tasks/${attemptId}/draft`, {
+            method: "PATCH",
+            body: JSON.stringify({ answerText: text }),
+          });
         });
+        document.getElementById("submit").onclick = async () => {
+          const err = document.getElementById("err");
+          err.hidden = true;
+          try {
+            await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
+              method: "POST",
+              body: JSON.stringify({ answerText: ta.value }),
+            });
+            localStorage.removeItem(draftKey);
+            await init();
+          } catch (e) {
+            err.hidden = false;
+            err.textContent = HandCheck.formatApiError(e);
+          }
+        };
+      }
+      init().catch(() => {
+        panel.innerHTML = HandCheck.emptyState("Ошибка", "Войдите как кандидат.", "/auth", "Войти");
       });
-      document.getElementById("submit").onclick = async () => {
-        const text = document.getElementById("answer").value;
-        await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
-          method: "POST",
-          body: JSON.stringify({ answerText: text }),
-        });
-        location.reload();
-      };
     </script>
   </body>
 </html>

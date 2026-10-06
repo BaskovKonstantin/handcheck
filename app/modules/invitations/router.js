@@ -73,18 +73,55 @@ router.post("/invitations", (req, res, next) => {
 router.get("/invitations", (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT i.*, cp.display_name FROM invitations i
+      `SELECT i.*, cp.display_name, cp.phone, cp.contact_email
+       FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
        WHERE i.employer_user_id = ? ORDER BY i.created_at DESC`
     )
     .all(req.user.id);
   res.json({
+    items: rows.map((r) => {
+      const item = {
+        id: r.id,
+        candidateId: r.candidate_user_id,
+        candidateName: r.display_name,
+        salaryFrom: r.salary_from,
+        salaryTo: r.salary_to,
+        status: r.status,
+        offerText: r.offer_text,
+        contactChannel: r.contact_channel,
+      };
+      if (r.status === "accepted") {
+        item.candidatePhone = r.phone;
+        item.candidateContactEmail = r.contact_email;
+      }
+      return item;
+    }),
+  });
+});
+
+router.get("/calls", (req, res) => {
+  const rows = getDb()
+    .prepare(
+      `SELECT i.id AS invitation_id, i.candidate_user_id, cp.display_name,
+              c.id AS call_id, c.status AS call_status, n.title AS need_title
+       FROM invitations i
+       JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       JOIN employer_needs n ON n.id = i.need_id
+       LEFT JOIN calls c ON c.invitation_id = i.id
+       WHERE i.employer_user_id = ? AND i.status = 'accepted'
+       ORDER BY i.created_at DESC`
+    )
+    .all(req.user.id);
+  res.json({
     items: rows.map((r) => ({
-      id: r.id,
+      invitationId: r.invitation_id,
+      callId: r.call_id,
+      callStatus: r.call_status || "ready",
       candidateName: r.display_name,
-      salaryFrom: r.salary_from,
-      salaryTo: r.salary_to,
-      status: r.status,
+      needTitle: r.need_title,
+      roomUrl: `/call/${r.invitation_id}`,
+      analysisUrl: r.call_id ? `/api/calls/${r.call_id}/analysis` : null,
     })),
   });
 });

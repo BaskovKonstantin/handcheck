@@ -8,10 +8,37 @@
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Звонки</h1>
-      <p class="empty">Список звонков по принятым приглашениям — без разбора и транскрипта.</p>
+      <header class="page-header">
+        <h1>Звонки</h1>
+        <p class="lede">Только принятые приглашения. Разбор звонка кандидату не показывается.</p>
+      </header>
+      <div id="list"><p class="loading">Загрузка…</p></div>
     </main>
     <script src="/app.js"></script>
-    <script>HandCheck.candidateNav();</script>
+    <script>
+      HandCheck.candidateNav();
+      const list = document.getElementById("list");
+      HandCheck.api("/api/candidate/calls")
+        .then((d) => {
+          if (!d.items.length) {
+            list.innerHTML = HandCheck.emptyState(
+              "Звонков пока нет",
+              "Примите приглашение — здесь появится ссылка на комнату.",
+              "/candidate/invitations",
+              "К приглашениям"
+            );
+            return;
+          }
+          list.innerHTML = d.items
+            .map(
+              (c) =>
+                `<a class="row-link" href="${c.roomUrl}"><strong>${c.companyName}</strong> — ${c.needTitle}<br><span class="invite-meta">Статус: ${c.callStatus}</span></a>`
+            )
+            .join("");
+        })
+        .catch(() => {
+          list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
+        });
+    </script>
   </body>
 </html>

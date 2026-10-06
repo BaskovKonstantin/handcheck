@@ -64,6 +64,12 @@ paths:
   /api/employer/invitations:
     post:
       summary: Send invitation
+  /api/candidate/calls:
+    get:
+      summary: Accepted invitations with call room links
+  /api/employer/calls:
+    get:
+      summary: Employer call list with analysis when ended
   /api/calls/for-invitation/{invitationId}:
     get:
       summary: Call room info

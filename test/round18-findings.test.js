@@ -124,6 +124,7 @@ describe("round 18 findings", () => {
     const res = await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     assert.equal(res.status, 409);
     assert.equal(res.body.error, "cooldown");

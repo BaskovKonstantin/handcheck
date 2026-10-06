@@ -25,6 +25,7 @@
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.8.1",
     "express": "^4.21.2",
+    "fix-webm-duration": "^1.0.6",
     "multer": "^2.0.2",
     "ws": "^8.18.1",
     "zod": "^3.25.76"

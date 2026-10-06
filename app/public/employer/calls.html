@@ -17,11 +17,19 @@
           <p class="lede">После завершения — три фразы внутреннего разбора только для вас.</p>
         </div>
       </header>
+      <div id="stats"></div>
       <div id="list"></div>
     </main>
     <script src="/app.js"></script>
     <script>
       const list = document.getElementById("list");
+      const statsEl = document.getElementById("stats");
+      const ICON_READY =
+        '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg></span>';
+      const ICON_LIVE =
+        '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg></span>';
+      const ICON_DONE =
+        '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="none" stroke="currentColor" stroke-width="2"/></svg></span>';
 
       function formatTs(iso) {
         if (!iso) return "—";
@@ -48,8 +56,22 @@
       async function render() {
         const esc = HandCheck.escapeHtml;
         list.innerHTML = HandCheck.skeletonBlocks(3);
+        statsEl.innerHTML = HandCheck.skeletonBlocks(1);
         const d = await HandCheck.api("/api/employer/calls");
-        if (!d.items.length) {
+        const items = d.items || [];
+        const active = items.filter((r) => r.callStatus !== "ended");
+        const ended = items.filter((r) => r.callStatus === "ended");
+        const ready = active.filter((r) => r.callStatus !== "live").length;
+        const live = active.filter((r) => r.callStatus === "live").length;
+        statsEl.innerHTML = HandCheck.statTilesHtml(
+          [
+            { variant: "clay", icon: ICON_READY, label: "Готовы", value: ready, hint: "Комната открыта" },
+            { variant: "forest", icon: ICON_LIVE, label: "В эфире", value: live, hint: "Идёт звонок" },
+            { variant: "ink", icon: ICON_DONE, label: "Завершено", value: ended.length, hint: "С записью и разбором" },
+          ],
+          { gridClass: "stat-tile-grid-compact" }
+        );
+        if (!items.length) {
           list.innerHTML = HandCheck.emptyState(
             "Звонков пока нет",
             "Примите приглашение кандидатом, чтобы открыть комнату.",
@@ -58,7 +80,7 @@
           );
           return;
         }
-        const sorted = [...d.items].sort((a, b) => {
+        const sorted = [...items].sort((a, b) => {
           const ka = a.endedAt || a.startedAt || a.invitationAt || "";
           const kb = b.endedAt || b.startedAt || b.invitationAt || "";
           return kb.localeCompare(ka);

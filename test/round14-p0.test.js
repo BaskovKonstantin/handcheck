@@ -50,11 +50,12 @@ describe("round 14 P0 regressions", () => {
     await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const battery = await agent.get("/api/assessment/battery/current");
     const attempts = battery.body.battery.attempts;
     for (const a of attempts) {
-      await agent.get(`/api/assessment/tasks/${a.id}`);
+      await agent.post(`/api/assessment/tasks/${a.id}/open`);
       await agent.post(`/api/assessment/tasks/${a.id}/submit`).send({
         answerText: "не знаю",
       });

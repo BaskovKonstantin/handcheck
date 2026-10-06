@@ -14,6 +14,7 @@ const config = require("../../config");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { humanToolSummary } = require("../../lib/mcp-telemetry");
 const { formatClientDescriptor } = require("../../lib/ai-usage-summary");
+const { PRIVACY_POLICY_VERSION, privacyNoticeShort, recordDataConsent } = require("../../lib/privacy-policy");
 
 const router = express.Router();
 
@@ -55,8 +56,7 @@ router.post("/tokens", (req, res, next) => {
       fields.clientWhere = "Укажите, где подключаете клиент (Cursor, Claude Desktop и т.д.)";
     }
     if (!consent) {
-      fields.consent =
-        "Нужно согласие на запись действий ИИ-клиента (имя клиента, вызовы инструментов без секретов)";
+      fields.consent = `Нужно согласие на обработку данных ИИ-клиента. ${privacyNoticeShort()}`;
     }
     if (Object.keys(fields).length) throw httpError(400, "invalid_body", { fields });
     const rawScopes = req.body?.scopes;
@@ -74,12 +74,22 @@ router.post("/tokens", (req, res, next) => {
     const { raw, hash, displayPrefix } = generateTokenMaterial();
     const id = newId();
     const now = new Date().toISOString();
-    getDb()
-      .prepare(
-        `INSERT INTO api_tokens (id, user_id, name, token_hash, token_prefix, scopes_json, client_where, logging_consent_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(id, req.user.id, name, hash, displayPrefix, JSON.stringify(scopes), clientWhere, now);
+    const db = getDb();
+    db.prepare(
+      `INSERT INTO api_tokens (id, user_id, name, token_hash, token_prefix, scopes_json, client_where, logging_consent_at, privacy_policy_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id,
+      req.user.id,
+      name,
+      hash,
+      displayPrefix,
+      JSON.stringify(scopes),
+      clientWhere,
+      now,
+      PRIVACY_POLICY_VERSION
+    );
+    recordDataConsent(db, req.user.id, "mcp_token", { tokenId: id });
     res.status(201).json({
       id,
       token: raw,

@@ -169,7 +169,7 @@ describe("round 16 findings", () => {
     const js = fs.readFileSync(path.join(__dirname, "../app/public/integrations.js"), "utf8");
     const css = fs.readFileSync(path.join(__dirname, "../app/public/styles.css"), "utf8");
     assert.match(js, /integrations-steps/);
-    assert.match(js, /описания запроса/);
+    assert.match(js, /описание запроса/);
     assert.match(css, /label\.consent-option/);
   });
 

@@ -147,13 +147,13 @@ describe("round28 findings", () => {
       path.join(__dirname, "../app/public/call-room-webrtc.js"),
       "utf8"
     );
-    assert.match(webrtcSrc, /RECORDER_VIDEO_BPS\s*=\s*130_000/);
-    assert.match(webrtcSrc, /RECORDER_AUDIO_BPS\s*=\s*20_000/);
+    assert.match(webrtcSrc, /RECORDER_VIDEO_BPS\s*=\s*100_000/);
+    assert.match(webrtcSrc, /RECORDER_AUDIO_BPS\s*=\s*15_000/);
     const RECORDING_LIMIT_BYTES = 80 * 1024 * 1024;
     const RECORDING_TARGET_SECONDS = 60 * 60;
-    const RECORDER_TOTAL_BPS = 130_000 + 20_000;
+    const RECORDER_TOTAL_BPS = 100_000 + 15_000;
     const projected = (RECORDER_TOTAL_BPS / 8) * RECORDING_TARGET_SECONDS;
-    assert.ok(projected < RECORDING_LIMIT_BYTES * 0.92);
+    assert.ok(projected < RECORDING_LIMIT_BYTES * 0.85);
   });
 
   it("P2-10: ended calls reject WS upgrade", async () => {

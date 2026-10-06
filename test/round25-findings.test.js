@@ -78,11 +78,13 @@ async function passTest(agent) {
   await agent.post("/api/assessment/battery/start").send({
     specialization: "backend",
     grade: "middle",
+      privacyConsent: true,
   });
   const cur = await agent.get("/api/assessment/battery/current");
   for (const a of cur.body.battery.attempts) {
     const task = await agent.get(`/api/assessment/tasks/${a.id}`);
     const text = task.body.type === "work" ? answers.workAnswer : answers.quickAnswer;
+    await agent.post(`/api/assessment/tasks/${a.id}/open`);
     await agent.post(`/api/assessment/tasks/${a.id}/submit`).send({ answerText: text });
   }
 }
@@ -115,6 +117,7 @@ describe("round 25 findings", () => {
       title: "Calls need",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const cand = await registerCandidate(app, `r25c-${Date.now()}@demo.local`);
     await passTest(cand);
@@ -172,6 +175,7 @@ describe("round 25 findings", () => {
       title: "AI need",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const inv = await inviter.post("/api/employer/invitations").send({
       needId: need.body.id,
@@ -201,6 +205,7 @@ describe("round 25 findings", () => {
       title: "Pool",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const otherId = (await other.get("/api/me")).body.id;
     const summaryOther = summarizeAiUsageForEmployer(otherId, candId);
@@ -229,6 +234,7 @@ describe("round 25 findings", () => {
     const res = await agent.post("/api/assessment/battery/start").send({
       specialization: "frontend",
       grade: "middle",
+      privacyConsent: true,
     });
     assert.equal(res.status, 409);
     assert.equal(res.body.error, "battery_incomplete");
@@ -241,11 +247,13 @@ describe("round 25 findings", () => {
       title: "Same Title",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const dup = await employer.post("/api/employer/needs").send({
       title: "Same Title",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     assert.equal(dup.status, 409);
     assert.equal(dup.body.error, "need_duplicate_title");
@@ -258,6 +266,7 @@ describe("round 25 findings", () => {
       title: "Foreign",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const cand = await registerCandidate(app, `r25fc-${Date.now()}@demo.local`);
     await passTest(cand);

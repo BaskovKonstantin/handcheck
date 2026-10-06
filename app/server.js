@@ -79,6 +79,7 @@ function createApp() {
     ["/employer/calls", "employer/calls.html"],
     ["/employer/profile", "employer/profile.html"],
     ["/employer/integrations", "employer/integrations.html"],
+    ["/privacy", "privacy.html"],
   ];
   for (const [url, file] of routes) {
     app.get(url, (_req, res) => res.sendFile(path.join(publicDir, file)));

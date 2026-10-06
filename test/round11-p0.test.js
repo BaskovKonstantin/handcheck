@@ -170,6 +170,7 @@ describe("round 11 P0 fixes", () => {
     const start = await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     assert.equal(start.status, 201);
     const battery = await agent.get("/api/assessment/battery/current");
@@ -179,6 +180,7 @@ describe("round 11 P0 fixes", () => {
       const base = "короткий ответ без нужных тем";
       const answerText =
         task.body.type === "work" ? `${base} ${"подробнее ".repeat(8)}` : base;
+      await agent.post(`/api/assessment/tasks/${step.id}/open`);
       await agent.post(`/api/assessment/tasks/${step.id}/submit`).send({ answerText });
     }
     const cat = await agent.get("/api/candidate/category");

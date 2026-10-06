@@ -3,6 +3,7 @@
 const BATTERY_QUICK_COUNT = 8;
 const QUICK_DEADLINE_MS = 60 * 1000;
 const WORK_DEADLINE_MS = 7 * 24 * 60 * 60 * 1000;
+const QUICK_GRACE_MS = 2500;
 
 function deadlineMsForType(type) {
   return type === "quick" ? QUICK_DEADLINE_MS : WORK_DEADLINE_MS;
@@ -16,7 +17,8 @@ function deadlineAtIso(openedAt, type) {
 
 function isPastDeadline(openedAt, type, nowMs = Date.now()) {
   if (!openedAt) return false;
-  return nowMs > new Date(openedAt).getTime() + deadlineMsForType(type);
+  const grace = type === "quick" ? QUICK_GRACE_MS : 0;
+  return nowMs > new Date(openedAt).getTime() + deadlineMsForType(type) + grace;
 }
 
 function getCurrentAttemptId(db, batteryId) {
@@ -28,11 +30,10 @@ function getCurrentAttemptId(db, batteryId) {
   return row?.id || null;
 }
 
-/** Start per-task timer when the candidate opens the active attempt. */
-function ensureAttemptTimerStarted(db, userId, attemptId) {
+function assertCurrentAttempt(db, userId, attemptId) {
   const row = db
     .prepare(
-      `SELECT a.id, a.battery_id, a.started_at, a.submitted_at, a.candidate_user_id
+      `SELECT a.id, a.battery_id, a.started_at, a.opened_at, a.submitted_at, a.candidate_user_id
        FROM attempts a WHERE a.id = ? AND a.candidate_user_id = ?`
     )
     .get(attemptId, userId);
@@ -44,7 +45,14 @@ function ensureAttemptTimerStarted(db, userId, attemptId) {
     err.code = "not_current_task";
     throw err;
   }
-  if (!row.started_at) {
+  return row;
+}
+
+/** Explicit start of per-task timer (question clock). */
+function openAttemptTimer(db, userId, attemptId) {
+  const row = assertCurrentAttempt(db, userId, attemptId);
+  if (!row || row.submitted_at) return row;
+  if (!row.opened_at) {
     const now = new Date().toISOString();
     db.prepare("UPDATE attempts SET started_at = ?, opened_at = ? WHERE id = ?").run(now, now, attemptId);
     db.prepare(
@@ -52,19 +60,37 @@ function ensureAttemptTimerStarted(db, userId, attemptId) {
     ).run(attemptId);
     return { ...row, started_at: now, opened_at: now };
   }
-  const refreshed = db
+  return db
     .prepare(`SELECT id, battery_id, started_at, opened_at, submitted_at FROM attempts WHERE id = ?`)
     .get(attemptId);
-  return refreshed;
+}
+
+function assertAttemptOpened(row) {
+  if (!row?.opened_at) {
+    const err = new Error("task_not_opened");
+    err.status = 409;
+    err.code = "task_not_opened";
+    err.details = { message: "Сначала откройте вопрос — на него отведена одна минута." };
+    throw err;
+  }
+}
+
+/** @deprecated use openAttemptTimer — kept for tests that relied on name */
+function ensureAttemptTimerStarted(db, userId, attemptId) {
+  return openAttemptTimer(db, userId, attemptId);
 }
 
 module.exports = {
   BATTERY_QUICK_COUNT,
   QUICK_DEADLINE_MS,
   WORK_DEADLINE_MS,
+  QUICK_GRACE_MS,
   deadlineMsForType,
   deadlineAtIso,
   isPastDeadline,
   getCurrentAttemptId,
+  assertCurrentAttempt,
+  openAttemptTimer,
+  assertAttemptOpened,
   ensureAttemptTimerStarted,
 };

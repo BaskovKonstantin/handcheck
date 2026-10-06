@@ -12,7 +12,7 @@ const {
   cooldownActive,
 } = require("../assessment/service");
 const { submitAttemptAnswer: coreSubmitAttemptAnswer } = require("../../lib/assessment-submit");
-const { ensureAttemptTimerStarted, deadlineAtIso } = require("../../lib/assessment-timing");
+const { openAttemptTimer, deadlineAtIso, getCurrentAttemptId } = require("../../lib/assessment-timing");
 const { createInvitation, respondToInvitation } = require("../invitations/actions");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
@@ -136,23 +136,32 @@ function listAssessmentTasks(userId) {
   if (!battery) return { battery: null, tasks: [] };
   const attempts = db
     .prepare(
-      `SELECT a.id, a.submitted_at, t.type, t.prompt FROM attempts a
+      `SELECT a.id, a.submitted_at, a.opened_at, t.type, t.prompt FROM attempts a
        JOIN tasks t ON t.id = a.task_id WHERE a.battery_id = ? ORDER BY a.rowid`
     )
     .all(battery.id);
+  const currentId = getCurrentAttemptId(db, battery.id);
   return {
     battery: {
       id: battery.id,
       specialization: battery.specialization,
       claimedGrade: battery.claimed_grade,
       formKey: battery.form_key,
+      quickLimitSeconds: 60,
+      workDeadlineDays: 7,
     },
-    tasks: attempts.map((a) => ({
-      attemptId: a.id,
-      type: a.type,
-      prompt: a.prompt,
-      submitted: Boolean(a.submitted_at),
-    })),
+    tasks: attempts.map((a) => {
+      const isCurrent = a.id === currentId;
+      const revealPrompt = Boolean(a.submitted_at) || Boolean(a.opened_at);
+      return {
+        attemptId: a.id,
+        type: a.type,
+        prompt: revealPrompt ? a.prompt : isCurrent ? null : undefined,
+        needsOpen: isCurrent && !a.submitted_at && !a.opened_at,
+        submitted: Boolean(a.submitted_at),
+        openedAt: a.opened_at || null,
+      };
+    }),
   };
 }
 
@@ -168,7 +177,7 @@ function getAssessmentTask(userId, attemptId) {
   let openedAt = row.opened_at;
   if (!row.submitted_at) {
     try {
-      const started = ensureAttemptTimerStarted(db, userId, row.id);
+      const started = openAttemptTimer(db, userId, row.id);
       openedAt = started.opened_at || started.started_at;
     } catch (e) {
       if (e.code === "not_current_task") {
@@ -264,6 +273,9 @@ function submitAttemptAnswer(userId, attemptId, answerText, actionSource = "web"
     if (e.code === "not_current_task") {
       throw mcpError("Сначала завершите предыдущий шаг теста", "not_current_task");
     }
+    if (e.code === "task_not_opened") {
+      throw mcpError("Сначала откройте вопрос (get_task)", "task_not_opened");
+    }
     throw e;
   }
 }
@@ -311,11 +323,23 @@ function respondInvitation(userId, invitationId, decision) {
   }
 }
 
+function callRecordingSidesFromPath(recordingPath) {
+  if (!recordingPath) return [];
+  const fs = require("fs");
+  const path = require("path");
+  const sides = [];
+  for (const side of ["candidate", "employer"]) {
+    if (fs.existsSync(path.join(recordingPath, `${side}.webm`))) sides.push(side);
+  }
+  return sides;
+}
+
 function listCandidateCalls(userId) {
   const rows = getDb()
     .prepare(
-      `SELECT i.id AS invitation_id, i.salary_from, i.salary_to, c.status AS call_status,
-              c.started_at, c.ended_at, e.company_name, n.title AS need_title
+      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, i.salary_from, i.salary_to,
+              c.id AS call_id, c.status AS call_status, c.started_at, c.ended_at, c.recording_path,
+              e.company_name, n.title AS need_title
        FROM invitations i
        JOIN employer_profiles e ON e.user_id = i.employer_user_id
        JOIN employer_needs n ON n.id = i.need_id
@@ -326,11 +350,16 @@ function listCandidateCalls(userId) {
     .all(userId);
   return rows.map((r) => ({
     invitationId: r.invitation_id,
+    callId: r.call_id,
+    invitationAt: dbDateToIso(r.invitation_at),
     callStatus: r.call_status || "ready",
+    startedAt: dbDateToIso(r.started_at),
+    endedAt: dbDateToIso(r.ended_at),
     salaryFrom: r.salary_from,
     salaryTo: r.salary_to,
     companyName: r.company_name,
     needTitle: r.need_title,
+    recordingSides: callRecordingSidesFromPath(r.recording_path),
     roomUrl: `/call/${r.invitation_id}`,
   }));
 }
@@ -578,22 +607,30 @@ function listEmployerCalls(userId) {
        ORDER BY COALESCE(c.ended_at, c.started_at, i.created_at) DESC`
     )
     .all(userId);
-  return rows.map((r) => ({
-    invitationId: r.invitation_id,
-    candidateId: r.candidate_user_id,
-    invitationAt: dbDateToIso(r.invitation_at),
-    callId: r.call_id,
-    callStatus: r.call_status || "ready",
-    startedAt: dbDateToIso(r.started_at),
-    endedAt: dbDateToIso(r.ended_at),
-    candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
-    needTitle: r.need_title,
-    salaryFrom: r.salary_from,
-    salaryTo: r.salary_to,
-    hasRecording: Boolean(r.recording_path),
-    roomUrl: `/call/${r.invitation_id}`,
-    analysisUrl: r.call_id ? `/api/calls/${r.call_id}/analysis` : null,
-  }));
+  return rows.map((r) => {
+    const sides = callRecordingSidesFromPath(r.recording_path);
+    return {
+      invitationId: r.invitation_id,
+      candidateId: r.candidate_user_id,
+      invitationAt: dbDateToIso(r.invitation_at),
+      callId: r.call_id,
+      callStatus: r.call_status || "ready",
+      startedAt: dbDateToIso(r.started_at),
+      endedAt: dbDateToIso(r.ended_at),
+      candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
+      needTitle: r.need_title,
+      salaryFrom: r.salary_from,
+      salaryTo: r.salary_to,
+      hasRecording: sides.length > 0,
+      recordingSides: sides,
+      recordingUrl:
+        r.call_id && sides.includes("employer")
+          ? `/api/calls/${r.call_id}/recording?side=employer`
+          : null,
+      roomUrl: `/call/${r.invitation_id}`,
+      analysisUrl: r.call_id ? `/api/calls/${r.call_id}/analysis` : null,
+    };
+  });
 }
 
 function getCallAnalysis(userId, callId) {
@@ -606,7 +643,16 @@ function getCallAnalysis(userId, callId) {
   const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
   if (!a) throw mcpError("Разбор звонка ещё не готов", "not_ready");
   const aiUsage = summarizeAiUsageForEmployer(userId, inv.candidate_user_id);
-  return { summaryText: a.summary_text, aiUsage };
+  const sides = callRecordingSidesFromPath(call.recording_path);
+  return {
+    summaryText: a.summary_text,
+    aiUsage,
+    recordingSides: sides,
+    recordingUrls: sides.reduce((acc, side) => {
+      acc[side] = `/api/calls/${call.id}/recording?side=${side}`;
+      return acc;
+    }, {}),
+  };
 }
 
 function getNeedResource(userId, role, needId) {

@@ -4,12 +4,17 @@ const { scoreQuick, scoreWork } = require("./rubric-score");
 const { validateAnswerText } = require("./assessment-answer");
 const { httpError } = require("../middleware/errors");
 const { finalizeBattery } = require("../modules/assessment/service");
-const { isPastDeadline, ensureAttemptTimerStarted } = require("./assessment-timing");
+const {
+  isPastDeadline,
+  assertCurrentAttempt,
+  assertAttemptOpened,
+} = require("./assessment-timing");
 const { recordDraftTelemetry } = require("./assessment-telemetry");
 
 function submitAttemptAnswer(db, userId, attemptRow, answerText, meta = {}) {
   const a = attemptRow;
-  ensureAttemptTimerStarted(db, userId, a.id);
+  const current = assertCurrentAttempt(db, userId, a.id);
+  assertAttemptOpened(current);
   const refreshed = db
     .prepare(
       `SELECT a.*, t.type, t.rubric_json, b.claimed_grade, b.id AS battery_id
@@ -26,42 +31,72 @@ function submitAttemptAnswer(db, userId, attemptRow, answerText, meta = {}) {
     throw err;
   }
 
-  const parsed = validateAnswerText(answerText, refreshed.type);
-  if (!parsed.ok) {
-    throw httpError(400, "invalid_body", { fields: parsed.fields });
-  }
-  const text = parsed.value;
-  recordDraftTelemetry(db, refreshed.id, refreshed.answer_text, text);
-
   const quickExpired =
     refreshed.type === "quick" && isPastDeadline(refreshed.opened_at, "quick");
   const workExpired =
     refreshed.type === "work" && isPastDeadline(refreshed.opened_at, "work");
 
+  const incoming = String(answerText ?? "");
+  const draftBefore = String(refreshed.answer_text || "");
+  const scoredText = quickExpired ? draftBefore : incoming;
+  const lateExtra =
+    quickExpired && incoming.trim() && incoming.trim() !== draftBefore.trim() ? incoming.trim() : "";
+
+  let text = "";
+  if (quickExpired && refreshed.type === "quick") {
+    if (draftBefore.trim()) {
+      const parsed = validateAnswerText(draftBefore, refreshed.type);
+      if (!parsed.ok) {
+        throw httpError(400, "invalid_body", { fields: parsed.fields });
+      }
+      text = parsed.value;
+    } else {
+      text = "";
+    }
+  } else {
+    const parsed = validateAnswerText(incoming, refreshed.type);
+    if (!parsed.ok) {
+      throw httpError(400, "invalid_body", { fields: parsed.fields });
+    }
+    text = parsed.value;
+  }
+
+  if (!quickExpired) {
+    recordDraftTelemetry(db, refreshed.id, refreshed.answer_text, text, meta);
+  }
+
   if (workExpired) {
-    db.prepare("UPDATE attempts SET answer_text = ? WHERE id = ?").run(text, refreshed.id);
+    db.prepare("UPDATE attempts SET answer_text = ? WHERE id = ?").run(incoming.trim(), refreshed.id);
     throw httpError(409, "deadline_passed", {
       message: "Срок на мини-проект истёк. Текст сохранён, но сдать работу уже нельзя.",
     });
   }
 
   const rubric = JSON.parse(refreshed.rubric_json);
-  const scores = refreshed.type === "quick" ? scoreQuick(text, rubric) : scoreWork(text, rubric);
+  const scores =
+    text.trim().length > 0
+      ? refreshed.type === "quick"
+        ? scoreQuick(text, rubric)
+        : scoreWork(text, rubric)
+      : { knowledge: 0, breadth: 0 };
   const now = new Date().toISOString();
   db.prepare(
-    `UPDATE attempts SET answer_text = ?, knowledge = ?, breadth = ?, submitted_at = ?, action_source = COALESCE(?, action_source) WHERE id = ?`
+    `UPDATE attempts SET answer_text = ?, late_answer_text = ?, knowledge = ?, breadth = ?, submitted_at = ?, action_source = COALESCE(?, action_source), timed_out = ? WHERE id = ?`
   ).run(
     text,
+    lateExtra || null,
     scores.knowledge,
     scores.breadth,
     now,
     meta.actionSource || null,
+    quickExpired ? 1 : 0,
     refreshed.id
   );
   const submitPayload = {
     length: text.length,
     source: meta.actionSource || "web",
     timedOut: quickExpired,
+    lateLength: lateExtra.length,
   };
   db.prepare(
     `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'submit', ?)`
@@ -69,7 +104,7 @@ function submitAttemptAnswer(db, userId, attemptRow, answerText, meta = {}) {
   if (quickExpired) {
     db.prepare(
       `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'quick_timeout', ?)`
-    ).run(refreshed.id, JSON.stringify({ length: text.length }));
+    ).run(refreshed.id, JSON.stringify({ length: text.length, lateLength: lateExtra.length }));
   }
 
   const pending = db
@@ -84,7 +119,11 @@ function submitAttemptAnswer(db, userId, attemptRow, answerText, meta = {}) {
   if (quickExpired) {
     throw httpError(409, "quick_time_expired", {
       message:
-        "Время на этот короткий ответ истекло (лимит — одна минута). Текст сохранён и учтён в оценке.",
+        lateExtra.length > 0
+          ? "Время на этот короткий ответ истекло. Ответ до дедлайна сохранён; текст после истечения времени не засчитан как вовремя."
+          : text.trim()
+            ? "Время на этот короткий ответ истекло. Ответ сохранён, но не засчитан как вовремя."
+            : "Время вышло — ответ не засчитан как вовремя. Переходим к следующему вопросу.",
       batteryComplete: pending === 0,
       ...batteryResult,
     });

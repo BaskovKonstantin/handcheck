@@ -12,7 +12,7 @@ const { StreamableHTTPClientTransport } = require("@modelcontextprotocol/sdk/cli
 const { generateTokenMaterial } = require("../app/lib/api-token");
 const { newId } = require("../app/lib/ids");
 
-const answers = require("../scripts/fixtures/canonical-answer-ab.json");
+const answers = require("../scripts/fixtures/distinct-quick-answers");
 
 function bootServer() {
   const tmpDb = path.join(os.tmpdir(), `hc-mcp-${process.pid}-${Date.now()}.sqlite`);
@@ -89,9 +89,11 @@ describe("MCP e2e", () => {
     });
     const listed = parseToolJson(await client.callTool({ name: "list_tasks", arguments: {} }));
     assert.ok(listed.tasks.length >= 5);
+    let quickIdx = 0;
     for (const t of listed.tasks) {
       await client.callTool({ name: "get_task", arguments: { attemptId: t.attemptId } });
-      const text = t.type === "work" ? answers.workAnswer : answers.quickAnswer;
+      const text =
+        t.type === "work" ? answers.workAnswer : answers.quickAnswerForIndex(quickIdx++);
       const tool = t.type === "work" ? "submit_work_task" : "submit_answer";
       await client.callTool({
         name: tool,
@@ -200,7 +202,7 @@ describe("MCP e2e", () => {
       name: "submit_answer",
       arguments: {
         attemptId: quick.attemptId,
-        answerText: answers.quickAnswer,
+        answerText: answers.quickAnswerForIndex(0),
         intent: "помоги с REST",
       },
     });

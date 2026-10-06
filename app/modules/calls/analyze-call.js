@@ -3,7 +3,7 @@
 const { getDb } = require("../../db");
 const { buildCallAnalysisSummary } = require("../../lib/call-analysis-summary");
 
-const { hasAnyPlayableRecording } = require("../../lib/call-recording");
+const { hasAnyPlayableRecording, listPlayableRecordingSides } = require("../../lib/call-recording");
 
 function hasRecordingFile(call) {
   return hasAnyPlayableRecording(call.recording_path);
@@ -16,11 +16,13 @@ function analyzeCall(callId) {
   const inv = db.prepare("SELECT * FROM invitations WHERE id = ?").get(call.invitation_id);
   const need = db.prepare("SELECT domain_text FROM employer_needs WHERE id = ?").get(inv.need_id);
   const transcript = call.transcript_text || "";
+  const recordingSides = listPlayableRecordingSides(call.recording_path);
   const { summary_text, consistency_note, domain_hits } = buildCallAnalysisSummary({
     needDomainText: need?.domain_text || "",
     transcript,
     call,
     hasRecordingFile: hasRecordingFile(call),
+    recordingSides,
   });
   db.prepare(
     `INSERT INTO call_analyses (call_id, summary_text, domain_hits_json, consistency_note)

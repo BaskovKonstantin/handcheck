@@ -1218,12 +1218,21 @@ body.has-cabinet-chrome main {
     left: 0;
     top: 0;
     bottom: 0;
+    height: 100vh;
     min-height: 100vh;
     width: 15rem;
     padding: 1.15rem 0.75rem 1rem;
     border-right: 1px solid var(--line);
     background: var(--card);
     z-index: 10;
+  }
+
+  body.has-cabinet-chrome {
+    background: linear-gradient(
+      90deg,
+      var(--card) 15rem,
+      var(--paper) 15rem
+    );
   }
 
   .cabinet-aside-inner {
@@ -2606,21 +2615,35 @@ body.deck-page main.column {
   .battery-steps {
     display: flex;
     flex-wrap: nowrap;
-    gap: 0.35rem;
+    gap: 0.25rem;
     overflow-x: auto;
-    padding-bottom: 0.15rem;
+    padding-bottom: 0.1rem;
+    margin-bottom: 0.65rem;
     scroll-snap-type: x proximity;
   }
 
   .battery-step {
     flex: 0 0 auto;
-    min-width: 2.4rem;
-    padding: 0.25rem 0.4rem;
+    min-width: 1.85rem;
+    padding: 0.2rem 0.3rem;
     scroll-snap-align: center;
   }
 
   .battery-step-label {
-    font-size: 0.6rem;
+    display: none;
+  }
+
+  .battery-step-num {
+    font-size: 0.7rem;
+  }
+
+  .cabinet-content #panel textarea#answer {
+    min-height: 5.5rem;
+    max-height: 8rem;
+  }
+
+  .cabinet-content #panel .battery-timer {
+    margin-bottom: 0.35rem;
   }
 
   body.has-cabinet-chrome .cabinet-content #panel {

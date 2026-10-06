@@ -54,7 +54,19 @@ function domainPhrase(needDomainText, transcript) {
   return "Явных совпадений с доменом потребности в репликах нет.";
 }
 
-function buildCallAnalysisSummary({ needDomainText, transcript, call, hasRecordingFile }) {
+function recordingSummaryPhrase(recordingSides) {
+  const sides = recordingSides || [];
+  if (sides.length >= 2) {
+    return " Запись обеих сторон сохранена для внутреннего просмотра.";
+  }
+  if (sides.length === 1) {
+    const who = sides[0] === "candidate" ? "кандидата" : "работодателя";
+    return ` Запись сохранена только со стороны ${who}.`;
+  }
+  return "";
+}
+
+function buildCallAnalysisSummary({ needDomainText, transcript, call, hasRecordingFile, recordingSides }) {
   const seconds = callDurationSeconds(call);
   const parts = [
     domainPhrase(needDomainText, transcript),
@@ -63,7 +75,7 @@ function buildCallAnalysisSummary({ needDomainText, transcript, call, hasRecordi
   ];
   let summary = parts.join(" ");
   if (hasRecordingFile) {
-    summary += " Запись сохранена для внутреннего просмотра.";
+    summary += recordingSummaryPhrase(recordingSides);
   }
   const hits = domainKeywordHits(needDomainText || "", transcript || "");
   let consistency_note = "";

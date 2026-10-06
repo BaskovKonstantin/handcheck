@@ -126,7 +126,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "list_tasks",
       {
         description:
-          "Активная батарея: 8 коротких вопросов (60 с каждый после открытия) и мини-проект на 7 дней. Тексты неоткрытых вопросов скрыты.",
+          "Активный тест: 8 коротких вопросов (60 с каждый после открытия) и мини-проект на 7 дней. Тексты неоткрытых вопросов скрыты.",
         ...readToolExtra(z),
       },
       wrapTool(ctx, "list_tasks", false, () => services.listAssessmentTasks(ctx.user.id))

@@ -113,6 +113,17 @@ function writeFinalRecording(callId, side, buffer, durationMs) {
   return finalPath;
 }
 
+function finalizeOrphanChunkSides(callId, durationMs) {
+  const dir = callDir(callId);
+  for (const side of ["candidate", "employer"]) {
+    const chunks = listChunkFiles(callId, side);
+    if (!chunks.length) continue;
+    const finalPath = path.join(dir, `${side}.webm`);
+    if (isPlayableRecordingFile(finalPath)) continue;
+    mergeChunksToFinal(callId, side, Buffer.alloc(0), durationMs);
+  }
+}
+
 module.exports = {
   callDir,
   appendChunk,
@@ -121,4 +132,5 @@ module.exports = {
   listChunkFiles,
   totalChunkBytes,
   mergeBuffers,
+  finalizeOrphanChunkSides,
 };

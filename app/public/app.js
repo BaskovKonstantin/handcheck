@@ -594,7 +594,6 @@ function bootPublicPage(loadFn) {
   } catch {
     /* ignore */
   }
-  void refreshCabinetMeEmail(null);
 }
 
 async function mountCabinetShell(links, role) {

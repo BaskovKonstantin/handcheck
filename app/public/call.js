@@ -123,31 +123,68 @@ async function init() {
     ]);
     callId = info.callId;
     if (info.status === "ended") {
+      HandCheck.bootCabinetPage(me.role, () => {});
       const who =
         me.role === "employer"
           ? info.candidateName || "Кандидат"
           : info.companyName || "Работодатель";
-      const meta = [
-        info.needTitle,
-        HandCheck.formatSalaryRange(info.salaryFrom, info.salaryTo),
-        info.endedAt ? `Завершён ${HandCheck.formatDateTimeMoscow(info.endedAt)}` : "",
+      const esc = HandCheck.escapeHtml;
+      const endedWhen = info.endedAt
+        ? HandCheck.formatDateTimeMoscow(info.endedAt)
+        : "";
+      const salary = HandCheck.formatSalaryRange(info.salaryFrom, info.salaryTo);
+      const duration = info.durationHint ? esc(info.durationHint) : "";
+      const metaRows = [
+        info.needTitle ? `<dt>Потребность</dt><dd>${esc(info.needTitle)}</dd>` : "",
+        salary ? `<dt>Вилка</dt><dd>${esc(salary)}</dd>` : "",
+        endedWhen ? `<dt>Завершён</dt><dd>${esc(endedWhen)}</dd>` : "",
+        duration ? `<dt>Длительность</dt><dd>${duration}</dd>` : "",
       ]
         .filter(Boolean)
-        .join(" · ");
-      const esc = HandCheck.escapeHtml;
+        .join("");
       const analysis =
         me.role === "employer" && info.analysisText
           ? `<section class="panel call-analysis-panel"><h2 class="h2">Внутренний разбор</h2><p>${esc(info.analysisText)}</p></section>`
           : "";
-      setCallLede("Комната закрыта. Ниже — итог созвона и внутренний разбор для работодателя.");
-      roomHost.innerHTML = `<div class="call-ended-wrap">
-        <p class="call-state-banner ended">Звонок с ${esc(who)} завершён</p>
-        <p class="invite-meta">${esc(meta)}</p>
+      const aiUsage =
+        me.role === "employer" && info.aiUsage
+          ? `<section class="panel call-ai-panel"><h2 class="h2">Как работает с ИИ</h2><p>${esc(info.aiUsage.headline)}</p>${
+              (info.aiUsage.activityLines || []).length
+                ? `<ul class="deck-phrases">${(info.aiUsage.activityLines || [])
+                    .map((l) => `<li>${esc(l)}</li>`)
+                    .join("")}</ul>`
+                : ""
+            }</section>`
+          : "";
+      const recordings =
+        me.role === "employer" && info.recordingSides?.length
+          ? `<section class="panel call-recording-panel"><h2 class="h2">Запись</h2><div class="call-recording-players">${info.recordingSides
+              .map(
+                (side) =>
+                  `<div class="call-recording-side"><span class="invite-meta">${side === "candidate" ? "Кандидат" : "Работодатель"}</span><audio controls preload="metadata" src="/api/calls/${info.callId}/recording?side=${side}"></audio></div>`
+              )
+              .join("")}</div></section>`
+          : "";
+      const ledeEmployer =
+        "Комната закрыта. Ниже — итог созвона и материалы только для работодателя.";
+      const ledeCandidate = "Комната закрыта. Краткий итог созвона — подробности в списке звонков.";
+      setCallLede(me.role === "employer" ? ledeEmployer : ledeCandidate);
+      roomHost.innerHTML = `<article class="panel call-result-card">
+        <div class="call-result-head">
+          <span class="status-pill ended">Завершён</span>
+          <h2 class="h2">Звонок с ${esc(who)}</h2>
+        </div>
+        ${metaRows ? `<dl class="call-result-meta">${metaRows}</dl>` : ""}
         ${analysis}
-        <a class="btn-primary" href="${me.role === "employer" ? "/employer/calls" : "/candidate/calls"}">К списку звонков</a>
-      </div>`;
+        ${aiUsage}
+        ${recordings}
+        <div class="call-result-actions">
+          <a class="btn-primary" href="${me.role === "employer" ? "/employer/calls" : "/candidate/calls"}">К списку звонков</a>
+        </div>
+      </article>`;
       return;
     }
+    HandCheck.bootCabinetPage(me.role, () => {});
     renderRoomShell();
     if (info.status === "live") {
       setCallLede("Разговор в эфире. Запись ведётся после вашего согласия при входе.");

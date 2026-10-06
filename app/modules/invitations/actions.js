@@ -4,31 +4,7 @@ const { getDb } = require("../../db");
 const { newId } = require("../../lib/ids");
 const { httpError } = require("../../middleware/errors");
 
-function parseSalaryRange(salaryFrom, salaryTo) {
-  const fields = {};
-  const fromMissing =
-    salaryFrom === "" || salaryFrom === null || salaryFrom === undefined;
-  const toMissing = salaryTo === "" || salaryTo === null || salaryTo === undefined;
-  if (fromMissing || toMissing) {
-    fields.salaryRange = "Укажите вилку зарплаты";
-    return { fields, from: null, to: null };
-  }
-  const from = Number(salaryFrom);
-  const to = Number(salaryTo);
-  if (!Number.isInteger(from) || from < 0) {
-    fields.salaryRange = "Укажите целое число в поле «От»";
-  }
-  if (!Number.isInteger(to) || to < 0) {
-    fields.salaryRange = fields.salaryRange || "Укажите целое число в поле «До»";
-  }
-  if (Number.isInteger(from) && from === 0 && Number.isInteger(to) && to === 0) {
-    fields.salaryRange = "Укажите вилку зарплаты";
-  }
-  if (Number.isInteger(from) && Number.isInteger(to) && from > to) {
-    fields.salaryRange = "Вилка зарплаты: «От» не может быть больше «До»";
-  }
-  return { fields, from, to };
-}
+const { parseSalaryRange } = require("../../lib/salary-range");
 
 function findActiveInvitation(db, needId, candidateId) {
   return db

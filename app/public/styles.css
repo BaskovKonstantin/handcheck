@@ -1402,9 +1402,99 @@ body.has-cabinet-chrome main {
 }
 
 .chip-skill {
-  background: color-mix(in srgb, var(--clay) 12%, var(--card));
-  color: var(--clay-hover);
-  border: 1px solid color-mix(in srgb, var(--clay) 25%, transparent);
+  background: color-mix(in srgb, var(--forest) 10%, var(--card));
+  color: var(--forest);
+  border: 1px solid color-mix(in srgb, var(--forest) 22%, transparent);
+}
+
+.deck-explain-lines {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: 1.45;
+}
+
+.deck-explain-lines li + li {
+  margin-top: 0.35rem;
+}
+
+.list-explain {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.btn-disabled-visual:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.call-result-card {
+  max-width: 42rem;
+  margin: 0 auto 2rem;
+}
+
+.call-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.call-result-head .h2 {
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
+.status-pill.ended {
+  background: color-mix(in srgb, var(--muted) 15%, var(--card));
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.call-result-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 1.25rem;
+  font-size: 0.92rem;
+}
+
+.call-result-meta dt {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.call-result-meta dd {
+  margin: 0;
+}
+
+.call-result-actions {
+  margin-top: 1.5rem;
+  padding-top: 0.25rem;
+}
+
+.call-analysis-panel,
+.call-ai-panel,
+.call-recording-panel {
+  margin-top: 1rem;
+}
+
+.call-recording-players {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.call-recording-side audio {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+.list-ai-usage {
+  margin-top: 0.75rem;
 }
 
 .deck-phrases {

@@ -70,7 +70,6 @@
             const dateStr = formatInviteDate(primary.createdAt);
             const salary = HandCheck.formatSalaryRange(primary.salaryFrom, primary.salaryTo);
             const metaParts = [dateStr, salary].filter(Boolean);
-            const endedOnly = joinable.length === 0 && sorted.length > 0;
             const roomHref =
               joinable.length > 1
                 ? "/candidate/calls"
@@ -83,7 +82,6 @@
               primary,
               meta: `${metaParts.join(" · ")}${extra}`,
               joinableCount: joinable.length,
-              endedOnly,
               roomHref,
               roomLabel,
             };
@@ -95,12 +93,20 @@
       function buildUpcomingSteps(invItems, cat, callItems) {
         const statusByInv = callStatusByInvitation(callItems);
         const steps = [];
+        const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
         if (!cat.label) {
           steps.push({
             tone: "clay",
             title: "Пройти тест",
             meta: "Без теста категория не появится в подборе",
             cta: '<a class="btn-primary btn-sm" href="/candidate/tasks">Начать</a>',
+          });
+        } else if (!onCooldown) {
+          steps.push({
+            tone: "forest",
+            title: "Улучшить категорию",
+            meta: "Пересдайте тест, когда будете готовы",
+            cta: '<a class="btn-primary btn-sm" href="/candidate/tasks">Задания</a>',
           });
         }
         (invItems || [])
@@ -117,20 +123,13 @@
             });
           });
         groupAcceptedInvites(invItems, statusByInv).forEach(
-          ({ primary, meta, joinableCount, endedOnly, roomHref, roomLabel }) => {
+          ({ primary, meta, joinableCount, roomHref, roomLabel }) => {
             if (joinableCount > 0) {
               steps.push({
                 tone: "forest",
                 title: `Звонок с ${primary.companyName}`,
                 meta: meta || "Приглашение принято — можно войти в комнату",
                 cta: `<a class="btn-primary btn-sm" href="${roomHref}">${roomLabel}</a>`,
-              });
-            } else if (endedOnly) {
-              steps.push({
-                tone: "muted",
-                title: `Звонок с ${primary.companyName}`,
-                meta: meta ? `${meta} · завершён` : "Звонок завершён",
-                cta: '<a class="btn-ghost btn-sm" href="/candidate/calls">Звонки</a>',
               });
             }
           }
@@ -177,7 +176,7 @@
           ? `<p class="invite-meta">Пересдача возможна после ${retakeDate}</p>`
           : "";
         const improveBtn = onCooldown
-          ? `<button class="btn-ghost btn-sm" type="button" disabled title="Пересдача с ${retakeDate}">Улучшить категорию</button>`
+          ? `<button class="btn-ghost btn-sm btn-disabled-visual" type="button" disabled title="Пересдача с ${retakeDate}">Улучшить категорию</button>`
           : `<a class="btn-primary btn-sm" href="/candidate/tasks">Улучшить категорию</a>`;
         const categoryHint = `<p class="invite-meta">Задания подтверждают навык — при успешной пересдаче категория обновится.</p>
               ${improveBtn}`;

@@ -53,7 +53,9 @@
       }
 
       function isChoiceAvailable(field, value) {
-        return field === "specialization" ? value === "backend" : value === "middle";
+        if (field === "spec" || field === "specialization") return value === "backend";
+        if (field === "grade") return value === "middle";
+        return false;
       }
 
       function choiceChips(name, options, selected) {
@@ -89,16 +91,18 @@
         const retakeLine = retakeWhen
           ? `<p class="field-error">Пересдача возможна после ${retakeWhen}</p>`
           : "";
+        const retakeExplain = retakeWhen
+          ? `<p class="invite-meta">Пересдать тест можно после ${retakeWhen} — успешная пересдача обновит категорию.</p>`
+          : `<p class="invite-meta">Успешная пересдача обновит категорию.</p>`;
         const catBlock = category?.label
           ? `<div class="battery-last-result">
               <span class="invite-meta">Текущая категория</span>
               <span class="category-pill">${category.label}</span>
-              <p class="invite-meta">Новая попытка может улучшить категорию после паузы для пересдачи по специализации.</p>
+              ${retakeExplain}
               ${retakeLine}
             </div>`
           : `<p class="invite-meta">${onCooldown ? "Категория не подтверждена." : "Категория появится после первого завершённого теста."}</p>${retakeLine}`;
         panel.innerHTML = `
-          ${batteryStepIndicator(0, 5)}
           ${catBlock}
           <p class="invite-meta">Выберите специализацию и грейд. Сейчас доступна только категория Backend × Middle — другие тесты готовятся.</p>
           <div class="form-field">

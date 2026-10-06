@@ -12,6 +12,7 @@ const {
   validateOptionalPhone,
   validateBackgroundEpisode,
 } = require("../../lib/validation");
+const { shouldMarkUserAsTest } = require("../../lib/is-test-user");
 const { dbDateToIso } = require("../../lib/db-datetime");
 
 const router = express.Router();
@@ -60,6 +61,9 @@ router.put("/profile", (req, res, next) => {
       `UPDATE candidate_profiles SET display_name = ?, stack_json = ?, phone = ?, contact_email = ?
        WHERE user_id = ?`
     ).run(displayName, JSON.stringify(stack), phone, contactEmail, req.user.id);
+    const user = db.prepare("SELECT email FROM users WHERE id = ?").get(req.user.id);
+    const isTest = shouldMarkUserAsTest(user.email, displayName) ? 1 : 0;
+    db.prepare("UPDATE users SET is_test = ? WHERE id = ?").run(isTest, req.user.id);
     res.json({ ok: true });
   } catch (e) {
     next(e);

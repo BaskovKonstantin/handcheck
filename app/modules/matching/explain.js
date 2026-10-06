@@ -9,8 +9,8 @@ function buildExplanation(candidate, need) {
     const hint = String(need.domain_text || "").trim();
     lines.push(
       hint
-        ? `Доменный бонус: эпизоды опыта совпадают с потребностью («${hint}»)`
-        : "Доменный бонус: прошлый опыт совпадает с доменом задачи"
+        ? `Опыт в домене потребности: ${hint}`
+        : "Опыт в домене совпадает с задачей потребности"
     );
   }
   if (candidate.fsp_boost === 1) {
@@ -21,7 +21,7 @@ function buildExplanation(candidate, need) {
     candidate.stack.some((c) => String(c).toLowerCase() === String(s).toLowerCase())
   );
   if (overlap.length) {
-    lines.push(`Совпадает стек: ${overlap[0]}`);
+    lines.push(`Совпадает стек: ${overlap.join(", ")}`);
   }
   return lines.slice(0, 3);
 }

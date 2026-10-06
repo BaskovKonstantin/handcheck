@@ -2,11 +2,11 @@
 
 function emailLooksLikeRoundTest(email) {
   const local = String(email || "").split("@")[0] || "";
-  return /^r1\d[a-z]-\d+$/i.test(local);
+  return /^r\d+[a-z]-\d+$/i.test(local);
 }
 
 function displayNameLooksLikeRoundTest(name) {
-  return String(name || "").trim().startsWith("Тест Р1");
+  return /^Тест Р\d+/i.test(String(name || "").trim());
 }
 
 function shouldMarkUserAsTest(email, displayName) {

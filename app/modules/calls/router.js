@@ -37,7 +37,11 @@ function handleMulterUpload(req, res, next) {
   upload.single("file")(req, res, (err) => {
     if (!err) return next();
     if (err.code === "LIMIT_FILE_SIZE") {
-      return next(httpError(413, "file_too_large"));
+      return next(
+        httpError(413, "file_too_large", {
+          message: "Файл слишком большой (максимум 80 МБ)",
+        })
+      );
     }
     return next(httpError(400, "upload_failed"));
   });
@@ -243,7 +247,9 @@ router.post(
   if (call.status === "ended") {
     const endedAt = call.ended_at ? new Date(call.ended_at).getTime() : 0;
     if (Date.now() - endedAt > RECORDING_GRACE_MS) {
-      return next(httpError(409, "call_ended"));
+      return next(
+        httpError(409, "call_ended", { message: "Звонок уже завершён" })
+      );
     }
   } else if (call.status !== "live") {
     return next(httpError(409, "call_not_live"));
@@ -257,6 +263,9 @@ router.post(
   const filePath = path.join(dir, `${side}.webm`);
   if (path.resolve(filePath) !== filePath || !filePath.endsWith(`${side}.webm`)) {
     return next(httpError(400, "invalid_path"));
+  }
+  if (call.status === "ended" && fs.existsSync(filePath)) {
+    return next(httpError(409, "call_ended", { message: "Звонок уже завершён" }));
   }
   fs.writeFileSync(filePath, req.file.buffer);
   db.prepare("UPDATE calls SET recording_path = ? WHERE id = ?").run(dir, call.id);
@@ -314,6 +323,7 @@ router.get("/:id/analysis", (req, res, next) => {
   const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
   if (!a) return next(httpError(404, "not_ready"));
   res.json({
+    summaryText: a.summary_text,
     summary_text: a.summary_text,
     aiUsage: summarizeAiUsageForEmployer(req.user.id, inv.candidate_user_id),
   });

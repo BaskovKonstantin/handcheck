@@ -282,7 +282,10 @@ function listCandidateInvitations(userId) {
 function respondInvitation(userId, invitationId, decision) {
   const d = String(decision || "").trim().toLowerCase();
   if (!["accept", "decline"].includes(d)) {
-    throw mcpError("Решение должно быть accept или decline", "invalid_body");
+    throw mcpError(
+      "Решение: accept (принять) или decline (отклонить)",
+      "invalid_body"
+    );
   }
   try {
     return respondToInvitation(userId, invitationId, d === "accept" ? "accept" : "decline", "mcp");
@@ -384,6 +387,9 @@ function updateEmployerNeed(userId, needId, body) {
     throw mcpError(msg, "invalid_body");
   }
   const v = parsed.value;
+  if (employerNeedTitleTaken(db, userId, v.title, n.id)) {
+    throw mcpError("Потребность с таким названием уже есть", "need_duplicate_title");
+  }
   db.prepare(
     `UPDATE employer_needs SET title = ?, specialization = ?, grade = ?, stack_json = ?, domain_text = ?, notes = ?, active = ?
      WHERE id = ?`
@@ -439,7 +445,10 @@ function decideCandidate(userId, needId, payload, actionSource = "web") {
   const candidateId = payload.candidateId;
   if (!candidateId) throw mcpError("Укажите candidateId");
   if (!["reject", "later", "invite"].includes(decision)) {
-    throw mcpError("Решение должно быть reject, later или invite", "invalid_body");
+    throw mcpError(
+      "Решение: reject (отклонить), later (отложить) или invite (пригласить)",
+      "invalid_body"
+    );
   }
 
   if (decision === "reject" || decision === "later") {
@@ -473,7 +482,10 @@ function decideCandidate(userId, needId, payload, actionSource = "web") {
       httpErrToMcp(e);
     }
   }
-  throw mcpError("decision должен быть reject, later или invite");
+  throw mcpError(
+    "Решение: reject (отклонить), later (отложить) или invite (пригласить)",
+    "invalid_body"
+  );
 }
 
 function listShortlist(userId, needId, filters = {}) {

@@ -189,16 +189,24 @@
           cur.battery.specialization,
           cur.battery.claimedGrade
         );
+        const answerMax = t.answerMax || 4000;
         panel.innerHTML = `
           ${batteryStepIndicator(stepIndex, 5)}
           <p class="invite-meta">${HandCheck.escapeHtml(metaLine)}</p>
           <p>${HandCheck.escapeHtml(t.prompt)}</p>
-          <textarea id="answer" rows="8">${HandCheck.escapeHtml(restored)}</textarea>
+          <textarea id="answer" rows="8" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
+          <p class="invite-meta" id="answer-len">0 / ${answerMax} символов</p>
           <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
           <button class="btn-primary" id="submit">Отправить ответ</button>
           <p class="field-error" id="err" hidden></p>`;
         if (restored) document.getElementById("draft-note").hidden = false;
         const ta = document.getElementById("answer");
+        const lenEl = document.getElementById("answer-len");
+        const syncLen = () => {
+          lenEl.textContent = `${ta.value.length} / ${answerMax} символов`;
+        };
+        syncLen();
+        ta.addEventListener("input", syncLen);
         let submitting = false;
         const persistDraft = async () => {
           if (submitting) return;

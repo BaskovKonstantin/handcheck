@@ -133,10 +133,10 @@ describe("round 20 findings", () => {
       const { summarizeAiUsageForEmployer: summarize } = require("../app/lib/ai-usage-summary");
       const summary = summarize(cafeId, borisId);
       assert.ok(summary);
-      assert.match(summary.headline, /Claude Code/i);
+      assert.match(summary.clientLabel || summary.headline, /Claude Code/i);
       assert.ok(
         summary.activityLines.some((l) => /короткие ответы|REST/i.test(l)) ||
-          /Claude Code/i.test(summary.headline)
+          /Claude Code/i.test(summary.clientLabel || summary.headline)
       );
     });
   });

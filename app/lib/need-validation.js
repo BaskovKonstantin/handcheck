@@ -111,24 +111,24 @@ function validateNeedBody(body, { requireTitle = true } = {}) {
   return { ok: Object.keys(fields).length === 0, fields, value };
 }
 
+function normalizeNeedTitle(title) {
+  return String(title || "").trim().toLowerCase();
+}
+
 function employerNeedTitleTaken(db, employerUserId, title, excludeNeedId = null) {
-  const normalized = String(title || "").trim().toLowerCase();
+  const normalized = normalizeNeedTitle(title);
   if (!normalized) return false;
-  const row = db
-    .prepare(
-      `SELECT 1 FROM employer_needs
-       WHERE employer_user_id = ? AND lower(trim(title)) = ?
-         AND (? IS NULL OR id != ?)
-       LIMIT 1`
-    )
-    .get(employerUserId, normalized, excludeNeedId, excludeNeedId);
-  return Boolean(row);
+  const rows = db
+    .prepare(`SELECT id, title FROM employer_needs WHERE employer_user_id = ?`)
+    .all(employerUserId);
+  return rows.some((r) => r.id !== excludeNeedId && normalizeNeedTitle(r.title) === normalized);
 }
 
 module.exports = {
   validateNeedBody,
   normalizeStackInput,
   parseActiveFlag,
+  normalizeNeedTitle,
   employerNeedTitleTaken,
   VALID_SPECIALIZATIONS,
   VALID_GRADES,

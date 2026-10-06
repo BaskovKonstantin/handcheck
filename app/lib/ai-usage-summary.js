@@ -66,16 +66,21 @@ function employerMayViewCandidateAiUsage(employerUserId, candidateUserId) {
   );
 }
 
-function formatClientLabel(row) {
+function formatClientDescriptor(row) {
   const name = String(row.client_name || "").trim();
   const where = String(row.client_where || "").trim();
   if (name && !["http", "unknown"].includes(name.toLowerCase())) {
     const ver = row.client_version ? ` ${row.client_version}` : "";
-    const base = `${name}${ver}`;
-    return where ? `ИИ-клиент: ${base} (${where})` : `ИИ-клиент: ${base}`;
+    const base = `${name}${ver}`.trim();
+    return where ? `${base} — ${where}` : base;
   }
-  if (where) return `ИИ-клиент: ${where}`;
+  if (where) return where;
   return null;
+}
+
+function formatClientLabel(row) {
+  const desc = formatClientDescriptor(row);
+  return desc ? `ИИ-клиент: ${desc}` : null;
 }
 
 function employerInvitationIdsForCandidate(db, employerUserId, candidateUserId) {
@@ -87,8 +92,8 @@ function employerInvitationIdsForCandidate(db, employerUserId, candidateUserId) 
     .map((r) => r.id);
 }
 
-function sessionRelatesToEmployerInvitations(db, sessionId, candidateUserId, invitationIds) {
-  if (!invitationIds.length) return false;
+function sessionInvitationResponse(db, sessionId, candidateUserId, invitationIds) {
+  if (!invitationIds.length) return null;
   const idSet = new Set(invitationIds);
   const rows = db
     .prepare(
@@ -100,16 +105,21 @@ function sessionRelatesToEmployerInvitations(db, sessionId, candidateUserId, inv
     if (row.tool_name === "respond_invitation") {
       try {
         const args = JSON.parse(row.args_masked_json || "{}");
-        if (args.invitationId && idSet.has(args.invitationId)) return true;
+        if (args.invitationId && idSet.has(args.invitationId)) {
+          const decision = String(args.decision || "").trim().toLowerCase();
+          if (decision === "accept") return "accept";
+          if (decision === "decline") return "decline";
+          return "respond";
+        }
       } catch {
         /* ignore */
       }
     }
   }
-  return false;
+  return null;
 }
 
-function postTestClientLabelsForEmployer(db, employerUserId, candidateUserId, window, inWindowLabels) {
+function postTestLinesForEmployer(db, employerUserId, candidateUserId, window, inWindowDescriptors) {
   if (!employerHasInvitation(employerUserId, candidateUserId)) {
     return [];
   }
@@ -124,18 +134,25 @@ function postTestClientLabelsForEmployer(db, employerUserId, candidateUserId, wi
        ORDER BY s.last_seen_at DESC LIMIT 20`
     )
     .all(candidateUserId);
-  const labels = [];
-  const seen = new Set(inWindowLabels);
+  const lines = [];
+  const seen = new Set(inWindowDescriptors);
   for (const s of sessions) {
     const seenAt = sqliteComparableTimestamp(s.last_seen_at);
     if (!seenAt || seenAt <= windowEnd) continue;
-    const label = formatClientLabel(s);
-    if (!label || seen.has(label)) continue;
-    if (!sessionRelatesToEmployerInvitations(db, s.id, candidateUserId, invitationIds)) continue;
-    seen.add(label);
-    labels.push(label);
+    const descriptor = formatClientDescriptor(s);
+    if (!descriptor || seen.has(descriptor)) continue;
+    const response = sessionInvitationResponse(db, s.id, candidateUserId, invitationIds);
+    if (!response) continue;
+    seen.add(descriptor);
+    const verb =
+      response === "accept"
+        ? "принял ваше приглашение"
+        : response === "decline"
+          ? "отклонил ваше приглашение"
+          : "отвечал на ваше приглашение";
+    lines.push(`После теста ${verb} через ИИ-клиент ${descriptor}.`);
   }
-  return labels;
+  return lines;
 }
 
 function latestBatteryWindow(db, candidateUserId) {
@@ -262,7 +279,7 @@ function clientsFromAssessmentCalls(db, candidateUserId, window) {
        ORDER BY s.last_seen_at DESC`
     )
     .all(candidateUserId, fromIso, toIso);
-  return [...new Set(rows.map(formatClientLabel).filter(Boolean))];
+  return [...new Set(rows.map(formatClientDescriptor).filter(Boolean))];
 }
 
 function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
@@ -296,21 +313,27 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
       .all(candidateUserId, fromIso, toIso);
   }
 
-  const clients = window
+  const clientDescriptors = window
     ? clientsFromAssessmentCalls(db, candidateUserId, window)
     : [];
-
-  const postClientLabels =
+  const postTestLines =
     window
-      ? postTestClientLabelsForEmployer(db, employerUserId, candidateUserId, window, clients)
+      ? postTestLinesForEmployer(
+          db,
+          employerUserId,
+          candidateUserId,
+          window,
+          clientDescriptors
+        )
       : [];
 
   const { activityLines, intentLines } = buildActivityLines(calls, stats);
   const activityHeadline = activityHeadlineFromBattery(stats);
+  const clientLabel = clientDescriptors.length ? clientDescriptors.join("; ") : "";
 
   if (
-    !clients.length &&
-    !postClientLabels.length &&
+    !clientLabel &&
+    !postTestLines.length &&
     !activityLines.length &&
     !intentLines.length &&
     !activityHeadline
@@ -318,15 +341,14 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
     return null;
   }
 
-  const clientPart = clients.length ? `${clients.join("; ")}.` : "";
-  const postPart = postClientLabels.length
-    ? `После теста через ИИ-клиент по вашим приглашениям: ${postClientLabels.join("; ")}.`
-    : "";
-  const headline = [clientPart, activityHeadline, postPart].filter(Boolean).join(" ");
+  const headline = [activityHeadline, ...postTestLines].filter(Boolean).join(" ");
 
   return {
     headline,
-    clients,
+    clientLabel,
+    activityHeadline,
+    postTestLines,
+    clients: clientDescriptors,
     activityLines: [...activityLines, ...intentLines],
     empty: false,
   };
@@ -352,6 +374,7 @@ module.exports = {
   employerSeesCandidateInPool,
   employerMayViewCandidateAiUsage,
   summarizeAiUsageForEmployer,
+  formatClientDescriptor,
   buildIntegrationNoteForBattery,
   listHumanAuditForUser,
 };

@@ -9,7 +9,10 @@ function rejectOversizedBody(maxBytes) {
     const len = Number(raw);
     if (!Number.isFinite(len) || len < 0) return next();
     if (len > maxBytes) {
-      res.status(413).json({ error: "file_too_large" });
+      res.status(413).json({
+        error: "file_too_large",
+        details: { message: "Файл слишком большой (максимум 80 МБ)" },
+      });
       if (typeof req.destroy === "function") {
         req.destroy();
       } else if (req.socket && typeof req.socket.destroy === "function") {

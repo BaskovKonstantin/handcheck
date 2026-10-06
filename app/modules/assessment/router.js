@@ -20,7 +20,7 @@ const {
   WORK_DEADLINE_MS,
 } = require("./service");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
-const { validateAnswerText } = require("../../lib/assessment-answer");
+const { validateAnswerText, answerMaxForType, WORK_ANSWER_MIN } = require("../../lib/assessment-answer");
 
 const router = express.Router();
 
@@ -120,15 +120,21 @@ router.get("/tasks/:attemptId", (req, res, next) => {
     id: row.id,
     prompt: row.prompt,
     type: row.type,
+    answerMax: answerMaxForType(row.type),
+    workAnswerMin: row.type === "work" ? WORK_ANSWER_MIN : undefined,
     draftText: row.submitted_at ? "" : String(row.answer_text || ""),
   });
 });
 
 router.patch("/tasks/:attemptId/draft", (req, res, next) => {
-  const text = String(req.body?.answerText || "");
   const db = getDb();
   const a = loadAttemptForSubmit(req.params.attemptId, req.user.id);
   assertAttemptMutable(a);
+  const parsed = validateAnswerText(req.body?.answerText, a.type);
+  if (!parsed.ok && parsed.fields.answerText?.includes("длинный")) {
+    return next(httpError(400, "invalid_body", { fields: parsed.fields }));
+  }
+  const text = parsed.ok ? parsed.value : String(req.body?.answerText || "").slice(0, answerMaxForType(a.type));
   db.prepare("UPDATE attempts SET answer_text = ? WHERE id = ?").run(text, a.id);
   db.prepare(
     `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'draft', ?)`

@@ -152,7 +152,7 @@
       .map((a) => {
         const status = a.ok ? "Успешно" : "Ошибка";
         return `<li class="audit-row">
-          <span class="invite-meta audit-row-time">${HandCheck.formatTimeMoscow(a.at)}</span>
+          <span class="invite-meta audit-row-time">${HandCheck.formatAuditLogTime(a.at)}</span>
           <div class="audit-row-main">
             <p class="audit-row-title">${escapeHtml(a.text || a.tool)}</p>
             <p class="audit-row-meta">${escapeHtml(a.client || "ИИ-клиент")} · ${status}</p>

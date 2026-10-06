@@ -38,6 +38,24 @@ function formatApiError(err) {
 }
 
 async function api(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const dedupe = method === "GET" && options.dedupe !== false;
+  if (dedupe) {
+    const key = path;
+    const existing = inflightGetJson.get(key);
+    if (existing) return existing;
+    const run = apiOnce(path, options);
+    inflightGetJson.set(key, run);
+    try {
+      return await run;
+    } finally {
+      inflightGetJson.delete(key);
+    }
+  }
+  return apiOnce(path, options);
+}
+
+async function apiOnce(path, options = {}) {
   const { retries = API_RETRIES, timeoutMs = API_TIMEOUT_MS, ...fetchOpts } = options;
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -103,10 +121,11 @@ const CALL_STATUS_LABEL = {
 
 const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M8 16.5l4.5 4.5L24 9.5" stroke="#fff" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
 
-let cabinetNavMounted = false;
 let cabinetMeEmail = "";
 
 const ME_EMAIL_KEY = "hc_me_email";
+/** @type {Map<string, Promise<unknown>>} */
+const inflightGetJson = new Map();
 
 function getCachedMeEmail() {
   try {
@@ -249,17 +268,15 @@ function ensureCabinetChrome(links, role, meEmail) {
   tabs.innerHTML = tabLinks.map((l) => navLinkHtml(l, true)).join("");
 }
 
-async function mountCabinetShell(links, role) {
+function mountCabinetChromeSync(links, role) {
   const el = document.getElementById("site-header");
   if (!el) return;
   const placeholder = cabinetMeEmail || getCachedMeEmail();
-  if (!cabinetNavMounted) {
-    paintCabinetHeader(el, placeholder);
-    ensureCabinetChrome(links, role, placeholder);
-    cabinetNavMounted = true;
-  } else if (placeholder) {
-    updateCabinetEmails(placeholder);
-  }
+  paintCabinetHeader(el, placeholder);
+  ensureCabinetChrome(links, role, placeholder);
+}
+
+async function refreshCabinetMeEmail() {
   try {
     const me = await api("/api/me");
     cabinetMeEmail = me.email || "";
@@ -270,24 +287,38 @@ async function mountCabinetShell(links, role) {
   }
 }
 
+async function mountCabinetShell(links, role) {
+  mountCabinetChromeSync(links, role);
+  await refreshCabinetMeEmail();
+}
+
 /**
- * Start page data fetch in parallel with /api/me (cabinet shell).
- * Must be used instead of awaiting candidateNav/employerNav before API calls.
+ * Mount cabinet chrome synchronously, then load page data in parallel with /api/me.
  */
 function bootCabinetPage(role, loadFn) {
-  const run = () => {
-    try {
-      const result = loadFn();
-      if (result && typeof result.then === "function") {
-        result.catch(() => {});
-      }
-    } catch (_e) {
-      /* page-specific catch handlers */
+  const links = role === "employer" ? EMPLOYER_LINKS : CANDIDATE_LINKS;
+  mountCabinetChromeSync(links, role);
+  void refreshCabinetMeEmail();
+  try {
+    const result = loadFn();
+    if (result && typeof result.then === "function") {
+      result.catch(() => {});
     }
-  };
-  run();
-  if (role === "employer") void employerNav();
-  else void candidateNav();
+  } catch (_e) {
+    /* page-specific catch handlers */
+  }
+}
+
+let cabinetPageLoadSeq = 0;
+
+/** Ignore stale async results after a newer cabinet page load started. */
+function nextCabinetPageLoad() {
+  cabinetPageLoadSeq += 1;
+  return cabinetPageLoadSeq;
+}
+
+function isStaleCabinetPageLoad(seq) {
+  return seq !== cabinetPageLoadSeq;
 }
 
 function timelineSection(title, items) {
@@ -497,6 +528,8 @@ window.HandCheck = {
   candidateNav,
   employerNav,
   bootCabinetPage,
+  nextCabinetPageLoad,
+  isStaleCabinetPageLoad,
   setLoading,
   skeletonBlocks,
   deckSkeleton,

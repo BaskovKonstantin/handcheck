@@ -109,11 +109,13 @@
       }
 
       async function render() {
+        const seq = HandCheck.nextCabinetPageLoad();
         dash.innerHTML = HandCheck.skeletonBlocks(3);
         const [cat, inv] = await Promise.all([
           HandCheck.api("/api/candidate/category"),
           HandCheck.api("/api/candidate/invitations"),
         ]);
+        if (HandCheck.isStaleCabinetPageLoad(seq)) return;
         const items = inv.items || [];
         const pending = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
         const accepted = items.filter((i) => i.status === "accepted").length;

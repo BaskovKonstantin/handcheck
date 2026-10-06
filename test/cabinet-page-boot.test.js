@@ -74,6 +74,9 @@ describe("cabinet page data loading", () => {
     const app = readPublic("app.js");
     assert.match(app, /function bootCabinetPage\(/);
     assert.match(app, /bootCabinetPage,/);
+    assert.match(app, /mountCabinetChromeSync/);
+    assert.match(app, /nextCabinetPageLoad/);
+    assert.doesNotMatch(app, /cabinetNavMounted/);
   });
 
   for (const page of CABINET_PAGES) {
@@ -100,6 +103,12 @@ describe("cabinet page data loading", () => {
     const bindCallIdx = deck.lastIndexOf("bindDeckUi();");
     assert.ok(bootIdx >= 0 && bindCallIdx > bootIdx, "bootCabinetPage must run before bindDeckUi()");
     assert.doesNotMatch(deck, /HandCheck\.employerNav\(\)\s*;\s*\n\s*loadNeed/);
+  });
+
+  it("candidate/profile.html bootCabinetPage script is valid", () => {
+    const src = readPublic("candidate/profile.html");
+    assert.match(src, /HandCheck\.bootCabinetPage\("candidate"/);
+    assert.match(src, /\)\s*;\s*\n\s*<\/script>/);
   });
 
   it("deck.js toggles hidden on deck-card (regression guard)", () => {

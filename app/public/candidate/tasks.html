@@ -119,11 +119,13 @@
       }
 
       async function init() {
+        const seq = HandCheck.nextCabinetPageLoad();
         panel.innerHTML = HandCheck.skeletonBlocks(2);
         const [cur, category] = await Promise.all([
           HandCheck.api("/api/assessment/battery/current"),
           HandCheck.api("/api/candidate/category").catch(() => ({ label: null })),
         ]);
+        if (HandCheck.isStaleCabinetPageLoad(seq)) return;
         if (!cur.battery) {
           await renderStartForm(category);
           return;

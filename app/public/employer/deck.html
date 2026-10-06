@@ -4,14 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Колода — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="deck-page">
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <header class="page-header">
-        <h1>Колода</h1>
-        <p class="lede">Один жест — одно решение. Без фото и без числовых оценок.</p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Колода</h1>
+          <p class="lede">Один жест — одно решение. Без фото и без числовых оценок.</p>
+        </div>
       </header>
       <div class="deck-wrap" id="deck-wrap">
         <div id="deck-card" class="deck-card enter" hidden></div>
@@ -19,6 +23,17 @@
           <button class="btn-ghost" type="button" data-decision="rejected">Отказать</button>
           <button class="btn-ghost" type="button" data-decision="later">Отложить</button>
           <button class="btn-primary" type="button" id="invite-open">Пригласить</button>
+        </div>
+        <div class="deck-actions deck-actions-round" id="deck-actions-round" hidden>
+          <button class="deck-act deck-act-reject" type="button" data-decision="rejected" aria-label="Отказать">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          </button>
+          <button class="deck-act deck-act-later" type="button" data-decision="later" aria-label="Отложить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5l3 2M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <button class="deck-act deck-act-invite" type="button" id="invite-open-round" aria-label="Пригласить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 11c0 5.5-7 10-7 10z" fill="currentColor"/></svg>
+          </button>
         </div>
       </div>
       <p class="empty" id="empty" hidden></p>

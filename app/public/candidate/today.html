@@ -4,23 +4,34 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Сегодня — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <header class="page-header">
-        <h1>Сегодня</h1>
-        <p class="lede">Ваша категория по тесту — без числовых оценок. Краткий обзор активности.</p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Сегодня</h1>
+          <p class="lede">Ваша категория по тесту — без числовых оценок. Краткий обзор активности.</p>
+        </div>
       </header>
-      <div id="dash"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
+      <div id="dash"></div>
     </main>
     <script src="/app.js"></script>
     <script>
       const dash = document.getElementById("dash");
 
+      const ICON_CAT =
+        '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.8 5.7 21l2.3-7-6-4.6h7.6L12 2z" fill="currentColor"/></svg></span>';
+      const ICON_MAIL =
+        '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 8l8 5 8-5v10H4V8zm16-2H4l8 5 8-5z" fill="currentColor"/></svg></span>';
+      const ICON_CALL =
+        '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg></span>';
+
       async function render() {
-        HandCheck.candidateNav();
+        dash.innerHTML = HandCheck.skeletonBlocks(3);
         const [cat, inv] = await Promise.all([
           HandCheck.api("/api/candidate/category"),
           HandCheck.api("/api/candidate/invitations"),
@@ -28,34 +39,33 @@
         const pending = (inv.items || []).filter((i) => i.status === "sent" || i.status === "viewed").length;
         const accepted = (inv.items || []).filter((i) => i.status === "accepted").length;
         if (!cat.label) {
-          dash.innerHTML = `
-            ${HandCheck.emptyState(
-              "Категория ещё не подтверждена",
-              "Пройдите батарею заданий — специализация и грейд появятся здесь.",
-              "/candidate/tasks",
-              "Начать тест"
-            )}`;
+          dash.innerHTML = HandCheck.emptyState(
+            "Категория ещё не подтверждена",
+            "Пройдите батарею заданий — специализация и грейд появятся здесь.",
+            "/candidate/tasks",
+            "Начать тест"
+          );
           return;
         }
         const retake = cat.retakeAt
           ? `<p class="invite-meta">Пересдача возможна после ${new Date(cat.retakeAt).toLocaleDateString("ru")}</p>`
           : "";
         dash.innerHTML = `
-          <div class="dashboard-grid">
-            <article class="dashboard-card dashboard-card-featured">
-              <h3>Категория</h3>
-              <div class="dashboard-value"><span class="category-pill">${cat.label}</span></div>
+          <div class="stat-tile-grid">
+            <article class="stat-tile stat-tile-forest">
+              <div class="stat-tile-label">${ICON_CAT} Категория</div>
+              <div class="stat-tile-value"><span class="category-pill">${cat.label}</span></div>
               ${retake}
             </article>
-            <article class="dashboard-card">
-              <h3>Приглашения</h3>
-              <div class="dashboard-value">${pending}</div>
+            <article class="stat-tile stat-tile-clay">
+              <div class="stat-tile-label">${ICON_MAIL} Приглашения</div>
+              <div class="stat-tile-value">${pending}</div>
               <p class="invite-meta">ожидают ответа</p>
               <a class="btn-ghost btn-sm" href="/candidate/invitations">Открыть</a>
             </article>
-            <article class="dashboard-card">
-              <h3>Звонки</h3>
-              <div class="dashboard-value">${accepted}</div>
+            <article class="stat-tile stat-tile-ink">
+              <div class="stat-tile-label">${ICON_CALL} Звонки</div>
+              <div class="stat-tile-value">${accepted}</div>
               <p class="invite-meta">принято — можно в комнату</p>
               <a class="btn-ghost btn-sm" href="/candidate/calls">Звонки</a>
             </article>
@@ -66,7 +76,7 @@
           </div>`;
       }
 
-      HandCheck.loadPanel(dash, render);
+      HandCheck.candidateNav().then(render);
     </script>
   </body>
 </html>

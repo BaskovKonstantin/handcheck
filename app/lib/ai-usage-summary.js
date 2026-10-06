@@ -1,6 +1,7 @@
 "use strict";
 
 const { getDb } = require("../db");
+const { dbDateToIso, sqlDatetimeExpr } = require("./db-datetime");
 
 const ASSESSMENT_TOOLS = new Set([
   "start_assessment",
@@ -177,6 +178,33 @@ function buildActivityLines(calls, stats) {
   return lines.slice(0, 6);
 }
 
+function sqliteComparableTimestamp(value) {
+  const iso = dbDateToIso(value);
+  if (!iso) return String(value || "");
+  return iso.slice(0, 19).replace("T", " ");
+}
+
+function clientsFromAssessmentCalls(db, candidateUserId, window) {
+  const fromSlack = new Date(dbDateToIso(window.from) || window.from);
+  fromSlack.setMinutes(fromSlack.getMinutes() - 5);
+  const fromIso = sqliteComparableTimestamp(fromSlack);
+  const toIso = sqliteComparableTimestamp(window.to);
+  const dt = sqlDatetimeExpr("c.created_at");
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT s.client_name, s.client_version, tok.client_where
+       FROM mcp_tool_calls c
+       INNER JOIN mcp_client_sessions s ON s.id = c.session_id
+       LEFT JOIN api_tokens tok ON tok.id = s.api_token_id
+       WHERE c.user_id = ? AND c.ok = 1
+         AND c.tool_name IN ('start_assessment', 'submit_answer', 'submit_work_task', 'get_task', 'list_tasks')
+         AND ${dt} >= datetime(?) AND ${dt} <= datetime(?)
+       ORDER BY s.last_seen_at DESC`
+    )
+    .all(candidateUserId, fromIso, toIso);
+  return [...new Set(rows.map(formatClientLabel).filter(Boolean))];
+}
+
 function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
   if (!employerMayViewCandidateAiUsage(employerUserId, candidateUserId)) {
     return null;
@@ -192,19 +220,25 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
 
   let calls = [];
   if (window) {
-    const fromSlack = new Date(window.from);
+    const fromSlack = new Date(dbDateToIso(window.from) || window.from);
     fromSlack.setMinutes(fromSlack.getMinutes() - 5);
-    const fromIso = fromSlack.toISOString();
+    const fromIso = sqliteComparableTimestamp(fromSlack);
+    const toIso = sqliteComparableTimestamp(window.to);
+    const dt = sqlDatetimeExpr("created_at");
     calls = db
       .prepare(
-        `SELECT tool_name, intent_text, created_at FROM mcp_tool_calls
+        `SELECT tool_name, intent_text, created_at, session_id FROM mcp_tool_calls
          WHERE user_id = ? AND ok = 1
            AND tool_name IN ('start_assessment', 'submit_answer', 'submit_work_task', 'get_task', 'list_tasks')
-           AND created_at >= ? AND created_at <= ?
+           AND ${dt} >= datetime(?) AND ${dt} <= datetime(?)
          ORDER BY created_at ASC`
       )
-      .all(candidateUserId, fromIso, window.to);
+      .all(candidateUserId, fromIso, toIso);
   }
+
+  const clients = window
+    ? clientsFromAssessmentCalls(db, candidateUserId, window)
+    : [];
 
   let sessions = db
     .prepare(
@@ -216,17 +250,23 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
     )
     .all(candidateUserId);
 
-  let inWindowSessions = sessions;
-  let postWindowSessions = [];
+  let postClients = [];
   if (window) {
-    inWindowSessions = sessions.filter(
-      (s) => s.last_seen_at >= window.from && s.last_seen_at <= window.to
-    );
-    postWindowSessions = sessions.filter((s) => s.last_seen_at > window.to);
+    const windowEnd = sqliteComparableTimestamp(window.to);
+    postClients = [
+      ...new Set(
+        sessions
+          .filter((s) => {
+            const seen = sqliteComparableTimestamp(s.last_seen_at);
+            return seen && seen > windowEnd;
+          })
+          .map(formatClientLabel)
+          .filter(Boolean)
+          .filter((label) => !clients.includes(label))
+      ),
+    ];
   }
 
-  const clients = [...new Set(inWindowSessions.map(formatClientLabel).filter(Boolean))];
-  const postClients = [...new Set(postWindowSessions.map(formatClientLabel).filter(Boolean))];
   const activityLines = buildActivityLines(calls, stats);
   const activityHeadline = activityHeadlineFromBattery(stats);
 

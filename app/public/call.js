@@ -175,7 +175,7 @@ async function init() {
       roomHost.innerHTML = `<article class="panel call-result-card">
         <div class="call-result-head">
           <span class="status-pill ended">Завершён</span>
-          <h2 class="h2">Звонок с ${esc(who)}</h2>
+          <h2 class="h2">${me.role === "employer" ? `Звонок с кандидатом: ${esc(who)}` : `Звонок с ${esc(who)}`}</h2>
         </div>
         ${metaRows ? `<dl class="call-result-meta">${metaRows}</dl>` : ""}
         ${analysis}
@@ -188,6 +188,15 @@ async function init() {
       return;
     }
     HandCheck.bootCabinetPage(me.role, () => {});
+    const heroTitle = document.querySelector(".call-room-hero h1");
+    if (heroTitle) {
+      const prefix = me.role === "employer" ? "Звонок с кандидатом: " : "Звонок с ";
+      const name =
+        me.role === "employer"
+          ? info.candidateName || "кандидатом"
+          : info.companyName || "компанией";
+      heroTitle.textContent = prefix + name;
+    }
     renderRoomShell();
     if (info.status === "live") {
       setCallLede("Разговор в эфире. Запись ведётся после вашего согласия при входе.");

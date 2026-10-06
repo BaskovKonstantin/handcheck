@@ -25,6 +25,7 @@ const {
 const { validateNeedBody } = require("../../lib/need-validation");
 const { validateAnswerText } = require("../../lib/assessment-answer");
 const { dbDateToIso } = require("../../lib/db-datetime");
+const { publicCandidateDisplayName, sanitizeStoredDisplayName } = require("../../lib/public-candidate-name");
 
 function mcpError(message, code = "invalid_request") {
   const err = new Error(message);
@@ -43,17 +44,20 @@ function httpErrToMcp(err) {
     invitation_final: "Ответ на приглашение уже зафиксирован",
     candidate_paused: "Кандидат на паузе — новые приглашения не отправляются",
     candidate_rejected: "Кандидат отклонён по этой потребности",
-    candidate_deferred: "Кандидат в отложенных",
+    candidate_deferred: "Кандидат в отложенных — верните его в подбор",
     candidate_not_in_pool: "Кандидат не подходит под эту потребность",
+    need_inactive: "Потребность неактивна — новые приглашения отправить нельзя",
   };
   throw mcpError(map[err.code] || err.message || "Ошибка запроса", err.code || "invalid_request");
 }
 
 function getCandidateProfile(userId) {
-  const p = getDb().prepare("SELECT * FROM candidate_profiles WHERE user_id = ?").get(userId);
+  const db = getDb();
+  const p = db.prepare("SELECT * FROM candidate_profiles WHERE user_id = ?").get(userId);
   if (!p) throw mcpError("Профиль кандидата не найден", "not_found");
+  const user = db.prepare("SELECT email FROM users WHERE id = ?").get(userId);
   return {
-    displayName: p.display_name,
+    displayName: sanitizeStoredDisplayName(p.display_name, user?.email),
     stack: JSON.parse(p.stack_json || "[]"),
     phone: p.phone,
     contactEmail: p.contact_email,
@@ -322,10 +326,11 @@ function createEmployerNeed(userId, body) {
   }
   const id = newId();
   const v = parsed.value;
+  const activeFlag = v.active === undefined ? 1 : v.active ? 1 : 0;
   getDb()
     .prepare(
       `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -335,7 +340,8 @@ function createEmployerNeed(userId, body) {
       v.grade || "middle",
       JSON.stringify(v.stack || []),
       v.domainText || "",
-      v.notes || ""
+      v.notes || "",
+      activeFlag
     );
   return { id };
 }
@@ -466,15 +472,16 @@ function listShortlist(userId, needId, filters = {}) {
 function listEmployerInvitations(userId) {
   const rows = getDb()
     .prepare(
-      `SELECT i.*, cp.display_name FROM invitations i
+      `SELECT i.*, cp.display_name, u.email AS candidate_email FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       JOIN users u ON u.id = i.candidate_user_id
        WHERE i.employer_user_id = ? ORDER BY i.created_at DESC`
     )
     .all(userId);
   return rows.map((r) => ({
     id: r.id,
     candidateId: r.candidate_user_id,
-    candidateName: r.display_name,
+    candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
     salaryFrom: r.salary_from,
     salaryTo: r.salary_to,
     status: r.status,
@@ -486,7 +493,7 @@ function listEmployerInvitations(userId) {
 function listEmployerCalls(userId) {
   const rows = getDb()
     .prepare(
-      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, cp.display_name,
+      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, cp.display_name, u.email AS candidate_email,
               c.id AS call_id, c.status AS call_status, c.ended_at, n.title AS need_title
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
@@ -500,7 +507,7 @@ function listEmployerCalls(userId) {
     invitationId: r.invitation_id,
     callId: r.call_id,
     callStatus: r.call_status || "ready",
-    candidateName: r.display_name,
+    candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
     needTitle: r.need_title,
   }));
 }
@@ -513,7 +520,8 @@ function getCallAnalysis(userId, callId) {
   if (inv.employer_user_id !== userId) throw mcpError("Нет доступа", "forbidden");
   const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
   if (!a) throw mcpError("Разбор звонка ещё не готов", "not_ready");
-  return { summaryText: a.summary_text };
+  const aiUsage = summarizeAiUsageForEmployer(userId, inv.candidate_user_id);
+  return { summaryText: a.summary_text, aiUsage };
 }
 
 function getNeedResource(userId, role, needId) {

@@ -98,7 +98,18 @@ describe("round 20 findings", () => {
         )
         .get(borisId);
       const callAt = bat?.started_at || new Date().toISOString();
-      if (bat) {
+      if (!bat) {
+        const batId = newId();
+        db.prepare(
+          `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at, completed_at)
+           VALUES (?, ?, 'backend', 'middle', 'A', ?, ?)`
+        ).run(batId, borisId, callAt, callAt);
+        const taskId = db.prepare("SELECT id FROM tasks WHERE type = 'quick' LIMIT 1").get().id;
+        db.prepare(
+          `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, answer_text, submitted_at, action_source)
+           VALUES (?, ?, ?, ?, 'A', 'ok', ?, 'mcp')`
+        ).run(newId(), borisId, taskId, batId, callAt);
+      } else if (bat) {
         const taskId = db.prepare("SELECT id FROM tasks WHERE type = 'quick' LIMIT 1").get().id;
         db.prepare(
           `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, answer_text, submitted_at, action_source)
@@ -108,6 +119,10 @@ describe("round 20 findings", () => {
       db.prepare(
         `INSERT INTO mcp_tool_calls (id, session_id, user_id, api_token_id, tool_name, args_masked_json, intent_text, ok, created_at)
          VALUES (?, ?, ?, ?, 'submit_answer', '{}', 'проверяю REST', 1, ?)`
+      ).run(newId(), sessionId, borisId, tokenId, callAt);
+      db.prepare(
+        `INSERT INTO mcp_tool_calls (id, session_id, user_id, api_token_id, tool_name, args_masked_json, intent_text, ok, created_at)
+         VALUES (?, ?, ?, ?, 'start_assessment', '{}', 'начну', 1, ?)`
       ).run(newId(), sessionId, borisId, tokenId, callAt);
     });
 

@@ -151,13 +151,11 @@
     const auditRows = (audit.items || [])
       .map((a) => {
         const status = a.ok ? "Успешно" : "Ошибка";
-        const intent = a.intent ? `<p class="audit-row-meta">Запрос: ${escapeHtml(a.intent)}</p>` : "";
         return `<li class="audit-row">
           <span class="invite-meta">${HandCheck.formatDateTimeMoscow(a.at)}</span>
           <div class="audit-row-main">
             <p class="audit-row-title">${escapeHtml(a.text || a.tool)}</p>
             <p class="audit-row-meta">${escapeHtml(a.client || "ИИ-клиент")} · ${status}</p>
-            ${intent}
           </div>
         </li>`;
       })

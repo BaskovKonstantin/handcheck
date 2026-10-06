@@ -32,7 +32,7 @@ router.post("/register", (req, res, next) => {
     if (role === "candidate") {
       db.prepare(
         "INSERT INTO candidate_profiles (user_id, display_name, contact_email) VALUES (?, ?, ?)"
-      ).run(id, email.split("@")[0], email);
+      ).run(id, "", email);
     } else {
       db.prepare(
         "INSERT INTO employer_profiles (user_id, company_name, contact_email) VALUES (?, ?, ?)"

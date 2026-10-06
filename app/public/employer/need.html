@@ -78,10 +78,9 @@
 
       function paintForm(n) {
         const specGrade = (item) => {
-          const s = item.specialization || "backend";
-          const g = item.grade || "middle";
+          const label = HandCheck.formatSpecGradeLabel(item.specialization, item.grade);
           const inactive = item.active ? "" : " (неактивна)";
-          return ` · ${s} ${g}${inactive}`;
+          return label ? ` · ${label}${inactive}` : inactive;
         };
         const options = needs
           .map(
@@ -104,7 +103,7 @@
               <button type="button" class="btn-ghost btn-sm" id="create-need-cancel">Отмена</button>
             </div>
           </div>
-          <label class="need-active-toggle"><input type="checkbox" id="need-active"${n.active ? " checked" : ""} /> Потребность активна (показывается в колоде и списке)</label>
+          <label class="need-active-toggle"><input type="checkbox" id="need-active"${n.active ? " checked" : ""} /> Потребность активна (можно приглашать кандидатов)</label>
           <label>Название <input id="title" value="${HandCheck.escapeHtml(n.title || "")}" /></label>
           <label>Специализация
             <select id="spec">
@@ -126,6 +125,10 @@
         refreshDirty();
         document.getElementById("need-select").onchange = () => {
           activeId = document.getElementById("need-select").value;
+          HandCheck.persistEmployerNeedId(activeId);
+          const p = new URLSearchParams(location.search);
+          p.set("need", activeId);
+          history.replaceState({}, "", `${location.pathname}?${p.toString()}`);
           const picked = needs.find((x) => x.id === activeId) || needs[0];
           paintTiles(picked);
           document.getElementById("title").value = picked.title || "";
@@ -225,8 +228,16 @@
           needs = again.items || [];
           activeId = res.id;
         }
+        const params = new URLSearchParams(location.search);
+        activeId = HandCheck.resolveEmployerNeedId(needs, params);
         const n = needs.find((x) => x.id === activeId) || needs[0];
         activeId = n.id;
+        HandCheck.persistEmployerNeedId(activeId);
+        const p = new URLSearchParams(location.search);
+        if (p.get("need") !== activeId) {
+          p.set("need", activeId);
+          history.replaceState({}, "", `${location.pathname}?${p.toString()}`);
+        }
         paintTiles(n);
         paintForm(n);
       }

@@ -10,3 +10,4 @@ dist/
 .vscode/
 handcheck-ui/mcp-integrations/*.sqlite
 handcheck-ui/mcp-integrations/session.secret
+session.secret

@@ -58,7 +58,18 @@ router.post("/tokens", (req, res, next) => {
         "Нужно согласие на запись действий ИИ-клиента (имя клиента, вызовы инструментов без секретов)";
     }
     if (Object.keys(fields).length) throw httpError(400, "invalid_body", { fields });
-    const scopes = normalizeScopes(req.body?.scopes);
+    const rawScopes = req.body?.scopes;
+    let scopes;
+    if (rawScopes === undefined || rawScopes === null) {
+      scopes = ["read"];
+    } else {
+      scopes = normalizeScopes(rawScopes);
+      if (!scopes.length) {
+        throw httpError(400, "invalid_body", {
+          fields: { scopes: "Выберите права: чтение и/или запись" },
+        });
+      }
+    }
     const { raw, hash, displayPrefix } = generateTokenMaterial();
     const id = newId();
     const now = new Date().toISOString();

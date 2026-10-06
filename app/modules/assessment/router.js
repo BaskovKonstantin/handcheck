@@ -30,7 +30,13 @@ router.post("/battery/start", (req, res, next) => {
   try {
     const specialization = String(req.body?.specialization || "").trim();
     const grade = String(req.body?.grade || "").trim();
-    if (!specialization || !grade) throw httpError(400, "invalid_body");
+    const allowedSpec = new Set(["backend", "frontend", "qa"]);
+    const allowedGrade = new Set(["junior", "middle", "senior"]);
+    if (!allowedSpec.has(specialization) || !allowedGrade.has(grade)) {
+      throw httpError(400, "invalid_body", {
+        fields: { category: "Выберите специализацию / грейд" },
+      });
+    }
     const db = getDb();
     const last = lastSpecializationAttempt(req.user.id, specialization);
     if (cooldownActive(last?.completed_at)) {
@@ -96,12 +102,17 @@ router.get("/tasks/:attemptId", (req, res, next) => {
   const db = getDb();
   const row = db
     .prepare(
-      `SELECT a.id, a.battery_id, t.prompt, t.type FROM attempts a JOIN tasks t ON t.id = a.task_id
+      `SELECT a.id, a.battery_id, a.submitted_at, a.answer_text, t.prompt, t.type FROM attempts a JOIN tasks t ON t.id = a.task_id
        WHERE a.id = ? AND a.candidate_user_id = ?`
     )
     .get(req.params.attemptId, req.user.id);
   if (!row) return next(httpError(404, "not_found"));
-  res.json({ id: row.id, prompt: row.prompt, type: row.type });
+  res.json({
+    id: row.id,
+    prompt: row.prompt,
+    type: row.type,
+    draftText: row.submitted_at ? "" : String(row.answer_text || ""),
+  });
 });
 
 router.patch("/tasks/:attemptId/draft", (req, res, next) => {

@@ -178,10 +178,14 @@ function logToolCall(ctx, toolName, args, result) {
   const errorCode = ok ? null : "tool_error";
   const durationMs = result?.durationMs ?? null;
   const summary = humanToolSummary(toolName, ok, args);
+  const now = new Date().toISOString();
+  if (sessionId) {
+    db.prepare("UPDATE mcp_client_sessions SET last_seen_at = ? WHERE id = ?").run(now, sessionId);
+  }
   db.prepare(
     `INSERT INTO mcp_tool_calls
-     (id, session_id, user_id, api_token_id, tool_name, args_masked_json, intent_text, ok, error_code, duration_ms)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     (id, session_id, user_id, api_token_id, tool_name, args_masked_json, intent_text, ok, error_code, duration_ms, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     newId(),
     sessionId,
@@ -192,7 +196,8 @@ function logToolCall(ctx, toolName, args, result) {
     intent,
     ok ? 1 : 0,
     errorCode,
-    durationMs
+    durationMs,
+    now
   );
   db.prepare(
     `INSERT INTO mcp_audit_log (user_id, api_token_id, tool_name, ok, result_summary)

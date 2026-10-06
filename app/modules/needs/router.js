@@ -34,10 +34,11 @@ router.post("/needs", (req, res, next) => {
   if (!parsed.ok) return next(httpError(400, "invalid_body", { fields: parsed.fields }));
   const id = newId();
   const v = parsed.value;
+  const activeFlag = v.active === undefined ? 1 : v.active ? 1 : 0;
   getDb()
     .prepare(
       `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -47,7 +48,8 @@ router.post("/needs", (req, res, next) => {
       v.grade || "middle",
       JSON.stringify(v.stack || []),
       v.domainText || "",
-      v.notes || ""
+      v.notes || "",
+      activeFlag
     );
   res.status(201).json({ id });
 });

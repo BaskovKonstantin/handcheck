@@ -62,8 +62,8 @@ async function main() {
   const inv = await agent.post("/api/employer/invitations").send({
     needId: need.id,
     candidateId: annaId,
-    salaryFrom: 100,
-    salaryTo: 200,
+    salaryFrom: 100000,
+    salaryTo: 200000,
     offerText: "hi",
     contactChannel: "tg",
   });
@@ -78,8 +78,8 @@ async function main() {
   const inv2 = await agent.post("/api/employer/invitations").send({
     needId: need.id,
     candidateId: borisId,
-    salaryFrom: 100,
-    salaryTo: 200,
+    salaryFrom: 100000,
+    salaryTo: 200000,
     offerText: "hi",
     contactChannel: "tg",
   });

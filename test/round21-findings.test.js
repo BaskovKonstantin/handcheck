@@ -105,7 +105,7 @@ describe("round 21 findings", () => {
   });
 
   it("4: salary upper bound and offer length", () => {
-    const high = parseSalaryRange(1, 1e15);
+    const high = parseSalaryRange(100_000, 1e15);
     assert.match(high.fields.salaryRange, /Слишком большая сумма/);
   });
 

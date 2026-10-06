@@ -28,7 +28,7 @@ function bootServer() {
 
 function loadStatTilesHtml() {
   const src = fs.readFileSync(path.join(__dirname, "../app/public/app.js"), "utf8");
-  const fn = src.match(/function statTilesHtml\(tiles\) \{[\s\S]*?\n\}/);
+  const fn = src.match(/function statTilesHtml\(tiles[^)]*\) \{[\s\S]*?\n\}/);
   assert.ok(fn);
   const escFn = src.match(/function escapeHtml\(text\) \{[\s\S]*?\n\}/);
   // eslint-disable-next-line no-new-func
@@ -151,6 +151,7 @@ describe("round 22 findings", () => {
   it("P1-4: public candidate name fallback", () => {
     assert.equal(publicCandidateDisplayName(""), "Кандидат без имени");
     assert.equal(publicCandidateDisplayName("  Анна  "), "Анна");
+    assert.equal(publicCandidateDisplayName("r24h-1", "r24h-1@demo.local"), "Кандидат без имени");
   });
 
   it("P1-5: empty company name rejected", async () => {

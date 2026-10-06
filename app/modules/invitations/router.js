@@ -24,10 +24,13 @@ router.post("/invitations", (req, res, next) => {
 router.get("/invitations", (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT i.*, cp.display_name, cp.phone, cp.contact_email, n.title AS need_title
+      `SELECT i.*, cp.display_name, cp.phone, cp.contact_email, n.title AS need_title, u.email AS candidate_email,
+              c.status AS call_status
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       JOIN users u ON u.id = i.candidate_user_id
        JOIN employer_needs n ON n.id = i.need_id
+       LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.employer_user_id = ?
          AND (
            (SELECT is_test FROM users WHERE id = i.candidate_user_id) = 0
@@ -41,8 +44,9 @@ router.get("/invitations", (req, res) => {
       const item = {
         id: r.id,
         candidateId: r.candidate_user_id,
-        candidateName: publicCandidateDisplayName(r.display_name),
+        candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
         needTitle: r.need_title,
+        callStatus: r.call_status || null,
         salaryFrom: r.salary_from,
         salaryTo: r.salary_to,
         status: r.status,
@@ -55,6 +59,16 @@ router.get("/invitations", (req, res) => {
         item.candidatePhone = r.phone;
         item.candidateContactEmail = r.contact_email;
       }
+      const hadPriorDecline = Boolean(
+        getDb()
+          .prepare(
+            `SELECT 1 FROM invitations i2
+             WHERE i2.employer_user_id = ? AND i2.need_id = ? AND i2.candidate_user_id = ?
+               AND i2.status = 'declined' AND i2.created_at < ? LIMIT 1`
+          )
+          .get(req.user.id, r.need_id, r.candidate_user_id, r.created_at)
+      );
+      item.hadPriorDecline = hadPriorDecline;
       return item;
     }),
   });
@@ -63,12 +77,13 @@ router.get("/invitations", (req, res) => {
 router.get("/calls", (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, i.candidate_user_id, cp.display_name,
+      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, i.candidate_user_id, cp.display_name, u.email AS candidate_email,
               i.salary_from, i.salary_to,
               c.id AS call_id, c.status AS call_status, c.started_at, c.ended_at, n.title AS need_title,
               c.recording_path
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       JOIN users u ON u.id = i.candidate_user_id
        JOIN employer_needs n ON n.id = i.need_id
        LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.employer_user_id = ? AND i.status = 'accepted'
@@ -84,7 +99,7 @@ router.get("/calls", (req, res) => {
       callStatus: r.call_status || "ready",
       startedAt: dbDateToIso(r.started_at),
       endedAt: dbDateToIso(r.ended_at),
-      candidateName: publicCandidateDisplayName(r.display_name),
+      candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
       needTitle: r.need_title,
       salaryFrom: r.salary_from,
       salaryTo: r.salary_to,

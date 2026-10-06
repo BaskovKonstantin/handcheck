@@ -56,6 +56,24 @@ function cooldownActive(completedAt) {
 
 function finalizeBattery(batteryId, userId, claimedGrade) {
   const db = getDb();
+  const batteryRow = db.prepare("SELECT completed_at, specialization FROM batteries WHERE id = ?").get(batteryId);
+  if (batteryRow?.completed_at) {
+    const catRow = db
+      .prepare(
+        `SELECT c.label FROM candidate_categories cc JOIN categories c ON c.id = cc.category_id
+         WHERE cc.candidate_user_id = ?`
+      )
+      .get(userId);
+    if (catRow?.label) {
+      return { passed: true, message: "confirmed", label: catRow.label, alreadyFinalized: true };
+    }
+    return {
+      passed: false,
+      message: "not_confirmed",
+      retakeAfterDays: config.GRADE_COOLDOWN_DAYS,
+      alreadyFinalized: true,
+    };
+  }
   const attempts = db
     .prepare(
       `SELECT a.*, t.type, t.rubric_json FROM attempts a JOIN tasks t ON t.id = a.task_id

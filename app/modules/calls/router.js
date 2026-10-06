@@ -18,6 +18,8 @@ const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail);
 
 const RECORDING_LIMIT = 80 * 1024 * 1024;
+const RECORDING_GRACE_MS = 45 * 1000;
+const { assertWebmUpload } = require("../../lib/webm");
 
 router.param("id", (req, res, next, id) => {
   if (!isUuid(id)) return next(httpError(400, "invalid_id"));
@@ -64,13 +66,32 @@ router.get("/for-invitation/:invitationId", (req, res, next) => {
   const inv = getInvitationAccess(req.user.id, req.params.invitationId);
   if (!inv) return next(httpError(403, "forbidden"));
   const call = ensureCall(inv.id);
-  res.json({
+  const db = getDb();
+  const need = db.prepare("SELECT title FROM employer_needs WHERE id = ?").get(inv.need_id);
+  const employer = db
+    .prepare("SELECT company_name FROM employer_profiles WHERE user_id = ?")
+    .get(inv.employer_user_id);
+  const candidate = db
+    .prepare("SELECT display_name FROM candidate_profiles WHERE user_id = ?")
+    .get(inv.candidate_user_id);
+  const payload = {
     callId: call.id,
     status: call.status,
     endedAt: call.ended_at ? dbDateToIso(call.ended_at) : null,
+    startedAt: call.started_at ? dbDateToIso(call.started_at) : null,
     consentCandidate: Boolean(call.consent_at_candidate),
     consentEmployer: Boolean(call.consent_at_employer),
-  });
+    needTitle: need?.title || "",
+    companyName: employer?.company_name || "",
+    candidateName: candidate?.display_name || "",
+    salaryFrom: inv.salary_from,
+    salaryTo: inv.salary_to,
+  };
+  if (req.user.role === "employer" && call.status === "ended") {
+    const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
+    if (a) payload.analysisText = a.summary_text;
+  }
+  res.json(payload);
 });
 
 router.post("/:id/consent", (req, res, next) => {
@@ -101,11 +122,15 @@ router.post("/:id/start", (req, res, next) => {
   if (isCandidate && !call.consent_at_candidate) return next(httpError(400, "consent_required"));
   if (isEmployer && !call.consent_at_employer) return next(httpError(400, "consent_required"));
   const updated = db.prepare("SELECT * FROM calls WHERE id = ?").get(call.id);
+  if (call.status === "ended") {
+    return next(httpError(409, "call_ended"));
+  }
   if (updated.consent_at_candidate && updated.consent_at_employer && updated.status === "ready") {
     const now = new Date().toISOString();
     db.prepare("UPDATE calls SET status = 'live', started_at = ? WHERE id = ?").run(now, call.id);
   }
-  res.json({ ok: true, status: db.prepare("SELECT status FROM calls WHERE id = ?").get(call.id).status });
+  const status = db.prepare("SELECT status FROM calls WHERE id = ?").get(call.id).status;
+  res.json({ ok: true, status });
 });
 
 router.post("/:id/end", (req, res, next) => {
@@ -120,8 +145,12 @@ router.post("/:id/end", (req, res, next) => {
   if (call.status === "ended") {
     return res.json({ ok: true, status: "ended" });
   }
-  if (call.status !== "live" && call.status !== "ready") {
-    return next(httpError(409, "invalid_body"));
+  if (call.status !== "live") {
+    return next(
+      httpError(409, "call_not_live", {
+        fields: { call: "Завершить можно только активный звонок" },
+      })
+    );
   }
   const now = new Date().toISOString();
   db.prepare("UPDATE calls SET status = 'ended', ended_at = ? WHERE id = ?").run(now, call.id);
@@ -135,17 +164,37 @@ router.post(
   handleMulterUpload,
   (req, res, next) => {
   const callId = req.params.id;
-  const side = req.body?.side;
-  if (!["candidate", "employer"].includes(side)) return next(httpError(400, "invalid_side"));
   if (!req.file?.buffer) return next(httpError(400, "file_required"));
+  if (!assertWebmUpload(req.file)) {
+    return next(
+      httpError(400, "invalid_recording", {
+        fields: { file: "Нужен файл записи в формате WebM" },
+      })
+    );
+  }
   const db = getDb();
-  const call = db.prepare("SELECT id, invitation_id FROM calls WHERE id = ?").get(callId);
+  const call = db.prepare("SELECT id, invitation_id, status, ended_at FROM calls WHERE id = ?").get(callId);
   if (!call) return next(httpError(404, "not_found"));
   const inv = db.prepare("SELECT candidate_user_id, employer_user_id FROM invitations WHERE id = ?").get(
     call.invitation_id
   );
   if (!inv || ![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
     return next(httpError(403, "forbidden"));
+  }
+  const side =
+    req.user.id === inv.candidate_user_id
+      ? "candidate"
+      : req.user.id === inv.employer_user_id
+        ? "employer"
+        : null;
+  if (!side) return next(httpError(403, "forbidden"));
+  if (call.status === "ended") {
+    const endedAt = call.ended_at ? new Date(call.ended_at).getTime() : 0;
+    if (Date.now() - endedAt > RECORDING_GRACE_MS) {
+      return next(httpError(409, "call_ended"));
+    }
+  } else if (call.status !== "live") {
+    return next(httpError(409, "call_not_live"));
   }
   const callsRoot = path.resolve(config.CALLS_DIR);
   const dir = path.resolve(callsRoot, callId);
@@ -171,6 +220,9 @@ router.post("/:id/transcript-chunk", (req, res, next) => {
   const inv = db.prepare("SELECT * FROM invitations WHERE id = ?").get(call.invitation_id);
   if (![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
     return next(httpError(403, "forbidden"));
+  }
+  if (call.status !== "live") {
+    return next(httpError(409, "call_not_live"));
   }
   const merged = (call.transcript_text + " " + text).trim();
   db.prepare("UPDATE calls SET transcript_text = ? WHERE id = ?").run(merged, call.id);

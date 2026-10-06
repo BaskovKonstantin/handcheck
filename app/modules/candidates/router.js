@@ -6,6 +6,13 @@ const { newId } = require("../../lib/ids");
 const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
+const {
+  validateDisplayName,
+  validateOptionalEmail,
+  validateOptionalPhone,
+  validateBackgroundEpisode,
+} = require("../../lib/validation");
+const { dbDateToIso } = require("../../lib/db-datetime");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("candidate"));
@@ -26,16 +33,33 @@ router.get("/profile", (req, res) => {
 
 router.put("/profile", (req, res, next) => {
   try {
-    const displayName = String(req.body?.displayName || "").trim();
-    const stack = Array.isArray(req.body?.stack) ? req.body.stack : [];
-    const phone = String(req.body?.phone || "").trim();
-    const contactEmail = String(req.body?.contactEmail || "").trim();
-    getDb()
-      .prepare(
-        `UPDATE candidate_profiles SET display_name = ?, stack_json = ?, phone = ?, contact_email = ?
-         WHERE user_id = ?`
-      )
-      .run(displayName, JSON.stringify(stack), phone, contactEmail, req.user.id);
+    const db = getDb();
+    const existing = db.prepare("SELECT * FROM candidate_profiles WHERE user_id = ?").get(req.user.id);
+    const fields = {};
+    let displayName = existing.display_name;
+    if (req.body?.displayName !== undefined) {
+      const v = validateDisplayName(req.body.displayName);
+      Object.assign(fields, v.fields);
+      if (!v.fields.displayName) displayName = v.displayName;
+    }
+    const stack = Array.isArray(req.body?.stack) ? req.body.stack : JSON.parse(existing.stack_json || "[]");
+    let phone = existing.phone || "";
+    if (req.body?.phone !== undefined) {
+      const v = validateOptionalPhone(req.body.phone);
+      Object.assign(fields, v.fields);
+      if (!v.fields.phone) phone = v.phone;
+    }
+    let contactEmail = existing.contact_email || "";
+    if (req.body?.contactEmail !== undefined) {
+      const v = validateOptionalEmail(req.body.contactEmail);
+      Object.assign(fields, v.fields);
+      if (!v.fields.contactEmail) contactEmail = v.value;
+    }
+    if (Object.keys(fields).length) throw httpError(400, "invalid_body", { fields });
+    db.prepare(
+      `UPDATE candidate_profiles SET display_name = ?, stack_json = ?, phone = ?, contact_email = ?
+       WHERE user_id = ?`
+    ).run(displayName, JSON.stringify(stack), phone, contactEmail, req.user.id);
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -51,9 +75,10 @@ router.get("/background", (req, res) => {
   res.json({ items: rows });
 });
 
-router.post("/background", (req, res) => {
+router.post("/background", (req, res, next) => {
+  try {
   const id = newId();
-  const { roleTitle = "", domain = "", industry = "", note = "" } = req.body || {};
+  const { roleTitle, domain, industry, note } = validateBackgroundEpisode(req.body || {});
   getDb()
     .prepare(
       `INSERT INTO background_episodes (id, candidate_user_id, role_title, domain, industry, note)
@@ -61,6 +86,9 @@ router.post("/background", (req, res) => {
     )
     .run(id, req.user.id, roleTitle, domain, industry, note);
   res.status(201).json({ id });
+  } catch (e) {
+    next(e);
+  }
 });
 
 router.delete("/background/:id", (req, res) => {
@@ -149,13 +177,85 @@ router.get("/invitations", (req, res) => {
         contactChannel: r.contact_channel,
         status: r.status,
         companyName: r.company_name,
-        createdAt: r.created_at,
+        createdAt: dbDateToIso(r.created_at),
       };
       if (r.status === "accepted") {
         item.employerContactEmail = r.employer_contact_email;
       }
       return item;
     }),
+  });
+});
+
+router.get("/past", (req, res) => {
+  const db = getDb();
+  const appConfig = require("../../config");
+  const batteries = db
+    .prepare(
+      `SELECT b.id, b.specialization, b.claimed_grade, b.completed_at, c.label
+       FROM batteries b
+       LEFT JOIN categories c ON c.specialization = b.specialization AND c.grade = b.claimed_grade
+       WHERE b.candidate_user_id = ? AND b.completed_at IS NOT NULL
+       ORDER BY b.completed_at DESC`
+    )
+    .all(req.user.id);
+  const cat = db
+    .prepare(
+      `SELECT cc.specialization, cc.grade, c.label FROM candidate_categories cc
+       JOIN categories c ON c.id = cc.category_id WHERE cc.candidate_user_id = ?`
+    )
+    .get(req.user.id);
+  const batteryItems = batteries.map((b) => {
+    const passed = cat && cat.specialization === b.specialization && cat.grade === b.claimed_grade;
+    let retakeAt = null;
+    if (b.completed_at) {
+      const d = new Date(dbDateToIso(b.completed_at));
+      d.setDate(d.getDate() + Number(appConfig.GRADE_COOLDOWN_DAYS || 90));
+      retakeAt = d.toISOString();
+    }
+    return {
+      completedAt: dbDateToIso(b.completed_at),
+      label: b.label || `${b.specialization} × ${b.claimed_grade}`,
+      outcome: passed ? "категория подтверждена" : "категория не подтверждена",
+      retakeAt: passed ? null : retakeAt,
+    };
+  });
+  const invitations = db
+    .prepare(
+      `SELECT i.status, i.created_at, i.salary_from, i.salary_to, e.company_name, n.title
+       FROM invitations i
+       JOIN employer_profiles e ON e.user_id = i.employer_user_id
+       JOIN employer_needs n ON n.id = i.need_id
+       WHERE i.candidate_user_id = ? AND i.status IN ('accepted', 'declined')
+       ORDER BY i.created_at DESC`
+    )
+    .all(req.user.id);
+  const calls = db
+    .prepare(
+      `SELECT c.ended_at, e.company_name, n.title
+       FROM invitations i
+       JOIN calls c ON c.invitation_id = i.id
+       JOIN employer_profiles e ON e.user_id = i.employer_user_id
+       JOIN employer_needs n ON n.id = i.need_id
+       WHERE i.candidate_user_id = ? AND c.status = 'ended'
+       ORDER BY c.ended_at DESC`
+    )
+    .all(req.user.id);
+  res.json({
+    batteries: batteryItems,
+    invitations: invitations.map((r) => ({
+      status: r.status,
+      at: dbDateToIso(r.created_at),
+      companyName: r.company_name,
+      needTitle: r.title,
+      salaryFrom: r.salary_from,
+      salaryTo: r.salary_to,
+    })),
+    calls: calls.map((r) => ({
+      endedAt: dbDateToIso(r.ended_at),
+      companyName: r.company_name,
+      needTitle: r.title,
+    })),
   });
 });
 
@@ -176,13 +276,13 @@ router.get("/calls", (req, res) => {
   res.json({
     items: rows.map((r) => ({
       invitationId: r.invitation_id,
-      invitationAt: r.invitation_at,
+      invitationAt: dbDateToIso(r.invitation_at),
       salaryFrom: r.salary_from,
       salaryTo: r.salary_to,
       callId: r.call_id,
       callStatus: r.call_status || "ready",
-      startedAt: r.started_at,
-      endedAt: r.ended_at,
+      startedAt: dbDateToIso(r.started_at),
+      endedAt: dbDateToIso(r.ended_at),
       companyName: r.company_name,
       needTitle: r.need_title,
       roomUrl: `/call/${r.invitation_id}`,

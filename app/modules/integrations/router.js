@@ -24,7 +24,7 @@ router.use(requireAuth, requireConfirmedEmail);
 router.get("/tokens", (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT id, name, token_prefix, scopes_json, created_at, last_used_at, revoked_at
+      `SELECT id, name, token_prefix, scopes_json, client_where, created_at, last_used_at, revoked_at
        FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC`
     )
     .all(req.user.id);
@@ -33,6 +33,7 @@ router.get("/tokens", (req, res) => {
       id: r.id,
       name: r.name,
       prefix: r.token_prefix,
+      clientWhere: r.client_where || "",
       scopes: JSON.parse(r.scopes_json || "[]"),
       createdAt: dbDateToIso(r.created_at),
       lastUsedAt: dbDateToIso(r.last_used_at),
@@ -44,16 +45,28 @@ router.get("/tokens", (req, res) => {
 router.post("/tokens", (req, res, next) => {
   try {
     const name = String(req.body?.name || "").trim();
-    if (!name || name.length > 80) throw httpError(400, "invalid_body");
+    const clientWhere = String(req.body?.clientWhere || req.body?.client_where || "").trim();
+    const consent = req.body?.loggingConsent === true || req.body?.consent === true;
+    const fields = {};
+    if (!name || name.length > 80) fields.tokenName = "Укажите название токена (до 80 символов)";
+    if (!clientWhere || clientWhere.length > 120) {
+      fields.clientWhere = "Укажите, где подключаете клиент (Cursor, Claude Desktop и т.д.)";
+    }
+    if (!consent) {
+      fields.consent =
+        "Нужно согласие на запись действий ИИ-клиента (имя клиента, вызовы инструментов без секретов)";
+    }
+    if (Object.keys(fields).length) throw httpError(400, "invalid_body", { fields });
     const scopes = normalizeScopes(req.body?.scopes);
     const { raw, hash, displayPrefix } = generateTokenMaterial();
     const id = newId();
+    const now = new Date().toISOString();
     getDb()
       .prepare(
-        `INSERT INTO api_tokens (id, user_id, name, token_hash, token_prefix, scopes_json)
-         VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO api_tokens (id, user_id, name, token_hash, token_prefix, scopes_json, client_where, logging_consent_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, req.user.id, name, hash, displayPrefix, JSON.stringify(scopes));
+      .run(id, req.user.id, name, hash, displayPrefix, JSON.stringify(scopes), clientWhere, now);
     res.status(201).json({
       id,
       token: raw,
@@ -79,7 +92,7 @@ router.get("/audit", (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const rows = getDb()
     .prepare(
-      `SELECT tool_name, ok, result_summary, created_at
+      `SELECT tool_name, ok, result_summary AS text, created_at
        FROM mcp_audit_log WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`
     )
     .all(req.user.id, limit);
@@ -87,7 +100,7 @@ router.get("/audit", (req, res) => {
     items: rows.map((r) => ({
       tool: r.tool_name,
       ok: Boolean(r.ok),
-      summary: r.result_summary,
+      text: r.text,
       at: dbDateToIso(r.created_at),
     })),
   });

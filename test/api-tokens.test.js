@@ -42,6 +42,8 @@ describe("API tokens", () => {
     const created = await agent.post("/api/integrations/tokens").send({
       name: "Test read",
       scopes: ["read"],
+      clientWhere: "Cursor",
+      loggingConsent: true,
     });
     assert.equal(created.status, 201);
     assert.match(created.body.token, /^hc_/);
@@ -70,6 +72,8 @@ describe("API tokens", () => {
     const created = await agent.post("/api/integrations/tokens").send({
       name: "read REST",
       scopes: ["read"],
+      clientWhere: "Claude Desktop",
+      loggingConsent: true,
     });
     const res = await request(app)
       .get("/api/candidate/profile")

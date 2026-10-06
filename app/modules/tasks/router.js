@@ -13,10 +13,15 @@ const router = express.Router();
 
 router.post("/generate", requireAuth, requireConfirmedEmail, requireNotCandidate, async (req, res, next) => {
   try {
+    if (!config.LLM_BASE_URL) {
+      return res.status(501).json({
+        error: "llm_not_configured",
+        message: "Генерация заданий недоступна без LLM",
+      });
+    }
     if (config.DEMO_MODE && req.headers["x-demo-admin"] !== "1") {
       throw httpError(403, "forbidden");
     }
-    if (!config.LLM_BASE_URL) return res.status(501).json({ error: "llm_not_configured" });
     const specialization = String(req.body?.specialization || "");
     const grade = String(req.body?.grade || "");
     const type = req.body?.type === "work" ? "work" : "quick";

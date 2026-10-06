@@ -111,6 +111,17 @@ function renderCard(data) {
       <ul class="deck-phrases">${phrases}</ul>
       ${explain ? `<p class="deck-explain"><svg class="inline-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 3a1 1 0 1 1-1 1 1 1 0 0 1 1-1zm2 8H6v-1h1V8H6V7h3v4h1v1z" fill="currentColor"/></svg> ${explain}</p>` : ""}
       ${data.card.integrationNote ? `<p class="deck-integration-note invite-meta">${data.card.integrationNote}</p>` : ""}
+      ${
+        data.card.aiUsage
+          ? `<div class="deck-ai-usage panel-soft"><h3 class="h3">Как работает с ИИ</h3><p class="invite-meta">${data.card.aiUsage.headline}</p>${
+              (data.card.aiUsage.activityLines || []).length
+                ? `<ul class="deck-phrases">${(data.card.aiUsage.activityLines || [])
+                    .map((l) => `<li>${l}</li>`)
+                    .join("")}</ul>`
+                : ""
+            }</div>`
+          : ""
+      }
     </div>`;
 }
 

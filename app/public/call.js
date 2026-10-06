@@ -117,14 +117,29 @@ async function init() {
     ]);
     callId = info.callId;
     if (info.status === "ended") {
-      roomHost.innerHTML = HandCheck.emptyState(
-        "Звонок завершён",
-        info.endedAt
-          ? `Комната закрыта ${HandCheck.formatDateTimeMoscow(info.endedAt)}.`
-          : "Эта комната больше не активна — откройте список звонков в кабинете.",
-        me.role === "employer" ? "/employer/calls" : "/candidate/calls",
-        "К списку звонков"
-      );
+      const who =
+        me.role === "employer"
+          ? info.candidateName || "Кандидат"
+          : info.companyName || "Работодатель";
+      const meta = [
+        info.needTitle,
+        HandCheck.formatSalaryRange(info.salaryFrom, info.salaryTo),
+        info.endedAt ? `Завершён ${HandCheck.formatDateTimeMoscow(info.endedAt)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const analysis =
+        me.role === "employer" && info.analysisText
+          ? `<section class="panel call-analysis-panel"><h2 class="h2">Внутренний разбор</h2><p>${info.analysisText}</p></section>`
+          : "";
+      roomHost.innerHTML = `<div class="call-ended-wrap">
+        <p class="call-state-banner ended">Звонок с ${who} завершён</p>
+        <p class="invite-meta">${meta}</p>
+        ${analysis}
+        <a class="btn-primary" href="${me.role === "employer" ? "/employer/calls" : "/candidate/calls"}">К списку звонков</a>
+      </div>`;
+      const hero = document.querySelector(".cabinet-page-hero .lede");
+      if (hero) hero.textContent = "Комната закрыта. Контекст звонка и итог ниже.";
       return;
     }
     renderRoomShell();

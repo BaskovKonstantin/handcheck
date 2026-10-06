@@ -173,6 +173,57 @@ describe("MCP e2e", () => {
     await transport.close();
   });
 
+  it("logs MCP tool calls with masked args and blocks work on submit_answer", async () => {
+    const db = require("../app/db").getDb();
+    const userId = db.prepare("SELECT id FROM users WHERE email = 'demo4@demo.local'").get().id;
+    db.prepare("DELETE FROM batteries WHERE candidate_user_id = ?").run(userId);
+    const token = insertToken(db, userId, ["read", "write"]);
+    const { client, transport } = await connectMcp(baseUrl, token);
+    await client.callTool({
+      name: "start_assessment",
+      arguments: { specialization: "backend", grade: "middle" },
+    });
+    const listed = parseToolJson(await client.callTool({ name: "list_tasks", arguments: {} }));
+    const work = listed.tasks.find((t) => t.type === "work");
+    const quick = listed.tasks.find((t) => t.type === "quick");
+    const bad = await client.callTool({
+      name: "submit_answer",
+      arguments: { attemptId: work.attemptId, answerText: "x", intent: "тест" },
+    });
+    assert.ok(bad.isError);
+    await client.callTool({
+      name: "submit_answer",
+      arguments: {
+        attemptId: quick.attemptId,
+        answerText: answers.quickAnswer,
+        intent: "помоги с REST",
+      },
+    });
+    const row = db
+      .prepare(
+        `SELECT args_masked_json, intent_text FROM mcp_tool_calls
+         WHERE user_id = ? AND tool_name = 'submit_answer' AND ok = 1 ORDER BY created_at DESC LIMIT 1`
+      )
+      .get(userId);
+    assert.ok(row);
+    assert.match(row.args_masked_json, /attemptId/);
+    assert.equal(row.intent_text, "помоги с REST");
+    const cafeId = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get().id;
+    const { summarizeAiUsageForEmployer } = require("../app/lib/ai-usage-summary");
+    const demo5Id = db.prepare("SELECT id FROM users WHERE email = 'demo5@demo.local'").get().id;
+    assert.ok(
+      db.prepare("SELECT COUNT(*) AS c FROM mcp_tool_calls WHERE user_id = ?").get(userId).c > 0
+    );
+    assert.equal(summarizeAiUsageForEmployer(cafeId, demo5Id), null);
+    const needId = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafeId).id;
+    db.prepare(
+      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+       VALUES (?, ?, ?, ?, 100000, 120000, 'MCP log test', 'email', 'sent')`
+    ).run(newId(), cafeId, needId, userId);
+    assert.ok(summarizeAiUsageForEmployer(cafeId, userId));
+    await transport.close();
+  });
+
   it("GET /mcp returns 405 JSON", async () => {
     const res = await request(`http://127.0.0.1:${server.address().port}`).get("/mcp");
     assert.equal(res.status, 405);

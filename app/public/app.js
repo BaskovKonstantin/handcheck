@@ -152,6 +152,28 @@ function bindLogout(btn) {
   });
 }
 
+function updateCabinetEmails(email) {
+  document.querySelectorAll(".cabinet-email").forEach((el) => {
+    el.textContent = email;
+    el.title = email;
+  });
+}
+
+function paintCabinetHeader(el, meEmail) {
+  el.innerHTML = `
+    <header class="cabinet-header cabinet-header-v3 cabinet-header-r6">
+      <div class="cabinet-header-inner">
+        <a class="logo cabinet-header-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
+        <div class="cabinet-user cabinet-user-inline">
+          <span class="cabinet-email" title="${meEmail}">${meEmail}</span>
+          <button type="button" class="btn-ghost btn-sm" id="logout-btn-header">Выход</button>
+        </div>
+      </div>
+      <div class="cabinet-header-glow" aria-hidden="true"></div>
+    </header>`;
+  bindLogout(document.getElementById("logout-btn-header"));
+}
+
 function ensureCabinetChrome(links, role, meEmail) {
   document.body.classList.add("has-cabinet-chrome", `cabinet-${role}`);
   let aside = document.getElementById("cabinet-aside");
@@ -193,30 +215,49 @@ function ensureCabinetChrome(links, role, meEmail) {
 async function mountCabinetShell(links, role) {
   const el = document.getElementById("site-header");
   if (!el) return;
-  let me = { email: cabinetMeEmail };
-  if (!cabinetNavMounted) {
-    try {
-      me = await api("/api/me");
-      cabinetMeEmail = me.email || "";
-    } catch {
-      window.location.href = "/auth";
-      return;
-    }
-  }
-  el.innerHTML = `
-    <header class="cabinet-header cabinet-header-v3 cabinet-header-r6">
-      <div class="cabinet-header-inner">
-        <a class="logo cabinet-header-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
-        <div class="cabinet-user cabinet-user-inline">
-          <span class="cabinet-email" title="${me.email}">${me.email}</span>
-          <button type="button" class="btn-ghost btn-sm" id="logout-btn-header">Выход</button>
-        </div>
-      </div>
-      <div class="cabinet-header-glow" aria-hidden="true"></div>
-    </header>`;
-  bindLogout(document.getElementById("logout-btn-header"));
-  ensureCabinetChrome(links, role, me.email);
+  const placeholder = cabinetMeEmail || "…";
+  paintCabinetHeader(el, placeholder);
+  ensureCabinetChrome(links, role, placeholder);
   cabinetNavMounted = true;
+  try {
+    const me = await api("/api/me");
+    cabinetMeEmail = me.email || "";
+    updateCabinetEmails(cabinetMeEmail);
+  } catch {
+    window.location.href = "/auth";
+  }
+}
+
+function timelineSection(title, items) {
+  if (!items?.length) {
+    return `<section class="timeline-section"><h2 class="timeline-heading">${title}</h2><p class="invite-meta">Пока ничего нового — держите профиль открытым и проверяйте приглашения.</p></section>`;
+  }
+  const rows = items
+    .map(
+      (it) => `<li class="timeline-item">
+        <span class="timeline-dot timeline-dot-${it.tone || "forest"}" aria-hidden="true"></span>
+        <div class="timeline-body">
+          <p class="timeline-title">${it.title}</p>
+          ${it.meta ? `<p class="timeline-meta">${it.meta}</p>` : ""}
+          ${it.cta || ""}
+        </div>
+      </li>`
+    )
+    .join("");
+  return `<section class="timeline-section"><h2 class="timeline-heading">${title}</h2><ol class="timeline-list">${rows}</ol></section>`;
+}
+
+function statTilesHtml(tiles) {
+  return `<div class="stat-tile-grid">${tiles
+    .map(
+      (t) => `<article class="stat-tile stat-tile-${t.variant || "forest"}">
+      <div class="stat-tile-label">${t.icon || ""}${t.label}</div>
+      <div class="stat-tile-value">${t.value}</div>
+      ${t.hint ? `<p class="invite-meta">${t.hint}</p>` : ""}
+      ${t.link ? `<a class="btn-ghost btn-sm" href="${t.link.href}">${t.link.label}</a>` : ""}
+    </article>`
+    )
+    .join("")}</div>`;
 }
 
 const CANDIDATE_LINKS = [
@@ -387,6 +428,8 @@ window.HandCheck = {
   loadPanel,
   toast,
   initials,
+  timelineSection,
+  statTilesHtml,
   invitationStatusLabel: (s) => INVITATION_STATUS_LABEL[s] || s,
   invitationStatusClass,
   callStatusLabel: (s) => CALL_STATUS_LABEL[s] || s,

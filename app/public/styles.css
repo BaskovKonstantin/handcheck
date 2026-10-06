@@ -360,6 +360,12 @@ a {
 
 .cabinet-content {
   animation: section-in 200ms var(--ease-out) both;
+  overflow-x: clip;
+}
+
+body.has-cabinet-chrome,
+body.call-room-page {
+  overflow-x: clip;
 }
 
 @keyframes section-in {
@@ -602,6 +608,7 @@ textarea:focus {
   max-width: 880px;
   margin: 0 auto;
   padding: 1.5rem;
+  overflow-x: clip;
 }
 
 .call-video {
@@ -1681,6 +1688,183 @@ body.has-cabinet-chrome main {
   padding-top: 1.35rem;
 }
 
+.invite-card-status-sent {
+  border-left-color: var(--clay);
+  background: linear-gradient(135deg, var(--card) 0%, color-mix(in srgb, var(--clay) 4%, var(--card)) 100%);
+}
+
+.invite-card-status-accepted {
+  border-left-color: var(--forest);
+  background: linear-gradient(135deg, var(--card) 0%, color-mix(in srgb, var(--forest) 6%, var(--card)) 100%);
+}
+
+.invite-card-status-declined {
+  border-left-color: var(--danger);
+  opacity: 0.92;
+}
+
+.timeline-section {
+  margin-top: 2rem;
+  padding: 1.35rem 1.25rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 22px rgba(20, 28, 40, 0.05);
+}
+
+.timeline-heading {
+  margin: 0 0 1rem;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.timeline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.timeline-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  margin-top: 0.35rem;
+  background: var(--forest);
+  box-shadow: 0 0 0 4px var(--forest-soft);
+}
+
+.timeline-dot-clay {
+  background: var(--clay);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--clay) 18%, var(--card));
+}
+
+.timeline-dot-muted {
+  background: var(--muted);
+  box-shadow: 0 0 0 4px var(--paper);
+}
+
+.timeline-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.timeline-meta {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.call-room-hero {
+  position: relative;
+  margin: -1.5rem -1.5rem 1.5rem;
+  padding: 1.5rem 1.5rem;
+  background: var(--forest);
+  color: #fff;
+  border-bottom: 3px solid var(--clay);
+}
+
+.call-room-hero h1 {
+  margin: 0 0 0.35rem;
+  font-family: var(--display);
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  border: 0;
+  padding: 0;
+}
+
+.call-room-hero .lede {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+  max-width: 36rem;
+}
+
+.auth-shell {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+.auth-hero-band {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.auth-hero-band .logo {
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+  padding: 0.25rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.auth-tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 0.65rem 0.5rem;
+  border-radius: calc(var(--radius-md) - 4px);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+
+.auth-tab.active {
+  background: var(--forest-soft);
+  color: var(--forest);
+}
+
+.auth-demo-hint {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--forest-soft);
+  border-left: 3px solid var(--forest);
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.auth-confirm-block {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.auth-confirm-block[hidden] {
+  display: none !important;
+}
+
+.invite-card-grid {
+  display: grid;
+  gap: 1rem;
+}
+
 .invite-card-top {
   display: flex;
   align-items: flex-start;
@@ -1840,6 +2024,10 @@ body.deck-page main.column {
 }
 
 @media (min-width: 900px) {
+  body.has-cabinet-chrome #site-header {
+    display: none;
+  }
+
   .cabinet-header-logo {
     visibility: hidden;
     pointer-events: none;

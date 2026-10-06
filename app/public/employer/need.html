@@ -4,23 +4,56 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Потребность — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Потребность</h1>
-      <div class="panel" id="form">Загрузка…</div>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Потребность</h1>
+          <p class="lede">Название и домен задачи задают подбор и доменный бонус в колоде — без рейтингов по резюме.</p>
+        </div>
+      </header>
+      <div id="stats"></div>
+      <div class="panel" id="form"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
       <button class="btn-primary" id="save" disabled>Сохранить</button>
     </main>
     <script src="/app.js"></script>
     <script>
       HandCheck.employerNav();
       let snapshot = "";
+      const statsEl = document.getElementById("stats");
+      const formEl = document.getElementById("form");
+
       HandCheck.api("/api/employer/needs").then((d) => {
         const n = d.items[0] || {};
-        document.getElementById("form").innerHTML = `
-          <label>Название <input id="title" value="${n.title || ""}" /></label>
+        const spec = n.specialization || "backend";
+        const grade = n.grade || "middle";
+        statsEl.innerHTML = HandCheck.statTilesHtml([
+          {
+            variant: "forest",
+            label: "Специализация",
+            value: spec,
+            hint: "Из потребности в подборе",
+          },
+          {
+            variant: "clay",
+            label: "Грейд",
+            value: grade,
+            hint: "Категория кандидатов",
+          },
+          {
+            variant: "ink",
+            label: "Домен",
+            value: (n.domainText || "—").slice(0, 28) + ((n.domainText || "").length > 28 ? "…" : ""),
+            hint: "Текст для domain boost",
+          },
+        ]);
+        formEl.innerHTML = `
+          <label>Название <input id="title" value="${(n.title || "").replace(/"/g, "&quot;")}" /></label>
           <label>Домен <textarea id="domain">${n.domainText || ""}</textarea></label>`;
         snapshot = JSON.stringify({ title: n.title, domain: n.domainText });
         document.querySelectorAll("input,textarea").forEach((el) => {
@@ -35,7 +68,7 @@
       });
       document.getElementById("save").onclick = async () => {
         const needs = await HandCheck.api("/api/employer/needs");
-        const id = needs.items[0].id;
+        const id = needs.items[0]?.id;
         await HandCheck.api(`/api/employer/needs/${id}`, {
           method: "PUT",
           body: JSON.stringify({
@@ -43,6 +76,7 @@
             domainText: document.getElementById("domain").value,
           }),
         });
+        HandCheck.toast("Потребность сохранена", "success");
         location.reload();
       };
     </script>

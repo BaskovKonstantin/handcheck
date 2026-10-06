@@ -19,7 +19,7 @@ async function login(page, email) {
   await page.goto(`${BASE}/auth`);
   await page.fill("#email", email);
   await page.fill("#password", PASS);
-  await page.click("#login");
+  await page.click("#primary-action");
   await page.waitForTimeout(900);
 }
 

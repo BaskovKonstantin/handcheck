@@ -4,25 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Профиль компании — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <header class="page-header">
-        <h1>Профиль компании</h1>
-        <p class="lede">Эти данные видны кандидату после принятия приглашения.</p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Профиль компании</h1>
+          <p class="lede">Эти данные видны кандидату после принятия приглашения.</p>
+        </div>
       </header>
-      <div id="main">Загрузка…</div>
+      <div id="main"></div>
     </main>
     <script src="/app.js"></script>
     <script>
       let snapshot = "";
       async function load() {
-        HandCheck.employerNav();
+        const main = document.getElementById("main");
+        main.innerHTML = HandCheck.skeletonBlocks(1);
         const p = await HandCheck.api("/api/employer/profile");
         snapshot = JSON.stringify(p);
-        const main = document.getElementById("main");
         main.innerHTML = `
           <section class="panel">
             <label>Название компании <input id="companyName" value="${p.companyName || ""}" /></label>
@@ -59,6 +63,7 @@
           }
         };
       }
+      HandCheck.employerNav();
       load();
     </script>
   </body>

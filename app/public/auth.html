@@ -4,19 +4,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Вход — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body class="auth-page">
-    <main class="column auth-column">
-      <a class="logo" href="/" id="auth-logo">HandCheck</a>
-      <header class="page-header">
-        <h1>Вход и регистрация</h1>
-        <p class="lede">Демо: anna@demo.local или cafe@demo.local, пароль из .env.example. Код подтверждения 000000.</p>
-      </header>
+    <main class="column auth-column auth-shell">
+      <div class="auth-hero-band">
+        <a class="logo" href="/" id="auth-logo">HandCheck</a>
+        <h1 class="display-title" style="font-size:clamp(1.75rem,5vw,2.25rem);max-width:none">Кабинет HandCheck</h1>
+      </div>
+      <p class="auth-demo-hint" id="demo-hint">
+        Демо-аккаунты: <strong>anna@demo.local</strong>, <strong>cafe@demo.local</strong> и другие с паролем
+        <strong>demo-demo-demo</strong>. После регистрации код подтверждения в демо: <strong>000000</strong>.
+      </p>
+      <div class="auth-tabs" role="tablist">
+        <button type="button" class="auth-tab active" id="tab-login" role="tab" aria-selected="true">Вход</button>
+        <button type="button" class="auth-tab" id="tab-register" role="tab" aria-selected="false">Регистрация</button>
+      </div>
       <div class="panel auth-panel">
         <label>Email <input type="email" id="email" autocomplete="username" /></label>
         <label>Пароль <input type="password" id="password" autocomplete="current-password" /></label>
-        <label>Роль
+        <label id="role-wrap">Роль
           <select id="role">
             <option value="candidate">Кандидат</option>
             <option value="employer">Работодатель</option>
@@ -24,12 +32,13 @@
         </label>
         <p class="field-error" id="err" hidden></p>
         <div class="form-actions">
-          <button class="btn-primary" type="button" id="login">Войти</button>
-          <button class="btn-ghost" type="button" id="register">Зарегистрироваться</button>
+          <button class="btn-primary" type="button" id="primary-action">Войти</button>
         </div>
-        <hr style="border:none;border-top:1px solid var(--line);margin:1.5rem 0" />
-        <label>Подтверждение кода <input id="code" autocomplete="one-time-code" placeholder="000000" /></label>
-        <button class="btn-ghost" type="button" id="confirm">Подтвердить email</button>
+        <div class="auth-confirm-block" id="confirm-block" hidden>
+          <p class="invite-meta">Мы отправили код на email. В демо введите <strong>000000</strong>.</p>
+          <label>Код подтверждения <input id="code" autocomplete="one-time-code" inputmode="numeric" /></label>
+          <button class="btn-ghost" type="button" id="confirm">Подтвердить email</button>
+        </div>
       </div>
     </main>
     <script src="/app.js"></script>
@@ -37,29 +46,53 @@
       document.getElementById("auth-logo").innerHTML = `${HandCheck.LOGO_MARK}<span>HandCheck</span>`;
       const q = new URLSearchParams(location.search);
       if (q.get("role")) document.getElementById("role").value = q.get("role");
+
+      let mode = "login";
       const err = document.getElementById("err");
-      const showErr = (m) => {
+      const tabLogin = document.getElementById("tab-login");
+      const tabRegister = document.getElementById("tab-register");
+      const roleWrap = document.getElementById("role-wrap");
+      const confirmBlock = document.getElementById("confirm-block");
+      const primaryBtn = document.getElementById("primary-action");
+
+      const showErr = (m, asInfo) => {
         err.hidden = false;
         err.textContent = m;
+        err.style.color = asInfo ? "var(--forest)" : "";
       };
-      document.getElementById("login").onclick = async () => {
+
+      function setMode(next) {
+        mode = next;
+        const isLogin = mode === "login";
+        tabLogin.classList.toggle("active", isLogin);
+        tabRegister.classList.toggle("active", !isLogin);
+        tabLogin.setAttribute("aria-selected", isLogin ? "true" : "false");
+        tabRegister.setAttribute("aria-selected", !isLogin ? "true" : "false");
+        roleWrap.hidden = isLogin;
+        primaryBtn.textContent = isLogin ? "Войти" : "Зарегистрироваться";
+        confirmBlock.hidden = isLogin;
+        err.hidden = true;
+        document.getElementById("password").autocomplete = isLogin ? "current-password" : "new-password";
+      }
+
+      tabLogin.onclick = () => setMode("login");
+      tabRegister.onclick = () => setMode("register");
+      setMode(q.get("mode") === "register" ? "register" : "login");
+
+      primaryBtn.onclick = async () => {
         err.hidden = true;
         try {
-          const j = await HandCheck.api("/api/auth/login", {
-            method: "POST",
-            body: JSON.stringify({
-              email: document.getElementById("email").value,
-              password: document.getElementById("password").value,
-            }),
-          });
-          location.href = j.user.role === "employer" ? "/employer/deck" : "/candidate/today";
-        } catch (e) {
-          showErr(HandCheck.formatApiError(e));
-        }
-      };
-      document.getElementById("register").onclick = async () => {
-        err.hidden = true;
-        try {
+          if (mode === "login") {
+            const j = await HandCheck.api("/api/auth/login", {
+              method: "POST",
+              body: JSON.stringify({
+                email: document.getElementById("email").value,
+                password: document.getElementById("password").value,
+              }),
+            });
+            location.href = j.user.role === "employer" ? "/employer/deck" : "/candidate/today";
+            return;
+          }
           await HandCheck.api("/api/auth/register", {
             method: "POST",
             body: JSON.stringify({
@@ -68,11 +101,13 @@
               role: document.getElementById("role").value,
             }),
           });
-          showErr("Аккаунт создан. Введите код 000000 в демо и нажмите «Подтвердить email».");
+          confirmBlock.hidden = false;
+          showErr("Аккаунт создан — введите код подтверждения ниже.", true);
         } catch (e) {
           showErr(HandCheck.formatApiError(e));
         }
       };
+
       document.getElementById("confirm").onclick = async () => {
         err.hidden = true;
         try {
@@ -83,7 +118,8 @@
               code: document.getElementById("code").value,
             }),
           });
-          showErr("Email подтверждён — нажмите «Войти».");
+          setMode("login");
+          showErr("Email подтверждён — нажмите «Войти».", true);
         } catch (e) {
           showErr(HandCheck.formatApiError(e));
         }

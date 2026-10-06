@@ -30,26 +30,72 @@
       const ICON_CALL =
         '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg></span>';
 
+      function buildUpcomingSteps(invItems, cat) {
+        const steps = [];
+        if (!cat.label) {
+          steps.push({
+            tone: "clay",
+            title: "Пройти батарею заданий",
+            meta: "Без теста категория не появится в подборе",
+            cta: '<a class="btn-primary btn-sm" href="/candidate/tasks">Начать</a>',
+          });
+        }
+        (invItems || [])
+          .filter((i) => i.status === "sent" || i.status === "viewed")
+          .slice(0, 4)
+          .forEach((i) => {
+            steps.push({
+              tone: "clay",
+              title: `Ответить: ${i.companyName}`,
+              meta: HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo),
+              cta: '<a class="btn-ghost btn-sm" href="/candidate/invitations">Приглашения</a>',
+            });
+          });
+        (invItems || [])
+          .filter((i) => i.status === "accepted")
+          .slice(0, 3)
+          .forEach((i) => {
+            steps.push({
+              tone: "forest",
+              title: `Звонок с ${i.companyName}`,
+              meta: "Приглашение принято — можно войти в комнату",
+              cta: `<a class="btn-primary btn-sm" href="/call/${i.id}">Комната</a>`,
+            });
+          });
+        if (!steps.length) {
+          steps.push({
+            tone: "muted",
+            title: "Профиль и доступность",
+            meta: "Откройте профиль и держите статус «Открыт к приглашениям»",
+            cta: '<a class="btn-ghost btn-sm" href="/candidate/profile">Профиль</a>',
+          });
+        }
+        return steps;
+      }
+
       async function render() {
         dash.innerHTML = HandCheck.skeletonBlocks(3);
         const [cat, inv] = await Promise.all([
           HandCheck.api("/api/candidate/category"),
           HandCheck.api("/api/candidate/invitations"),
         ]);
-        const pending = (inv.items || []).filter((i) => i.status === "sent" || i.status === "viewed").length;
-        const accepted = (inv.items || []).filter((i) => i.status === "accepted").length;
+        const items = inv.items || [];
+        const pending = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
+        const accepted = items.filter((i) => i.status === "accepted").length;
         if (!cat.label) {
-          dash.innerHTML = HandCheck.emptyState(
-            "Категория ещё не подтверждена",
-            "Пройдите батарею заданий — специализация и грейд появятся здесь.",
-            "/candidate/tasks",
-            "Начать тест"
-          );
+          dash.innerHTML =
+            HandCheck.emptyState(
+              "Категория ещё не подтверждена",
+              "Пройдите батарею заданий — специализация и грейд появятся здесь.",
+              "/candidate/tasks",
+              "Начать тест"
+            ) + HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat));
           return;
         }
         const retake = cat.retakeAt
           ? `<p class="invite-meta">Пересдача возможна после ${new Date(cat.retakeAt).toLocaleDateString("ru")}</p>`
           : "";
+        const timeline = HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat));
         dash.innerHTML = `
           <div class="stat-tile-grid">
             <article class="stat-tile stat-tile-forest">
@@ -70,13 +116,15 @@
               <a class="btn-ghost btn-sm" href="/candidate/calls">Звонки</a>
             </article>
           </div>
+          ${timeline}
           <div class="form-actions" style="margin-top:1.5rem">
             <a class="btn-ghost" href="/candidate/profile">Профиль</a>
             <a class="btn-primary" href="/candidate/tasks">Задания</a>
           </div>`;
       }
 
-      HandCheck.candidateNav().then(render);
+      HandCheck.candidateNav();
+      render();
     </script>
   </body>
 </html>

@@ -51,11 +51,15 @@ function normalizeStackInput(stack) {
   return { stack: out, fields };
 }
 
+function collapseInnerWhitespace(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
 function validateNeedBody(body, { requireTitle = true } = {}) {
   const fields = {};
   const b = body || {};
 
-  let title = b.title !== undefined ? String(b.title).trim() : undefined;
+  let title = b.title !== undefined ? collapseInnerWhitespace(b.title) : undefined;
   if (requireTitle || b.title !== undefined) {
     if (!title) fields.title = "Укажите название потребности";
     else if (title.length > TITLE_MAX) fields.title = `Название — не длиннее ${TITLE_MAX} символов`;
@@ -112,7 +116,7 @@ function validateNeedBody(body, { requireTitle = true } = {}) {
 }
 
 function normalizeNeedTitle(title) {
-  return String(title || "").trim().toLowerCase();
+  return collapseInnerWhitespace(title).toLowerCase().replace(/ё/g, "е");
 }
 
 function employerNeedTitleTaken(db, employerUserId, title, excludeNeedId = null) {
@@ -126,6 +130,7 @@ function employerNeedTitleTaken(db, employerUserId, title, excludeNeedId = null)
 
 module.exports = {
   validateNeedBody,
+  collapseInnerWhitespace,
   normalizeStackInput,
   parseActiveFlag,
   normalizeNeedTitle,

@@ -56,6 +56,10 @@ function createApp() {
   app.use("/api/integrations", require("./modules/integrations/router"));
   app.use("/mcp", require("./modules/mcp/router"));
 
+  app.use("/api", (req, res) => {
+    res.status(404).json({ error: "not_found" });
+  });
+
   const publicDir = path.join(__dirname, "public");
   const routes = [
     ["/", "index.html"],

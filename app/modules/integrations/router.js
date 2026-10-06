@@ -13,6 +13,7 @@ const { httpError } = require("../../middleware/errors");
 const config = require("../../config");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { humanToolSummary } = require("../../lib/mcp-telemetry");
+const { formatClientDescriptor } = require("../../lib/ai-usage-summary");
 
 const router = express.Router();
 
@@ -115,14 +116,12 @@ router.get("/audit", (req, res) => {
     .all(req.user.id, limit);
   res.json({
     items: rows.map((r) => {
-      const clientBits = [];
-      if (r.client_name && r.client_name !== "unknown" && r.client_name !== "http") {
-        clientBits.push(r.client_name + (r.client_version ? ` ${r.client_version}` : ""));
-      } else if (r.token_name) {
-        clientBits.push(r.token_name);
-      }
-      if (r.client_where) clientBits.push(r.client_where);
-      const clientLabel = clientBits.length ? clientBits.join(" · ") : "ИИ-клиент";
+      const descriptor = formatClientDescriptor({
+        client_name: r.client_name,
+        client_version: r.client_version,
+        client_where: r.client_where,
+      });
+      const clientLabel = descriptor || r.token_name || "ИИ-клиент";
       const summary = humanToolSummary(r.tool_name, Boolean(r.ok), {
         intent: r.intent_text || undefined,
       });

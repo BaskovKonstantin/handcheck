@@ -631,9 +631,14 @@ textarea:focus {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--clay);
+  background: var(--muted);
   display: inline-block;
   margin-right: 0.5rem;
+}
+
+.rec-dot.live {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 25%, transparent);
 }
 
 .empty {
@@ -2455,6 +2460,46 @@ body.deck-page main.column {
   border-radius: 0;
 }
 
+.call-video-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.call-video-tile {
+  position: relative;
+  background: var(--ink);
+}
+
+.call-video-tile-label {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.65rem;
+  z-index: 2;
+  margin: 0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.call-video-remote,
+.call-video-local {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  object-fit: cover;
+  opacity: 1;
+}
+
+.call-video-tile .call-video-placeholder {
+  min-height: 0;
+  aspect-ratio: 16 / 9;
+}
+
 .call-timer {
   position: absolute;
   bottom: 0.75rem;
@@ -2976,20 +3021,25 @@ body.has-cabinet-chrome {
   }
 
   .stat-tile-grid-today {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
   }
 
   .stat-tile-grid-today .stat-tile {
-    padding: 1rem 1.1rem;
+    padding: 0.65rem 0.45rem;
   }
 
   .stat-tile-grid-today .stat-tile-value {
-    font-size: 1.75rem;
+    font-size: 1.35rem;
   }
 
   .stat-tile-grid-today .stat-tile-label {
-    font-size: 0.78rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.03em;
+  }
+
+  .stat-tile-grid-today .stat-tile-icon {
+    display: none;
   }
 }
 

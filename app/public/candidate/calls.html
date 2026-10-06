@@ -126,9 +126,10 @@
         const activeHtml = active
           .map((row) => callCard(row, row.callStatus === "ready"))
           .join("");
+        const expandEnded = active.length === 0 && ended.length > 0;
         const endedSection =
           ended.length > 0
-            ? `<details class="calls-archive">
+            ? `<details class="calls-archive"${expandEnded ? " open" : ""}>
                 <summary class="calls-archive-summary">Завершённые звонки</summary>
                 <div class="invite-card-grid">${ended.map((row) => callCard(row, false)).join("")}</div>
               </details>`

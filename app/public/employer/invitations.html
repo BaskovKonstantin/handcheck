@@ -49,11 +49,14 @@
         const sent = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
         const accepted = items.filter((i) => i.status === "accepted").length;
         const declined = items.filter((i) => i.status === "declined").length;
-        statsEl.innerHTML = HandCheck.statTilesHtml([
-          { variant: "clay", label: "Ожидают", value: sent, hint: "Ответ кандидата" },
-          { variant: "forest", label: "Принято", value: accepted, hint: "Контакты открыты" },
-          { variant: "ink", label: "Отклонено", value: declined, hint: "Без контактов" },
-        ]);
+        statsEl.innerHTML = HandCheck.statTilesHtml(
+          [
+            { variant: "clay", label: "Ожидают", value: sent, hint: "Ответ кандидата" },
+            { variant: "forest", label: "Принято", value: accepted, hint: "Контакты открыты" },
+            { variant: "ink", label: "Отклонено", value: declined, hint: "Без контактов" },
+          ],
+          { gridClass: "stat-tile-grid-compact" }
+        );
         if (!items.length) {
           list.innerHTML = HandCheck.emptyState(
             "Приглашений пока нет",

@@ -5,7 +5,8 @@ const { getDb } = require("../db");
 const { newId } = require("./ids");
 const config = require("../config");
 
-const SECRET_MASK_RE = /(hc_[a-zA-Z0-9_-]+|Bearer\s+\S+|password|token|secret)/gi;
+// No `g` flag: `.test()` must be stateless (global regexes keep `lastIndex` across calls).
+const SECRET_MASK_TEST_RE = /(hc_[a-zA-Z0-9_-]+|Bearer\s+\S+|password|token|secret)/i;
 
 function hashIp(ip) {
   const salt = config.MCP_IP_SALT || "handcheck-mcp-ip";
@@ -17,7 +18,7 @@ const GENERIC_TEXT_MAX = 240;
 
 function looksLikeSecretValue(value) {
   if (typeof value !== "string" || !value) return false;
-  return SECRET_MASK_RE.test(value);
+  return SECRET_MASK_TEST_RE.test(value);
 }
 
 function maskValue(key, value) {

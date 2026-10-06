@@ -132,4 +132,58 @@ describe("PR14 bugbot fixes", () => {
     assert.ok(masked.answerText.length < 400);
     assert.ok(masked.answerText.endsWith("…"));
   });
+
+  it("maskArgs masks every secret-like value across fields and repeated calls", () => {
+    const { maskArgs } = require("../app/lib/mcp-telemetry");
+
+    function expectMasked(masked, path, expected = "[скрыто]") {
+      const parts = path.split(".");
+      let cur = masked;
+      for (const p of parts) cur = cur[p];
+      assert.equal(cur, expected, path);
+    }
+
+    const payloads = [
+      {
+        args: {
+          first: "hc_live_aaaaaaaaaaaa",
+          second: "hc_live_bbbbbbbbbbbb",
+          third: "hc_test_cccccccccccc",
+        },
+        masked: ["first", "second", "third"],
+      },
+      {
+        args: {
+          auth: "Bearer eyJhbGciOiJIUzI1NiJ9",
+          backup: "Bearer another-token-value",
+        },
+        masked: ["auth", "backup"],
+      },
+      {
+        args: {
+          memo: "use password qwerty here",
+          hint: "api token leaked",
+        },
+        masked: ["memo", "hint"],
+      },
+      {
+        args: {
+          nested: { deep: "hc_nested_dddddddddddd" },
+          plain: "safe text only",
+        },
+        masked: ["nested.deep"],
+        plain: ["plain"],
+      },
+    ];
+
+    for (let round = 0; round < 8; round += 1) {
+      for (const { args, masked: maskedPaths, plain: plainPaths } of payloads) {
+        const masked = maskArgs(args);
+        for (const p of maskedPaths) expectMasked(masked, p);
+        if (plainPaths) {
+          for (const p of plainPaths) expectMasked(masked, p, args[p]);
+        }
+      }
+    }
+  });
 });

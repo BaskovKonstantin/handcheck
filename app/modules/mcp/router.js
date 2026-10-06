@@ -5,6 +5,7 @@ const { requireApiTokenAuth } = require("../../middleware/auth");
 const { mcpRateLimit } = require("../../middleware/mcp-rate-limit");
 const { httpError } = require("../../middleware/errors");
 const { createMcpServerForContext } = require("./register-server");
+const { recordInitialize, resolveMcpSessionId } = require("../../lib/mcp-telemetry");
 
 const router = express.Router();
 
@@ -26,6 +27,12 @@ async function handleMcpPost(req, res) {
     tokenName: req.apiToken.name,
     scopesJson: req.apiToken.scopes_json,
   };
+  const body = req.body;
+  if (body?.method === "initialize" && body.params) {
+    recordInitialize(ctx, req, body.params);
+  } else {
+    ctx.mcpSessionId = resolveMcpSessionId(ctx, req);
+  }
   const server = createMcpServerForContext(ctx);
   try {
     const transport = new StreamableHTTPServerTransport({

@@ -54,7 +54,7 @@ function cooldownActive(completedAt) {
   return new Date() < until;
 }
 
-function finalizeBattery(batteryId, userId, claimedGrade) {
+function scoreBatteryAttempts(batteryId, claimedGrade) {
   const db = getDb();
   const attempts = db
     .prepare(
@@ -64,19 +64,54 @@ function finalizeBattery(batteryId, userId, claimedGrade) {
     .all(batteryId);
   const quickScores = [];
   let workScore = { knowledge: 0, breadth: 0 };
-  let workAttempt = null;
   for (const a of attempts) {
     const rubric = JSON.parse(a.rubric_json);
     if (a.type === "quick") {
       quickScores.push(scoreQuick(a.answer_text, rubric));
     } else {
       workScore = scoreWork(a.answer_text, rubric);
-      workAttempt = a;
     }
   }
   const agg = aggregateBattery(quickScores, workScore);
   const cutoff = cutoffForGrade(claimedGrade);
   const passed = agg.test_score >= cutoff;
+  let label = null;
+  if (passed) {
+    const battery = db.prepare("SELECT specialization FROM batteries WHERE id = ?").get(batteryId);
+    const catRow = db
+      .prepare("SELECT label FROM categories WHERE specialization = ? AND grade = ?")
+      .get(battery.specialization, claimedGrade);
+    label = catRow?.label || null;
+  }
+  return { passed, label, agg, attempts, workScore };
+}
+
+function finalizeBattery(batteryId, userId, claimedGrade) {
+  const db = getDb();
+  const batteryRow = db.prepare("SELECT completed_at, specialization FROM batteries WHERE id = ?").get(batteryId);
+  if (batteryRow?.completed_at) {
+    const { passed, label } = scoreBatteryAttempts(batteryId, claimedGrade);
+    if (passed) {
+      return { passed: true, message: "confirmed", label, alreadyFinalized: true };
+    }
+    return {
+      passed: false,
+      message: "not_confirmed",
+      retakeAfterDays: config.GRADE_COOLDOWN_DAYS,
+      alreadyFinalized: true,
+    };
+  }
+  const { passed, label: scoredLabel, agg, attempts, workScore } = scoreBatteryAttempts(
+    batteryId,
+    claimedGrade
+  );
+  let workAttempt = null;
+  for (const a of attempts) {
+    if (a.type === "work") {
+      workAttempt = a;
+      break;
+    }
+  }
 
   let motivation = 0;
   let integrity = 0;
@@ -159,6 +194,7 @@ module.exports = {
   assertBatteryComplete,
   lastSpecializationAttempt,
   cooldownActive,
+  scoreBatteryAttempts,
   finalizeBattery,
   WORK_DEADLINE_MS,
 };

@@ -8,9 +8,12 @@ const { buildExplanation } = require("./explain");
 function loadCandidatesForNeed(need, employerUserId, options = {}) {
   const forDeck = options.forDeck === true;
   const db = getDb();
+  const employerIsTest = Boolean(
+    db.prepare("SELECT is_test FROM users WHERE id = ?").get(employerUserId)?.is_test
+  );
   const rows = db
     .prepare(
-      `SELECT u.id AS user_id, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
+      `SELECT u.id AS user_id, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
               cc.test_score, cc.motivation, cc.assigned_at, c.label AS category_label,
               priv.trust_ok
        FROM candidate_categories cc
@@ -25,6 +28,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
 
   const out = [];
   for (const r of rows) {
+    if (!employerIsTest && r.is_test) continue;
     const rejected = db
       .prepare(
         `SELECT decision FROM need_reviews WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?`
@@ -143,12 +147,17 @@ function applyFilters(items, query) {
 function publicMatchShape(c) {
   const row = {
     id: c.id,
+    displayName: c.displayName,
     categoryLabel: c.categoryLabel,
     stack: c.stack,
     backgroundDomains: c.backgroundDomains,
     explanation: c.explanation,
+    taskPhrases: c.taskPhrases,
+    integrationNote: c.integrationNote,
   };
   if (c.reviewDecision === "invited") row.reviewStatus = "invited";
+  else if (c.reviewDecision === "later") row.reviewStatus = "later";
+  else if (c.reviewDecision === "rejected") row.reviewStatus = "rejected";
   return row;
 }
 

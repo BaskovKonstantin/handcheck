@@ -3,6 +3,7 @@
 const { getDb } = require("../../db");
 const { scopesAllow } = require("../../lib/api-token");
 const services = require("./services");
+const { logToolCall } = require("../../lib/mcp-telemetry");
 
 function writeAudit(ctx, toolName, ok, summary) {
   getDb()
@@ -26,24 +27,29 @@ function toolError(message) {
   };
 }
 
-function wrapTool(ctx, name, needWrite, fn) {
+function wrapTool(ctx, name, needWrite, fn, meta = {}) {
   return async (args) => {
+    const started = Date.now();
     if (needWrite && !scopesAllow(ctx.scopesJson, "write")) {
-      writeAudit(ctx, name, false, "Недостаточно прав (нужен scope write)");
-      return toolError("Недостаточно прав: для этого действия нужен scope «write».");
+      const err = toolError("Недостаточно прав: для этого действия нужен scope «write».");
+      logToolCall(ctx, name, args, { ...err, durationMs: Date.now() - started });
+      return err;
     }
     if (!scopesAllow(ctx.scopesJson, "read")) {
-      writeAudit(ctx, name, false, "Недостаточно прав (read)");
-      return toolError("Недостаточно прав: нужен scope «read».");
+      const err = toolError("Недостаточно прав: нужен scope «read».");
+      logToolCall(ctx, name, args, { ...err, durationMs: Date.now() - started });
+      return err;
     }
     try {
       const data = await fn(args);
-      writeAudit(ctx, name, true, "ok");
-      return toolResult(data);
+      const result = toolResult(data);
+      logToolCall(ctx, name, args, { ...result, durationMs: Date.now() - started });
+      return result;
     } catch (e) {
       const msg = e.isMcp ? e.message : "Не удалось выполнить действие";
-      writeAudit(ctx, name, false, msg);
-      return toolError(msg);
+      const err = toolError(msg);
+      logToolCall(ctx, name, args, { ...err, durationMs: Date.now() - started });
+      return err;
     }
   };
 }
@@ -52,12 +58,13 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
   const z = require("zod/v4");
   const role = ctx.user.role;
 
-  server.registerTool(
-    "whoami",
-    {
-      description: "Текущий пользователь HandCheck: email, роль, подтверждение почты.",
-      inputSchema: {},
-    },
+    server.registerTool(
+      "whoami",
+      {
+        description: "Текущий пользователь HandCheck: email, роль, подтверждение почты.",
+        inputSchema: {},
+        annotations: { readOnlyHint: true },
+      },
     wrapTool(ctx, "whoami", false, async () => ({
       email: ctx.user.email,
       role: ctx.user.role,
@@ -134,10 +141,14 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
         inputSchema: {
           attemptId: z.string(),
           answerText: z.string(),
+          intent: z.string().optional().describe("Кратко: что попросил пользователь у ассистента"),
         },
+        annotations: { destructiveHint: true },
       },
       wrapTool(ctx, "submit_answer", true, (args) =>
-        services.submitAttemptAnswer(ctx.user.id, args.attemptId, args.answerText, "mcp")
+        services.submitAttemptAnswer(ctx.user.id, args.attemptId, args.answerText, "mcp", {
+          requireQuick: true,
+        })
       )
     );
 
@@ -148,10 +159,14 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
         inputSchema: {
           attemptId: z.string(),
           answerText: z.string(),
+          intent: z.string().optional().describe("Кратко: что попросил пользователь у ассистента"),
         },
+        annotations: { destructiveHint: true },
       },
       wrapTool(ctx, "submit_work_task", true, (args) =>
-        services.submitAttemptAnswer(ctx.user.id, args.attemptId, args.answerText, "mcp")
+        services.submitAttemptAnswer(ctx.user.id, args.attemptId, args.answerText, "mcp", {
+          requireWork: true,
+        })
       )
     );
 
@@ -350,6 +365,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
     }
   );
 
+  if (role === "candidate") {
   server.registerPrompt(
     "candidate-next-steps",
     {
@@ -365,13 +381,16 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
             text:
               "Ты помогаешь кандидату в HandCheck. Сначала проверь категорию (get_my_category). " +
               "Если категории нет — предложи start_assessment. Затем проверь list_invitations и list_calls. " +
-              "Не запрашивай и не показывай числовые оценки теста.",
+              "Не запрашивай и не показывай числовые оценки теста. " +
+              "При вызове инструментов заполняй поле intent одной фразой — что попросил пользователь.",
           },
         },
       ],
     })
   );
+  }
 
+  if (role === "employer") {
   server.registerPrompt(
     "employer-hiring-flow",
     {
@@ -393,13 +412,19 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       ],
     })
   );
+  }
 }
 
 function createMcpServerForContext(ctx) {
   const { McpServer, ResourceTemplate } = require("@modelcontextprotocol/sdk/server/mcp.js");
   const server = new McpServer(
     { name: "handcheck", version: "0.5.0" },
-    { capabilities: { logging: {} } }
+    {
+      capabilities: { logging: {} },
+      instructions:
+        "HandCheck MCP: при каждом вызове инструмента передавайте intent — короткую фразу о запросе пользователя. " +
+        "Не запрашивайте числовые оценки теста и не раскрывайте чужие данные.",
+    }
   );
   registerHandcheckTools(server, ctx, ResourceTemplate);
   return server;

@@ -18,6 +18,7 @@ const {
   finalizeBattery,
   WORK_DEADLINE_MS,
 } = require("./service");
+const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
 
 const router = express.Router();
 
@@ -97,10 +98,8 @@ router.get("/tasks/:attemptId", (req, res, next) => {
 router.patch("/tasks/:attemptId/draft", (req, res, next) => {
   const text = String(req.body?.answerText || "");
   const db = getDb();
-  const a = db
-    .prepare("SELECT * FROM attempts WHERE id = ? AND candidate_user_id = ?")
-    .get(req.params.attemptId, req.user.id);
-  if (!a) return next(httpError(404, "not_found"));
+  const a = loadAttemptForSubmit(req.params.attemptId, req.user.id);
+  assertAttemptMutable(a);
   db.prepare("UPDATE attempts SET answer_text = ? WHERE id = ?").run(text, a.id);
   db.prepare(
     `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'draft', ?)`
@@ -112,14 +111,8 @@ router.post("/tasks/:attemptId/submit", (req, res, next) => {
   try {
     const text = String(req.body?.answerText || "");
     const db = getDb();
-    const a = db
-      .prepare(
-        `SELECT a.*, t.type, t.rubric_json, b.claimed_grade, b.id AS battery_id
-         FROM attempts a JOIN tasks t ON t.id = a.task_id JOIN batteries b ON b.id = a.battery_id
-         WHERE a.id = ? AND a.candidate_user_id = ?`
-      )
-      .get(req.params.attemptId, req.user.id);
-    if (!a) return next(httpError(404, "not_found"));
+    const a = loadAttemptForSubmit(req.params.attemptId, req.user.id);
+    assertAttemptMutable(a);
     if (a.type === "work") {
       const opened = new Date(a.opened_at).getTime();
       if (Date.now() > opened + WORK_DEADLINE_MS) throw httpError(409, "deadline_passed");

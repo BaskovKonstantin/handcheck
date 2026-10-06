@@ -147,12 +147,44 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await context.close();
   });
 
+  it("mobile Ещё menu reaches every employer nav item at 390", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    const paths = [
+      "/employer/deck",
+      "/employer/need",
+      "/employer/invitations",
+      "/employer/calls",
+      "/employer/list",
+      "/employer/deferred",
+      "/employer/profile",
+      "/employer/integrations",
+    ];
+    for (const path of paths) {
+      if (!["/employer/deck", "/employer/need", "/employer/invitations", "/employer/calls"].includes(path)) {
+        await page.goto(`${BASE}/employer/deck`, { waitUntil: "commit" });
+        await page.click("#cabinet-more");
+        await page.waitForSelector("#cabinet-more-sheet:not([hidden])");
+        await page.locator(`#cabinet-more-sheet a[href="${path}"]`).click();
+        await page.waitForURL(`**${path}`, { timeout: 15000 });
+      } else {
+        await page.goto(`${BASE}${path}`, { waitUntil: "commit" });
+      }
+      assert.equal(new URL(page.url()).pathname, path);
+      assert.ok(await page.locator("#cabinet-aside").count());
+    }
+    await context.close();
+  });
+
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
     await login(page, "anna@demo.local");
     await page.goto(`${BASE}/candidate/integrations`, { waitUntil: "commit", timeout: 30000 });
     await page.fill("#token-name", "Browser test token");
+    await page.fill("#client-where", "Cursor");
+    await page.check("#logging-consent");
     await page.check("#scope-write");
     await page.click("#create-token", { force: true });
     await page.waitForFunction(() => {

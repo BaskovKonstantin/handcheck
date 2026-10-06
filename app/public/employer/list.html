@@ -47,6 +47,22 @@
         rowsEl.innerHTML = HandCheck.skeletonBlocks(4);
       }
 
+      async function review(decision, candidateId) {
+        try {
+          await HandCheck.api(`/api/employer/needs/${cachedNeedId}/reviews`, {
+            method: "POST",
+            body: JSON.stringify({ decision, candidateId }),
+          });
+          await loadRows();
+        } catch (e) {
+          HandCheck.toast(
+            HandCheck.formatApiError(e) || "Не удалось сохранить решение. Попробуйте ещё раз.",
+            "error"
+          );
+          await loadRows();
+        }
+      }
+
       async function loadRows() {
         const seq = ++loadSeq;
         showSkeleton();
@@ -71,29 +87,50 @@
           if (!data.items?.length) {
             rowsEl.innerHTML = HandCheck.emptyState(
               "Подходящих кандидатов нет",
-              "Проверьте фильтры или откройте колоду — возможно, все уже в приглашениях.",
-              "/employer/invitations",
-              "К приглашениям"
+              "Проверьте фильтры или откройте колоду.",
+              "/employer/deck",
+              "В колоду"
             );
             return;
           }
+          const esc = HandCheck.escapeHtml;
           rowsEl.innerHTML = data.items
             .map((r) => {
               const invited =
                 r.reviewStatus === "invited"
-                  ? '<span class="status-pill accepted">Приглашён</span>'
+                  ? '<span class="status-pill accepted">приглашён</span>'
                   : "";
-              const explain = (r.explanation || []).join(" · ");
-              return `<div class="list-row-card row-link-static">
-                <div>
-                  <strong>${r.categoryLabel}</strong>
+              const explain = (r.explanation || []).map(esc).join(" · ");
+              const stack = (r.stack || [])
+                .map((s) => `<span class="chip chip-skill">${esc(s)}</span>`)
+                .join("");
+              const domains = (r.backgroundDomains || [])
+                .map((d) => `<span class="chip">${esc(d)}</span>`)
+                .join("");
+              const actions =
+                r.reviewStatus === "invited"
+                  ? `<a class="btn-ghost btn-sm" href="/employer/invitations">К приглашениям</a>`
+                  : `<div class="list-row-actions">
+                  <button type="button" class="btn-ghost btn-sm" data-decision="later" data-id="${r.id}">Отложить</button>
+                  <button type="button" class="btn-ghost btn-sm" data-decision="rejected" data-id="${r.id}">Отказать</button>
+                  <a class="btn-primary btn-sm" href="/employer/deck">Пригласить</a>
+                </div>`;
+              return `<div class="list-row-card list-row-card-rich">
+                <div class="list-row-main">
+                  <strong>${esc(r.displayName || "Кандидат")}</strong>
+                  <span class="category-pill">${esc(r.categoryLabel)}</span>
                   ${invited}
-                  <p class="invite-meta" style="margin:0.35rem 0 0">${explain}</p>
+                  ${domains ? `<div class="chip-row">${domains}</div>` : ""}
+                  ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}
+                  <p class="invite-meta">${explain}</p>
                 </div>
-                <a class="btn-ghost btn-sm" href="/employer/deck">В колоду</a>
+                ${actions}
               </div>`;
             })
             .join("");
+          rowsEl.querySelectorAll("[data-decision]").forEach((btn) => {
+            btn.onclick = () => review(btn.dataset.decision, btn.dataset.id);
+          });
         } catch {
           if (seq !== loadSeq) return;
           rowsEl.innerHTML = HandCheck.loadErrorState(

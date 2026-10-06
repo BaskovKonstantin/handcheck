@@ -94,9 +94,9 @@
     const auditRows = (audit.items || [])
       .map(
         (a) =>
-          `<li class="audit-row"><span class="invite-meta">${HandCheck.formatDateTimeMoscow(a.at)}</span> · <code>${escapeHtml(a.tool)}</code> · ${
+          `<li class="audit-row"><span class="invite-meta">${HandCheck.formatDateTimeMoscow(a.at)}</span> · ${
             a.ok ? "успех" : "ошибка"
-          }${a.summary && a.summary !== "ok" ? ` — ${escapeHtml(a.summary)}` : ""}</li>`
+          } — ${escapeHtml(a.text || a.tool)}</li>`
       )
       .join("");
 
@@ -113,6 +113,13 @@
         <h2 class="h2">Новый токен</h2>
         <label>Название (например, «Cursor на ноутбуке»)
           <input id="token-name" maxlength="80" />
+        </label>
+        <label>Где подключаете (Cursor / Claude Desktop / Claude Code / другое)
+          <input id="client-where" maxlength="120" placeholder="Cursor на рабочем ноутбуке" />
+        </label>
+        <label class="scope-option consent-option">
+          <input type="checkbox" id="logging-consent" />
+          <span>Согласен на запись имени клиента, вызовов инструментов (аргументы без секретов) и краткого intent для улучшения продукта</span>
         </label>
         <fieldset class="scope-fieldset">
           <legend>Права</legend>
@@ -152,9 +159,11 @@
         return;
       }
       try {
+        const clientWhere = document.getElementById("client-where").value.trim();
+        const loggingConsent = document.getElementById("logging-consent").checked;
         const res = await HandCheck.api("/api/integrations/tokens", {
           method: "POST",
-          body: JSON.stringify({ name, scopes }),
+          body: JSON.stringify({ name, scopes, clientWhere, loggingConsent }),
         });
         await loadAll(main, res.token);
       } catch (e) {

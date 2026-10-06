@@ -2056,6 +2056,47 @@ body.has-cabinet-chrome main {
   color: var(--muted);
 }
 
+.cabinet-more-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+.cabinet-more-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 35, 50, 0.35);
+}
+.cabinet-more-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--card, #fffcf8);
+  border-radius: 16px 16px 0 0;
+  padding: 1rem 1rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  box-shadow: 0 -8px 32px rgba(26, 35, 50, 0.12);
+}
+.cabinet-more-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.list-row-card-rich {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.list-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
 .list-row-card {
   display: flex;
   flex-wrap: wrap;
@@ -2416,6 +2457,11 @@ body.deck-page main.column {
   border-color: var(--forest);
   color: var(--forest);
   font-weight: 600;
+}
+
+.choice-chip.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .form-field {

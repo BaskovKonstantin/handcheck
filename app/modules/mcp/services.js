@@ -15,6 +15,13 @@ const {
 } = require("../assessment/service");
 const { scoreQuick, scoreWork } = require("../../lib/rubric-score");
 const { createInvitation, respondToInvitation } = require("../invitations/actions");
+const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
+const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
+const {
+  validateDisplayName,
+  validateOptionalEmail,
+  validateOptionalPhone,
+} = require("../../lib/validation");
 
 function mcpError(message, code = "invalid_request") {
   const err = new Error(message);
@@ -51,21 +58,39 @@ function getCandidateProfile(userId) {
 }
 
 function updateCandidateProfile(userId, body) {
-  const displayName = String(body.displayName ?? body.display_name ?? "").trim();
-  const stack = Array.isArray(body.stack) ? body.stack : [];
-  const phone = String(body.phone ?? "").trim();
-  const contactEmail = String(body.contactEmail ?? body.contact_email ?? "").trim();
+  const db = getDb();
+  const existing = db.prepare("SELECT * FROM candidate_profiles WHERE user_id = ?").get(userId);
+  if (!existing) throw mcpError("Профиль кандидата не найден", "not_found");
+  const fields = {};
+  let displayName = existing.display_name;
+  if (body.displayName !== undefined || body.display_name !== undefined) {
+    const v = validateDisplayName(body.displayName ?? body.display_name);
+    Object.assign(fields, v.fields);
+    if (!v.fields.displayName) displayName = v.displayName;
+  }
+  const stack = Array.isArray(body.stack) ? body.stack : JSON.parse(existing.stack_json || "[]");
+  let phone = existing.phone || "";
+  if (body.phone !== undefined) {
+    const v = validateOptionalPhone(body.phone);
+    Object.assign(fields, v.fields);
+    if (!v.fields.phone) phone = v.phone;
+  }
+  let contactEmail = existing.contact_email || "";
+  if (body.contactEmail !== undefined || body.contact_email !== undefined) {
+    const v = validateOptionalEmail(body.contactEmail ?? body.contact_email);
+    Object.assign(fields, v.fields);
+    if (!v.fields.contactEmail) contactEmail = v.value;
+  }
+  if (Object.keys(fields).length) {
+    throw mcpError(Object.values(fields)[0], "invalid_body");
+  }
   const availability = body.availability;
-  getDb()
-    .prepare(
-      `UPDATE candidate_profiles SET display_name = ?, stack_json = ?, phone = ?, contact_email = ?
-       WHERE user_id = ?`
-    )
-    .run(displayName, JSON.stringify(stack), phone, contactEmail, userId);
+  db.prepare(
+    `UPDATE candidate_profiles SET display_name = ?, stack_json = ?, phone = ?, contact_email = ?
+     WHERE user_id = ?`
+  ).run(displayName, JSON.stringify(stack), phone, contactEmail, userId);
   if (availability && ["open", "paused"].includes(availability)) {
-    getDb()
-      .prepare("UPDATE candidate_profiles SET availability = ? WHERE user_id = ?")
-      .run(availability, userId);
+    db.prepare("UPDATE candidate_profiles SET availability = ? WHERE user_id = ?").run(availability, userId);
   }
   return getCandidateProfile(userId);
 }
@@ -168,17 +193,23 @@ function startAssessment(userId, specialization, grade, actionSource = "web") {
   return listAssessmentTasks(userId);
 }
 
-function submitAttemptAnswer(userId, attemptId, answerText, actionSource = "web") {
+function submitAttemptAnswer(userId, attemptId, answerText, actionSource = "web", options = {}) {
   const db = getDb();
-  const a = db
-    .prepare(
-      `SELECT a.*, t.type, t.rubric_json, b.claimed_grade, b.id AS battery_id
-       FROM attempts a JOIN tasks t ON t.id = a.task_id JOIN batteries b ON b.id = a.battery_id
-       WHERE a.id = ? AND a.candidate_user_id = ?`
-    )
-    .get(attemptId, userId);
-  if (!a) throw mcpError("Задание не найдено", "not_found");
-  if (a.submitted_at) throw mcpError("Ответ уже отправлен", "already_submitted");
+  let a;
+  try {
+    a = loadAttemptForSubmit(attemptId, userId);
+    assertAttemptMutable(a);
+  } catch (e) {
+    if (e.status === 409) throw mcpError("Ответ уже отправлен", "already_submitted");
+    if (e.status === 404) throw mcpError("Задание не найдено", "not_found");
+    throw e;
+  }
+  if (options.requireQuick && a.type !== "quick") {
+    throw mcpError("Для рабочего задания используйте submit_work_task", "invalid_body");
+  }
+  if (options.requireWork && a.type !== "work") {
+    throw mcpError("Для короткого задания используйте submit_answer", "invalid_body");
+  }
   if (a.type === "work") {
     const opened = new Date(a.opened_at).getTime();
     if (Date.now() > opened + WORK_DEADLINE_MS) {
@@ -334,6 +365,7 @@ function getDeckNext(userId, needId, filters = {}) {
       explanation: c.explanation.slice(0, 2),
       taskPhrases: c.taskPhrases,
       integrationNote: c.integrationNote,
+      aiUsage: summarizeAiUsageForEmployer(userId, c.id),
       phone: c.phone,
       contact_email: c.contact_email,
     },

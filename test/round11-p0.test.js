@@ -44,6 +44,8 @@ describe("round 11 P0 fixes", () => {
     const created = await agent.post("/api/integrations/tokens").send({
       name: "read only",
       scopes: ["read"],
+      clientWhere: "Cursor",
+      loggingConsent: true,
     });
     assert.equal(created.status, 201);
     const res = await request(app)

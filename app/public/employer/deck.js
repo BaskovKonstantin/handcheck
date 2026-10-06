@@ -82,17 +82,18 @@ async function loadNeed() {
 
 function renderCard(data) {
   const cardEl = document.getElementById("deck-card");
+  const esc = HandCheck.escapeHtml;
   const monogram = HandCheck.initials(data.card.displayName);
   const domains = (data.card.backgroundDomains || [])
-    .map((d) => `<span class="chip chip-domain">${d}</span>`)
+    .map((d) => `<span class="chip chip-domain">${esc(d)}</span>`)
     .join("");
   const stack = (data.card.stack || [])
-    .map((s) => `<span class="chip chip-skill">${s}</span>`)
+    .map((s) => `<span class="chip chip-skill">${esc(s)}</span>`)
     .join("");
   const phrases = (data.card.taskPhrases || [])
-    .map((t) => `<li>${t}</li>`)
+    .map((t) => `<li>${esc(t)}</li>`)
     .join("");
-  const explain = (data.card.explanation || []).join(". ");
+  const explain = (data.card.explanation || []).map(esc).join(". ");
 
   cardEl.hidden = false;
   cardEl.className = "deck-card enter deck-card-swipe";
@@ -102,15 +103,26 @@ function renderCard(data) {
       <div class="deck-card-head">
         <div class="avatar-monogram" title="Без фото по правилам платформы">${monogram}</div>
         <div>
-          <h2 class="deck-name">${data.card.displayName}</h2>
-          <span class="category-pill">${data.card.categoryLabel}</span>
+          <h2 class="deck-name">${esc(data.card.displayName)}</h2>
+          <span class="category-pill">${esc(data.card.categoryLabel)}</span>
         </div>
       </div>
       ${domains ? `<div class="chip-row">${domains}</div>` : ""}
       ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}
       <ul class="deck-phrases">${phrases}</ul>
       ${explain ? `<p class="deck-explain"><svg class="inline-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 3a1 1 0 1 1-1 1 1 1 0 0 1 1-1zm2 8H6v-1h1V8H6V7h3v4h1v1z" fill="currentColor"/></svg> ${explain}</p>` : ""}
-      ${data.card.integrationNote ? `<p class="deck-integration-note invite-meta">${data.card.integrationNote}</p>` : ""}
+      ${data.card.integrationNote ? `<p class="deck-integration-note invite-meta">${esc(data.card.integrationNote)}</p>` : ""}
+      ${
+        data.card.aiUsage
+          ? `<div class="deck-ai-usage panel-soft"><h3 class="h3">Как работает с ИИ</h3><p class="invite-meta">${esc(data.card.aiUsage.headline)}</p>${
+              (data.card.aiUsage.activityLines || []).length
+                ? `<ul class="deck-phrases">${(data.card.aiUsage.activityLines || [])
+                    .map((l) => `<li>${esc(l)}</li>`)
+                    .join("")}</ul>`
+                : ""
+            }</div>`
+          : ""
+      }
     </div>`;
 }
 

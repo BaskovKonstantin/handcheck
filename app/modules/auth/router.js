@@ -12,25 +12,23 @@ const {
   clearSessionCookie,
 } = require("../../middleware/auth");
 const { httpError } = require("../../middleware/errors");
+const { validateRegisterBody } = require("../../lib/validation");
+const { shouldMarkUserAsTest } = require("../../lib/is-test-user");
 
 const router = express.Router();
 
 router.post("/register", (req, res, next) => {
   try {
-    const email = String(req.body?.email || "").trim().toLowerCase();
-    const password = String(req.body?.password || "");
-    const role = String(req.body?.role || "").trim();
-    if (!email || !password || !["candidate", "employer"].includes(role)) {
-      throw httpError(400, "invalid_body");
-    }
+    const { email, password, role } = validateRegisterBody(req.body);
     const db = getDb();
     const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
     if (existing) throw httpError(409, "email_taken");
     const id = newId();
     const hash = bcrypt.hashSync(password, 10);
+    const isTest = shouldMarkUserAsTest(email, email.split("@")[0]) ? 1 : 0;
     db.prepare(
-      "INSERT INTO users (id, email, password_hash, role) VALUES (?, ?, ?, ?)"
-    ).run(id, email, hash, role);
+      "INSERT INTO users (id, email, password_hash, role, is_test) VALUES (?, ?, ?, ?, ?)"
+    ).run(id, email, hash, role, isTest);
     if (role === "candidate") {
       db.prepare(
         "INSERT INTO candidate_profiles (user_id, display_name, contact_email) VALUES (?, ?, ?)"

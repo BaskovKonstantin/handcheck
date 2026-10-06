@@ -10,6 +10,7 @@ function employerCandidateView(viewerEmployerId, candidate, invitation) {
     explanation: candidate.explanation,
     taskPhrases: candidate.taskPhrases,
     integrationNote: candidate.integrationNote || null,
+    aiUsage: candidate.aiUsage || null,
   };
   if (
     invitation &&

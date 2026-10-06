@@ -27,9 +27,14 @@ router.get("/invitations", (req, res) => {
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
        JOIN employer_needs n ON n.id = i.need_id
-       WHERE i.employer_user_id = ? ORDER BY i.created_at DESC`
+       WHERE i.employer_user_id = ?
+         AND (
+           (SELECT is_test FROM users WHERE id = i.candidate_user_id) = 0
+           OR (SELECT is_test FROM users WHERE id = ?) = 1
+         )
+       ORDER BY i.created_at DESC`
     )
-    .all(req.user.id);
+    .all(req.user.id, req.user.id);
   res.json({
     items: rows.map((r) => {
       const item = {

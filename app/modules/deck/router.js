@@ -8,6 +8,7 @@ const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
 const { loadCandidatesForNeed, applyFilters } = require("../matching/pool");
 const { employerCandidateView } = require("../../lib/privacy");
+const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -25,6 +26,7 @@ router.get("/needs/:id/deck/next", (req, res, next) => {
   items = applyFilters(items, req.query);
   if (!items.length) return res.json({ card: null });
   const c = items[0];
+  const aiUsage = summarizeAiUsageForEmployer(req.user.id, c.id);
   const card = employerCandidateView(req.user.id, {
     id: c.id,
     displayName: c.displayName,
@@ -34,6 +36,7 @@ router.get("/needs/:id/deck/next", (req, res, next) => {
     explanation: c.explanation.slice(0, 2),
     taskPhrases: c.taskPhrases,
     integrationNote: c.integrationNote,
+    aiUsage,
     phone: c.phone,
     contact_email: c.contact_email,
   }, null);

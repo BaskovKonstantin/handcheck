@@ -204,9 +204,44 @@ const LINK_ICON = {
 };
 
 const TAB_PRIMARY = {
-  candidate: ["/candidate/today", "/candidate/profile", "/candidate/invitations", "/candidate/calls"],
+  candidate: ["/candidate/today", "/candidate/invitations", "/candidate/calls", "/candidate/tasks"],
   employer: ["/employer/deck", "/employer/need", "/employer/invitations", "/employer/calls"],
 };
+
+function bindCabinetMoreMenu(role, links) {
+  const primary = new Set(TAB_PRIMARY[role] || []);
+  const extra = links.filter((l) => !primary.has(l.href));
+  const tabs = document.getElementById("cabinet-tabs");
+  if (!tabs || !extra.length) return;
+  let more = document.getElementById("cabinet-more");
+  if (!more) {
+    more = document.createElement("button");
+    more.type = "button";
+    more.id = "cabinet-more";
+    more.className = "cabinet-nav-link tab-link cabinet-more-btn";
+    more.innerHTML = `${NAV_ICONS.profile}<span>Ещё</span>`;
+    tabs.appendChild(more);
+  }
+  let sheet = document.getElementById("cabinet-more-sheet");
+  if (!sheet) {
+    sheet = document.createElement("div");
+    sheet.id = "cabinet-more-sheet";
+    sheet.className = "cabinet-more-sheet";
+    sheet.hidden = true;
+    document.body.appendChild(sheet);
+  }
+  sheet.innerHTML = `<div class="cabinet-more-backdrop" data-close="1"></div><div class="cabinet-more-panel" role="dialog" aria-label="Дополнительные разделы">${extra
+    .map((l) => navLinkHtml(l, false))
+    .join("")}</div>`;
+  const close = () => {
+    sheet.hidden = true;
+  };
+  more.onclick = () => {
+    sheet.hidden = !sheet.hidden;
+  };
+  sheet.querySelector("[data-close]")?.addEventListener("click", close);
+  sheet.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+}
 
 function navLinkHtml(l, compact) {
   const iconKey = LINK_ICON[l.href];
@@ -283,6 +318,7 @@ function ensureCabinetChrome(links, role, meEmail) {
     .map((href) => links.find((l) => l.href === href))
     .filter(Boolean);
   tabs.innerHTML = tabLinks.map((l) => navLinkHtml(l, true)).join("");
+  bindCabinetMoreMenu(role, links);
 }
 
 function mountCabinetChromeSync(links, role) {
@@ -380,6 +416,7 @@ const CANDIDATE_LINKS = [
   { href: "/candidate/tasks", label: "Задания" },
   { href: "/candidate/invitations", label: "Приглашения" },
   { href: "/candidate/calls", label: "Звонки" },
+  { href: "/candidate/past", label: "Прошлое" },
   { href: "/candidate/integrations", label: "Интеграции" },
 ];
 
@@ -591,5 +628,6 @@ window.HandCheck = {
   callStatusClass,
   formatSalaryRange,
   formatDateTimeMoscow,
+  escapeHtml,
   LOGO_MARK,
 };

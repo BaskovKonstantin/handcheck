@@ -80,6 +80,8 @@ describe("browser integrations smoke", () => {
     await page.goto(`${base}/candidate/integrations`);
     await page.waitForSelector("#create-token", { timeout: 15000 });
     await page.fill("#token-name", "Playwright token");
+    await page.fill("#client-where", "Cursor");
+    await page.check("#logging-consent");
     await page.click("#create-token");
     await page.waitForFunction(() => {
       const raw = document.getElementById("token-raw");

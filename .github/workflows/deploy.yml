@@ -15,14 +15,37 @@ jobs:
     name: Deploy on konBas
     runs-on: [self-hosted, handcheck, konbas]
     steps:
-      - name: Pull and rebuild
+      - name: Pull and rebuild (preserve /data volume and server .env)
         working-directory: /srv/homeserver/apps/handcheck
         run: |
           set -euo pipefail
+
+          # Never wipe production SQLite or server secrets (untracked .env lives here).
+          if [[ ! -f .env ]]; then
+            echo "ERROR: .env missing in deploy directory — aborting (will not start compose)."
+            exit 1
+          fi
+
           git fetch origin main
           git reset --hard origin/main
-          docker compose up -d --build
+
+          # Named volume handcheck-data must survive rebuilds (declared in docker-compose.yml).
+          if ! docker volume inspect handcheck_handcheck-data >/dev/null 2>&1; then
+            if ! docker volume inspect handcheck-data >/dev/null 2>&1; then
+              echo "WARN: handcheck data volume not found yet — compose will create handcheck-data on first up"
+            fi
+          fi
+
+          # Rebuild image and recreate container only; do NOT run `down -v` or `volume rm`.
+          docker compose up -d --build --remove-orphans
+
           sleep 3
-          curl -fsS http://127.0.0.1:8810/api/health
-          docker compose ps
+          curl -fsS --max-time 15 http://127.0.0.1:8810/api/health
+
+          if ! docker compose ps --status running | grep -q web; then
+            echo "ERROR: web service is not running after deploy"
+            docker compose ps
+            exit 1
+          fi
+
           echo "Deploy OK: $(git rev-parse --short HEAD)"

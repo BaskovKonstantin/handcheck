@@ -1,0 +1,75 @@
+openapi: 3.0.3
+info:
+  title: HandCheck API
+  version: 0.5.0
+paths:
+  /api/health:
+    get:
+      summary: Health check
+  /api/stats:
+    get:
+      summary: Landing counters
+  /api/me:
+    get:
+      summary: Current session user
+  /api/auth/register:
+    post:
+      summary: Register
+  /api/auth/confirm:
+    post:
+      summary: Confirm email
+  /api/auth/login:
+    post:
+      summary: Login
+  /api/auth/logout:
+    post:
+      summary: Logout
+  /api/candidate/profile:
+    get:
+      summary: Candidate profile
+    put:
+      summary: Update profile
+  /api/candidate/background:
+    get:
+      summary: List episodes
+    post:
+      summary: Add episode
+  /api/candidate/availability:
+    put:
+      summary: open or paused
+  /api/assessment/battery/start:
+    post:
+      summary: Start battery
+  /api/assessment/battery/current:
+    get:
+      summary: Current battery
+  /api/assessment/tasks/{attemptId}:
+    get:
+      summary: Task prompt
+  /api/assessment/tasks/{attemptId}/draft:
+    patch:
+      summary: Save draft
+  /api/assessment/tasks/{attemptId}/submit:
+    post:
+      summary: Submit answer
+  /api/assessment/events:
+    post:
+      summary: Telemetry batch
+  /api/employer/needs/{id}/matches:
+    get:
+      summary: Ranked matches
+  /api/employer/needs/{id}/deck/next:
+    get:
+      summary: Next deck card
+  /api/employer/invitations:
+    post:
+      summary: Send invitation
+  /api/calls/for-invitation/{invitationId}:
+    get:
+      summary: Call room info
+  /api/calls/{id}/consent:
+    post:
+      summary: Recording consent
+  /api/calls/{id}/analysis:
+    get:
+      summary: Employer call summary

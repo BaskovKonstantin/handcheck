@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Сегодня — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <h1>Сегодня</h1>
+      <div class="panel" id="cat">Загрузка…</div>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      HandCheck.candidateNav();
+      HandCheck.api("/api/candidate/category").then((c) => {
+        document.getElementById("cat").textContent = c.label
+          ? `Категория: ${c.label}`
+          : "Категория появится после теста";
+      });
+    </script>
+  </body>
+</html>

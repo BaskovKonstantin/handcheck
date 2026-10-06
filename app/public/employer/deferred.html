@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Отложенные — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <h1>Отложенные</h1>
+      <div id="list"></div>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      HandCheck.employerNav();
+      HandCheck.api("/api/employer/needs").then(async (needs) => {
+        const id = needs.items[0]?.id;
+        const d = await HandCheck.api(`/api/employer/needs/${id}/deferred`);
+        document.getElementById("list").innerHTML =
+          d.items
+            .map(
+              (x) =>
+                `<div class="panel">${x.displayName} — ${x.categoryLabel}
+                <button class="btn-ghost" data-c="${x.candidateId}">Вернуть в колоду</button></div>`
+            )
+            .join("") || '<p class="empty">Нет отложенных</p>';
+        document.querySelectorAll("button[data-c]").forEach((b) => {
+          b.onclick = async () => {
+            await HandCheck.api(`/api/employer/needs/${id}/reviews/${b.dataset.c}`, {
+              method: "DELETE",
+            });
+            location.reload();
+          };
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Колода — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <h1>Колода</h1>
+      <p class="hero-lede">Один жест — одно решение. Без фото и без числовых оценок.</p>
+      <div class="deck-wrap">
+        <div id="deck-card" class="deck-card enter"></div>
+        <div class="deck-actions" id="deck-actions" hidden>
+          <button class="btn-ghost" type="button" data-decision="rejected">Отказать</button>
+          <button class="btn-ghost" type="button" data-decision="later">Отложить</button>
+          <button class="btn-primary" type="button" id="invite-open">Пригласить</button>
+        </div>
+      </div>
+      <p class="empty" id="empty" hidden>Кандидатов в колоде нет</p>
+    </main>
+    <div class="invite-sheet hidden" id="sheet">
+      <div class="invite-panel">
+        <h2>Приглашение</h2>
+        <label>От <input type="number" id="salary-from" /></label>
+        <label>До <input type="number" id="salary-to" /></label>
+        <label>Текст оффера <textarea id="offer-text" rows="3"></textarea></label>
+        <label>Канал связи <input id="contact-channel" maxlength="64" /></label>
+        <p class="field-error" id="invite-err" hidden></p>
+        <button class="btn-primary" type="button" id="invite-send">Отправить</button>
+        <button class="btn-ghost" type="button" id="invite-cancel">Отмена</button>
+      </div>
+    </div>
+    <script src="/app.js"></script>
+    <script src="/employer/deck.js"></script>
+  </body>
+</html>

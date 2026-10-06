@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Задания — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <h1>Батарея</h1>
+      <div class="panel">
+        <button class="btn-primary" id="start">Начать backend × middle</button>
+        <div id="task" hidden></div>
+        <textarea id="answer" rows="6" hidden></textarea>
+        <button class="btn-ghost" id="submit" hidden>Отправить</button>
+      </div>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      HandCheck.candidateNav();
+      let attemptId = null;
+      document.getElementById("start").onclick = async () => {
+        await HandCheck.api("/api/assessment/battery/start", {
+          method: "POST",
+          body: JSON.stringify({ specialization: "backend", grade: "middle" }),
+        });
+        const cur = await HandCheck.api("/api/assessment/battery/current");
+        attemptId = cur.battery.attempts.find((a) => !a.submitted)?.id;
+        document.getElementById("task").hidden = false;
+        document.getElementById("answer").hidden = false;
+        document.getElementById("submit").hidden = false;
+        const t = await HandCheck.api(`/api/assessment/tasks/${attemptId}`);
+        document.getElementById("task").textContent = t.prompt;
+      };
+      const draftKey = () => (attemptId ? `handcheck:draft:v1:${attemptId}` : null);
+      document.getElementById("answer").addEventListener("blur", async () => {
+        const text = document.getElementById("answer").value;
+        if (!attemptId) return;
+        localStorage.setItem(draftKey(), JSON.stringify({ text, at: Date.now() }));
+        await HandCheck.api(`/api/assessment/tasks/${attemptId}/draft`, {
+          method: "PATCH",
+          body: JSON.stringify({ answerText: text }),
+        });
+      });
+      document.getElementById("submit").onclick = async () => {
+        const text = document.getElementById("answer").value;
+        await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
+          method: "POST",
+          body: JSON.stringify({ answerText: text }),
+        });
+        location.reload();
+      };
+    </script>
+  </body>
+</html>

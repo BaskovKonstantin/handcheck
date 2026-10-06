@@ -1,17 +1,29 @@
 {
   "name": "handcheck",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "private": true,
-  "description": "HandCheck — skills-first IT hiring template (FSP special track)",
+  "description": "HandCheck — skills-first IT hiring (FSP special track)",
   "main": "app/server.js",
   "scripts": {
     "start": "node app/server.js",
-    "dev": "node --watch app/server.js"
+    "dev": "node --watch app/server.js",
+    "test": "node --test test/*.test.js",
+    "validate:assessment": "node scripts/validate-assessment.js",
+    "validate:matching": "node scripts/validate-matching.js",
+    "validate:privacy": "node scripts/validate-privacy.js",
+    "validate": "npm run validate:assessment && npm run validate:matching && npm run validate:privacy"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.1",
+    "express": "^4.21.2",
+    "multer": "^2.0.2",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.0"
   }
 }

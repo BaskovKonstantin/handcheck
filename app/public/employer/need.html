@@ -17,6 +17,7 @@
           <p class="lede">Название, специализация, грейд, стек и домен задают, кого покажет колода.</p>
         </div>
       </header>
+      <div id="need-banner"></div>
       <div id="stats"></div>
       <div class="panel" id="form"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
       <p class="invite-meta need-save-hint" id="save-hint">Измените поля формы, чтобы активировать «Сохранить».</p>
@@ -72,8 +73,16 @@
             label: "Стек",
             value: stack,
             hint: "Фильтр и подсказки в списке",
+            clamp: true,
           },
         ]);
+        paintInactiveBanner(n);
+      }
+
+      function paintInactiveBanner(n) {
+        const el = document.getElementById("need-banner");
+        if (!el) return;
+        el.innerHTML = n && !n.active ? HandCheck.needInactiveBannerHtml() : "";
       }
 
       function paintForm(n) {
@@ -138,6 +147,7 @@
           document.getElementById("stack").value = (picked.stack || []).join(", ");
           const activeEl = document.getElementById("need-active");
           if (activeEl) activeEl.checked = Boolean(picked.active);
+          paintInactiveBanner(picked);
           snapshot = JSON.stringify(currentPayload());
           refreshDirty();
         };

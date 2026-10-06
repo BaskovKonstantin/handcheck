@@ -166,7 +166,7 @@ function humanToolSummary(toolName, ok, args) {
   };
   const base = map[toolName] || toolName;
   const intent = args?.intent ? ` — «${String(args.intent).slice(0, 80)}»` : "";
-  return `${base}${intent}${ok ? "" : " (ошибка)"}`;
+  return `${base}${intent}`;
 }
 
 function logToolCall(ctx, toolName, args, result) {

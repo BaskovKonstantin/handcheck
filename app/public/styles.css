@@ -1816,6 +1816,17 @@ body.has-cabinet-chrome main {
   word-break: break-word;
 }
 
+.stat-tile-value-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 .stat-tile-forest .stat-tile-value {
   color: var(--forest);
 }
@@ -2664,6 +2675,12 @@ body.deck-page main.column {
   align-items: center;
 }
 
+.audit-row > .audit-row-time {
+  flex: 0 0 4.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .scope-fieldset .scope-option {
   display: flex;
   align-items: center;
@@ -2805,12 +2822,18 @@ label.consent-option input {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.35rem 0.75rem;
+  max-width: 100%;
+  padding: 0.35rem 0.65rem;
   border-radius: 999px;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper) 92%, var(--muted));
   color: var(--muted);
   font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: not-allowed;
 }
 

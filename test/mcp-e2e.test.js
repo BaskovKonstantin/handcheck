@@ -159,6 +159,9 @@ describe("MCP e2e", () => {
     assert.equal(invRow.action_source, "mcp");
 
     db.prepare("UPDATE invitations SET status = 'accepted' WHERE id = ?").run(invited.invitationId);
+    const callsListed = parseToolJson(await client.callTool({ name: "list_calls", arguments: {} }));
+    assert.ok(Array.isArray(callsListed));
+    assert.ok(callsListed.some((r) => r.invitationId === invited.invitationId));
     const callId = newId();
     db.prepare(
       `INSERT INTO calls (id, invitation_id, status, ended_at) VALUES (?, ?, 'ended', datetime('now'))`

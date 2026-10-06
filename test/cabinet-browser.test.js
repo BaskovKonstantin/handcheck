@@ -454,9 +454,12 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await page.goto(`${BASE}/candidate/profile`, { waitUntil: "commit", timeout: 30000 });
     await page.waitForSelector("#add-ep", { timeout: 15000 });
     await page.click("#add-ep", { force: true });
-    await page.waitForSelector("#ep-err:not([hidden])", { timeout: 10000 });
-    const err = (await page.locator("#ep-err").textContent()) || "";
-    assert.match(err, /роль|домен/i);
+    await page.waitForSelector("#ep-role-err:not([hidden])", { timeout: 10000 });
+    await page.waitForSelector("#ep-domain-err:not([hidden])", { timeout: 10000 });
+    const roleErr = (await page.locator("#ep-role-err").textContent()) || "";
+    const domainErr = (await page.locator("#ep-domain-err").textContent()) || "";
+    assert.match(roleErr, /роль/i);
+    assert.match(domainErr, /домен/i);
     await context.close();
   });
 

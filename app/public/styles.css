@@ -2396,6 +2396,34 @@ body.deck-page main.column {
   }
 }
 
+@media (min-width: 1024px) {
+  .call-room-grid {
+    grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.35fr);
+  }
+
+  .call-video-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .call-video-shell {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .call-room-grid {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .call-room-grid .call-video-shell {
+    order: -1;
+  }
+}
+
 .call-room-panel-title {
   margin: 0 0 1rem;
   font-size: 1.05rem;
@@ -2498,6 +2526,17 @@ body.deck-page main.column {
 .call-video-tile .call-video-placeholder {
   min-height: 0;
   aspect-ratio: 16 / 9;
+}
+
+.call-video-tile .call-video-placeholder p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.call-recording-missing {
+  margin: 0 0 1rem;
+  color: var(--muted);
 }
 
 .call-timer {

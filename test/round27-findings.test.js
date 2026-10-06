@@ -243,20 +243,18 @@ describe("round27 findings", () => {
         ws2.once("error", j);
       }),
     ]);
-    const ws3 = new WebSocket(url, { headers: { Cookie: cafeCookie } });
-    const thirdRejected = await new Promise((resolve) => {
-      const done = (ok) => {
-        clearTimeout(timer);
-        resolve(ok);
-      };
-      const timer = setTimeout(() => done(ws3.readyState !== WebSocket.OPEN), 300);
-      ws3.once("close", () => done(true));
-      ws3.once("error", () => done(true));
+    const ws1Closed = new Promise((resolve) => {
+      ws1.once("close", () => resolve(true));
     });
-    assert.equal(thirdRejected, true);
-    ws1.close();
+    const ws3 = new WebSocket(url, { headers: { Cookie: cafeCookie } });
+    await new Promise((r, j) => {
+      ws3.once("open", r);
+      ws3.once("error", j);
+    });
+    assert.equal(await ws1Closed, true, "duplicate tab should replace prior employer socket");
+    assert.equal(ws3.readyState, WebSocket.OPEN);
     ws2.close();
-    ws3.terminate?.();
+    ws3.close();
   });
 
   it("P0-1: call UI does not claim recording without MediaRecorder path", () => {

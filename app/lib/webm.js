@@ -5,11 +5,17 @@ function isWebmBuffer(buf) {
   return buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3;
 }
 
-function assertWebmUpload(file) {
-  if (!file?.buffer?.length) return false;
-  const mime = String(file.mimetype || "").toLowerCase();
-  const mimeOk = mime === "video/webm" || mime === "audio/webm";
-  return mimeOk && isWebmBuffer(file.buffer);
+function normalizeWebmMime(mime) {
+  const base = String(mime || "").toLowerCase().split(";")[0].trim();
+  return base;
 }
 
-module.exports = { isWebmBuffer, assertWebmUpload };
+function assertWebmUpload(file) {
+  if (!file?.buffer?.length || !isWebmBuffer(file.buffer)) return false;
+  const base = normalizeWebmMime(file.mimetype);
+  if (base === "video/webm" || base === "audio/webm") return true;
+  const generic = new Set(["application/octet-stream", "text/plain", "binary/octet-stream"]);
+  return generic.has(base);
+}
+
+module.exports = { isWebmBuffer, assertWebmUpload, normalizeWebmMime };

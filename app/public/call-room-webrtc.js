@@ -4,14 +4,33 @@
 (function (global) {
   const WS_SIGNAL = { OFFER: "offer", ANSWER: "answer", ICE: "ice", ENDED: "ended" };
 
+  /** Target total bitrate so ~60 min fits in 80 MB upload limit (with headroom). */
+  const RECORDING_LIMIT_BYTES = 80 * 1024 * 1024;
+  const RECORDING_TARGET_SECONDS = 60 * 60;
+  const RECORDER_VIDEO_BPS = 130_000;
+  const RECORDER_AUDIO_BPS = 20_000;
+  const RECORDER_TOTAL_BPS = RECORDER_VIDEO_BPS + RECORDER_AUDIO_BPS;
+
   function wsUrl(callId) {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${location.host}/ws/calls/${callId}`;
   }
 
-  function parseSignal(raw) {
+  async function parseSignal(raw) {
+    let text = raw;
+    if (typeof raw !== "string") {
+      if (raw instanceof Blob) {
+        text = await raw.text();
+      } else if (raw instanceof ArrayBuffer) {
+        text = new TextDecoder().decode(raw);
+      } else if (raw && typeof raw.byteLength === "number") {
+        text = new TextDecoder().decode(new Uint8Array(raw));
+      } else {
+        text = String(raw);
+      }
+    }
     try {
-      const msg = JSON.parse(raw);
+      const msg = JSON.parse(text);
       if (msg && typeof msg.t === "string") return msg;
     } catch {
       /* ignore */
@@ -31,15 +50,22 @@
     return "";
   }
 
+  function recorderFitsPlanLimit() {
+    const bytesPerSecond = RECORDER_TOTAL_BPS / 8;
+    const projected = bytesPerSecond * RECORDING_TARGET_SECONDS;
+    return projected <= RECORDING_LIMIT_BYTES * 0.92;
+  }
+
   /**
    * @param {object} opts
    * @param {string} opts.callId
    * @param {string} opts.role - employer | candidate
    * @param {() => void} [opts.onPeerEnded]
    * @param {(state: object) => void} [opts.onState]
+   * @param {(message: string) => void} [opts.onUploadError]
    */
   function createCallSession(opts) {
-    const { callId, role, onPeerEnded, onState } = opts;
+    const { callId, role, onPeerEnded, onState, onUploadError } = opts;
     let ws = null;
     let pc = null;
     let localStream = null;
@@ -48,8 +74,11 @@
     let recorderChunks = [];
     let speech = null;
     let speechNoteShown = false;
+    let speechStopped = false;
     let pollTimer = null;
     let ended = false;
+    let liveFeaturesStarted = false;
+    let liveStartedAt = null;
 
     function emit(patch) {
       if (typeof onState === "function") {
@@ -126,8 +155,9 @@
       if (ws) return;
       ws = new WebSocket(wsUrl(callId));
       ws.onmessage = (ev) => {
-        const msg = parseSignal(ev.data);
-        if (msg) handleSignal(msg);
+        parseSignal(ev.data).then((msg) => {
+          if (msg) handleSignal(msg);
+        });
       };
       ws.onopen = async () => {
         emit({ wsOpen: true });
@@ -145,6 +175,17 @@
       };
     }
 
+    function restartSpeech() {
+      if (ended || speechStopped || !speech) return;
+      try {
+        speech.start();
+      } catch {
+        speechNoteShown = true;
+        speech = null;
+        emit({});
+      }
+    }
+
     function startSpeechRecognition() {
       const Ctor = global.SpeechRecognition || global.webkitSpeechRecognition;
       if (!Ctor) {
@@ -157,6 +198,8 @@
       speech.continuous = true;
       speech.interimResults = false;
       speech.onresult = (ev) => {
+        const at =
+          liveStartedAt != null ? Math.max(0, Math.round((Date.now() - liveStartedAt) / 1000)) : 0;
         for (let i = ev.resultIndex; i < ev.results.length; i += 1) {
           const res = ev.results[i];
           if (!res.isFinal) continue;
@@ -164,11 +207,23 @@
           if (!text) continue;
           HandCheck.api(`/api/calls/${callId}/transcript-chunk`, {
             method: "POST",
-            body: JSON.stringify({ text }),
+            body: JSON.stringify({ text, at }),
           }).catch(() => {});
         }
       };
-      speech.onerror = () => {};
+      speech.onerror = (ev) => {
+        if (ended || speechStopped) return;
+        const code = ev?.error || "";
+        if (code === "network" || code === "aborted" || code === "no-speech") {
+          setTimeout(() => restartSpeech(), 300);
+          return;
+        }
+        speechNoteShown = true;
+        emit({});
+      };
+      speech.onend = () => {
+        if (!ended && !speechStopped) restartSpeech();
+      };
       try {
         speech.start();
       } catch {
@@ -185,7 +240,11 @@
         return;
       }
       recorderChunks = [];
-      recorder = new MediaRecorder(stream, { mimeType: mime });
+      recorder = new MediaRecorder(stream, {
+        mimeType: mime,
+        videoBitsPerSecond: RECORDER_VIDEO_BPS,
+        audioBitsPerSecond: RECORDER_AUDIO_BPS,
+      });
       recorder.ondataavailable = (ev) => {
         if (ev.data && ev.data.size > 0) recorderChunks.push(ev.data);
       };
@@ -207,7 +266,13 @@
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error || `recording_upload_${res.status}`);
+        const code = err?.error || `recording_upload_${res.status}`;
+        const message =
+          res.status === 413
+            ? "Запись слишком большая (максимум 80 МБ). Сократите звонок или обратитесь в поддержку."
+            : HandCheck.formatApiError?.({ data: err, message: code }) || "Не удалось сохранить запись";
+        if (typeof onUploadError === "function") onUploadError(message);
+        throw new Error(code);
       }
     }
 
@@ -230,24 +295,31 @@
     return {
       getLocalStream: () => localStream,
       getRemoteStream: () => remoteStream,
+      getConnectionState: () => pc?.connectionState || "new",
       async attachLocalMedia(stream) {
         localStream = stream;
         if (pc) {
           stream.getTracks().forEach((tr) => pc.addTrack(tr, stream));
         }
       },
-      async enterLive(invitationId) {
+      async connectSignaling() {
         await connectSignaling();
+      },
+      async startLiveFeatures() {
+        if (liveFeaturesStarted) return;
+        liveFeaturesStarted = true;
+        liveStartedAt = Date.now();
         startRecorder(localStream);
         startSpeechRecognition();
         startStatusPoll((info) => {
           if (typeof onPeerEnded === "function") onPeerEnded(info);
         });
-        opts.invitationId = invitationId;
         emit({});
       },
-      async endLocalSide() {
+      async endLocalSide(options = {}) {
+        const { skipUpload = false } = options;
         ended = true;
+        speechStopped = true;
         sendSignal({ t: WS_SIGNAL.ENDED });
         clearInterval(pollTimer);
         clearInterval(offerRetryTimer);
@@ -265,7 +337,9 @@
             recorder.stop();
           });
         }
-        await uploadRecording().catch(() => {});
+        if (!skipUpload && liveFeaturesStarted) {
+          await uploadRecording();
+        }
         if (ws) {
           ws.close();
           ws = null;
@@ -289,6 +363,11 @@
   global.HandCheckCallRoom = {
     createCallSession,
     pickRecorderMime,
+    parseSignal,
+    recorderFitsPlanLimit,
+    RECORDER_TOTAL_BPS,
+    RECORDING_LIMIT_BYTES,
+    RECORDING_TARGET_SECONDS,
     _WS_SIGNAL: WS_SIGNAL,
   };
 })(window);

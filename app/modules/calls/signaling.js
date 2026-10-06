@@ -30,8 +30,8 @@ function attachSignaling(server) {
       return;
     }
     const db = getDb();
-    const call = db.prepare("SELECT invitation_id FROM calls WHERE id = ?").get(callId);
-    if (!call) {
+    const call = db.prepare("SELECT invitation_id, status FROM calls WHERE id = ?").get(callId);
+    if (!call || call.status === "ended") {
       socket.destroy();
       return;
     }
@@ -46,14 +46,25 @@ function attachSignaling(server) {
       ws.userId = uid;
       if (!rooms.has(callId)) rooms.set(callId, new Set());
       const set = rooms.get(callId);
+      for (const peer of set) {
+        if (peer.userId === uid) {
+          set.delete(peer);
+          try {
+            peer.close();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
       if (set.size >= 2) {
         ws.close();
         return;
       }
       set.add(ws);
       ws.on("message", (data) => {
+        const text = Buffer.isBuffer(data) ? data.toString("utf8") : String(data);
         for (const peer of set) {
-          if (peer !== ws && peer.readyState === 1) peer.send(data);
+          if (peer !== ws && peer.readyState === 1) peer.send(text);
         }
       });
       ws.on("close", () => {

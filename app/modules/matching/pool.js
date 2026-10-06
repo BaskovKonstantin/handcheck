@@ -75,6 +75,19 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
       });
     }
 
+    let integrationNote = null;
+    if (lastBattery) {
+      const mcpCount = db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM attempts WHERE battery_id = ? AND submit_source = 'mcp' AND submitted_at IS NOT NULL`
+        )
+        .get(lastBattery.id).c;
+      if (mcpCount > 0) {
+        integrationNote =
+          "Часть ответов в тесте отправлена через интеграцию (AI-клиент) — нейтральная пометка, не штраф.";
+      }
+    }
+
     out.push({
       id: r.user_id,
       reviewDecision: decision || null,
@@ -89,6 +102,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
       motivation: r.motivation,
       assigned_at: r.assigned_at,
       taskPhrases,
+      integrationNote,
       backgroundDomains: episodes.map((e) => `${e.role_title} · ${e.industry}`).filter(Boolean),
     });
   }
@@ -103,6 +117,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
       backgroundDomains: c.backgroundDomains,
       explanation,
       taskPhrases: c.taskPhrases,
+      integrationNote: c.integrationNote,
       _rank: c.rank,
       domain_boost: c.domain_boost,
       fsp_boost: c.fsp_boost,

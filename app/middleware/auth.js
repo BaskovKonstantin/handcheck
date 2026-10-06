@@ -4,6 +4,7 @@ const { getDb } = require("../db");
 const config = require("../config");
 const { httpError } = require("./errors");
 const { isRequestSecure } = require("../lib/request-secure");
+const { resolveBearerToken } = require("../lib/api-tokens");
 
 function parseCookies(req) {
   const header = req.headers.cookie || "";
@@ -36,14 +37,24 @@ function loadSession(req) {
 
 function attachUser(req, _res, next) {
   req.session = loadSession(req);
-  req.user = req.session
-    ? {
-        id: req.session.user_id,
-        email: req.session.email,
-        role: req.session.role,
-        email_confirmed_at: req.session.email_confirmed_at,
-      }
-    : null;
+  if (req.session) {
+    req.user = {
+      id: req.session.user_id,
+      email: req.session.email,
+      role: req.session.role,
+      email_confirmed_at: req.session.email_confirmed_at,
+    };
+    req.apiToken = null;
+  } else {
+    const resolved = resolveBearerToken(req.headers.authorization);
+    if (resolved) {
+      req.user = resolved.user;
+      req.apiToken = { id: resolved.id, scopes: resolved.scopes };
+    } else {
+      req.user = null;
+      req.apiToken = null;
+    }
+  }
   next();
 }
 

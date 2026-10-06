@@ -10,6 +10,9 @@ function employerCandidateView(viewerEmployerId, candidate, invitation) {
     explanation: candidate.explanation,
     taskPhrases: candidate.taskPhrases,
   };
+  if (candidate.integrationNote) {
+    base.integrationNote = candidate.integrationNote;
+  }
   if (
     invitation &&
     invitation.status === "accepted" &&

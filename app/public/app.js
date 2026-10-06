@@ -2,6 +2,12 @@ const ERROR_MESSAGES = {
   invalid_credentials: "Неверный email или пароль",
   unauthorized: "Войдите в аккаунт",
   forbidden: "Нет доступа",
+  email_not_confirmed: "Подтвердите email — проверьте почту после регистрации",
+  not_found: "Страница или объект не найдены",
+  invalid_body: "Проверьте поля формы",
+  cooldown: "Пересдача по этой специализации пока недоступна",
+  deadline_passed: "Время на рабочую задачу истекло",
+  candidate_paused: "Кандидат на паузе — новые приглашения не отправляются",
   file_too_large: "Файл слишком большой (максимум 80 МБ)",
   upload_failed: "Не удалось загрузить файл",
   invalid_id: "Некорректный идентификатор",
@@ -162,6 +168,7 @@ function formatCabinetEmailMarkup(email) {
 const NAV_ICONS = {
   today: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4V6zm2 2v10h12V8H6zm2 9h2v-2H8v2zm0-4h2v-2H8v2zm4 4h2v-2h-2v2zm0-4h2v-2h-2v2zm4 4h2v-2h-2v2z" fill="currentColor"/></svg>',
   profile: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" fill="currentColor"/></svg>',
+  integrations: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3H7V7zm0 7h10v3H7v-3zm-2-5h2v2H5v-2zm0 7h2v2H5v-2z" fill="currentColor"/></svg>',
   tasks: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v2H5V5zm0 6h14v2H5v-2zm0 6h10v2H5v-2z" fill="currentColor"/></svg>',
   invitations: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8l8 5 8-5v10H4V8zm16-2H4l8 5 8-5z" fill="currentColor"/></svg>',
   calls: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg>',
@@ -174,6 +181,7 @@ const NAV_ICONS = {
 const LINK_ICON = {
   "/candidate/today": "today",
   "/candidate/profile": "profile",
+  "/candidate/integrations": "integrations",
   "/candidate/tasks": "tasks",
   "/candidate/invitations": "invitations",
   "/candidate/calls": "calls",
@@ -182,6 +190,7 @@ const LINK_ICON = {
   "/employer/list": "list",
   "/employer/deferred": "deferred",
   "/employer/profile": "profile",
+  "/employer/integrations": "integrations",
   "/employer/invitations": "invitations",
   "/employer/calls": "calls",
 };
@@ -358,6 +367,7 @@ const CANDIDATE_LINKS = [
   { href: "/candidate/profile", label: "Профиль" },
   { href: "/candidate/tasks", label: "Задания" },
   { href: "/candidate/invitations", label: "Приглашения" },
+  { href: "/candidate/integrations", label: "Интеграции" },
   { href: "/candidate/calls", label: "Звонки" },
 ];
 
@@ -368,6 +378,7 @@ const EMPLOYER_LINKS = [
   { href: "/employer/deferred", label: "Отложенные" },
   { href: "/employer/profile", label: "Профиль" },
   { href: "/employer/invitations", label: "Приглашения" },
+  { href: "/employer/integrations", label: "Интеграции" },
   { href: "/employer/calls", label: "Звонки" },
 ];
 

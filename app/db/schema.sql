@@ -191,3 +191,28 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_candidate ON invitations(candidate_user_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_employer_candidate_status
   ON invitations(employer_user_id, candidate_user_id, status);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  token_prefix TEXT NOT NULL,
+  scopes_json TEXT NOT NULL DEFAULT '["read"]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_used_at TEXT,
+  revoked_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS mcp_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_id TEXT REFERENCES api_tokens(id) ON DELETE SET NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  tool_name TEXT NOT NULL,
+  result_summary TEXT NOT NULL DEFAULT '',
+  ok INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_audit_user ON mcp_audit_log(user_id, created_at DESC);

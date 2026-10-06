@@ -2,22 +2,13 @@
 
 const express = require("express");
 const { getDb } = require("../../db");
-const { newId } = require("../../lib/ids");
 const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
 const {
-  scoreQuick,
-  scoreWork,
-} = require("../../lib/rubric-score");
-const {
-  getPublishedBatteryTasks,
-  assertBatteryComplete,
-  lastSpecializationAttempt,
-  cooldownActive,
-  finalizeBattery,
-  WORK_DEADLINE_MS,
-} = require("./service");
+  startBattery,
+  submitAttempt,
+} = require("./actions");
 
 const router = express.Router();
 
@@ -25,34 +16,12 @@ router.use(requireAuth, requireConfirmedEmail, requireRole("candidate"));
 
 router.post("/battery/start", (req, res, next) => {
   try {
-    const specialization = String(req.body?.specialization || "").trim();
-    const grade = String(req.body?.grade || "").trim();
-    if (!specialization || !grade) throw httpError(400, "invalid_body");
-    const db = getDb();
-    const last = lastSpecializationAttempt(req.user.id, specialization);
-    if (cooldownActive(last?.completed_at)) throw httpError(409, "cooldown");
-    const formKey = Math.random() < 0.5 ? "A" : "B";
-    const { quick, work } = getPublishedBatteryTasks(specialization, grade, formKey);
-    assertBatteryComplete(quick, work);
-    const batteryId = newId();
-    const now = new Date().toISOString();
-    db.prepare(
-      `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(batteryId, req.user.id, specialization, grade, formKey, now);
-    const ins = db.prepare(
-      `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, opened_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+    const result = startBattery(
+      req.user.id,
+      req.body?.specialization,
+      req.body?.grade
     );
-    const order = [...quick, work];
-    for (const t of order) {
-      const attemptId = newId();
-      ins.run(attemptId, req.user.id, t.id, batteryId, formKey, now);
-      db.prepare(
-        `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'opened_at', NULL)`
-      ).run(attemptId);
-    }
-    res.status(201).json({ batteryId, formKey, taskCount: order.length });
+    res.status(201).json(result);
   } catch (e) {
     next(e);
   }
@@ -110,40 +79,10 @@ router.patch("/tasks/:attemptId/draft", (req, res, next) => {
 
 router.post("/tasks/:attemptId/submit", (req, res, next) => {
   try {
-    const text = String(req.body?.answerText || "");
-    const db = getDb();
-    const a = db
-      .prepare(
-        `SELECT a.*, t.type, t.rubric_json, b.claimed_grade, b.id AS battery_id
-         FROM attempts a JOIN tasks t ON t.id = a.task_id JOIN batteries b ON b.id = a.battery_id
-         WHERE a.id = ? AND a.candidate_user_id = ?`
-      )
-      .get(req.params.attemptId, req.user.id);
-    if (!a) return next(httpError(404, "not_found"));
-    if (a.type === "work") {
-      const opened = new Date(a.opened_at).getTime();
-      if (Date.now() > opened + WORK_DEADLINE_MS) throw httpError(409, "deadline_passed");
-    }
-    const rubric = JSON.parse(a.rubric_json);
-    const scores = a.type === "quick" ? scoreQuick(text, rubric) : scoreWork(text, rubric);
-    const now = new Date().toISOString();
-    db.prepare(
-      `UPDATE attempts SET answer_text = ?, knowledge = ?, breadth = ?, submitted_at = ? WHERE id = ?`
-    ).run(text, scores.knowledge, scores.breadth, now, a.id);
-    db.prepare(
-      `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'submit', ?)`
-    ).run(a.id, JSON.stringify({ length: text.length }));
-
-    const pending = db
-      .prepare(
-        `SELECT COUNT(*) AS c FROM attempts WHERE battery_id = ? AND submitted_at IS NULL`
-      )
-      .get(a.battery_id).c;
-    if (pending === 0) {
-      const result = finalizeBattery(a.battery_id, req.user.id, a.claimed_grade);
-      return res.json({ ok: true, batteryComplete: true, ...result });
-    }
-    res.json({ ok: true, batteryComplete: false });
+    const result = submitAttempt(req.user.id, req.params.attemptId, req.body?.answerText, {
+      source: "web",
+    });
+    res.json(result);
   } catch (e) {
     next(e);
   }

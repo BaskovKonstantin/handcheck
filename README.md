@@ -11,6 +11,7 @@ Skills-first IT hiring (FSP 2026 special track). Category from test battery; emp
 | [docs/IMPLEMENTATION-PLAN-rev5.md](./docs/IMPLEMENTATION-PLAN-rev5.md) | Canonical rev.5 spec |
 | [docs/design.md](./docs/design.md) | Palette clay/forest, motion |
 | [docs/UX.md](./docs/UX.md) | Routes and copy |
+| [docs/MCP.md](./docs/MCP.md) | MCP server, tokens, tools |
 | [AGENTS.md](./AGENTS.md) | Agent rules |
 
 ## Local
@@ -31,6 +32,14 @@ Demo logins (when `DEMO_MODE=1`, password from `.env.example`):
 ```bash
 npm test
 npm run validate
+```
+
+### MCP integrations
+
+Personal API tokens and MCP live at `/mcp` (Streamable HTTP). Create tokens under **Интеграции** in the cabinet, or see [docs/MCP.md](./docs/MCP.md). Answers and deck decisions via MCP are tagged `source: "mcp"`; employers see a neutral AI-client note on the deck when applicable.
+
+```bash
+HANDCHECK_API_TOKEN=hc_… npx handcheck-mcp
 ```
 
 ## Docker

@@ -2,12 +2,10 @@
 
 const express = require("express");
 const { getDb } = require("../../db");
-const { newId } = require("../../lib/ids");
 const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
-const { loadCandidatesForNeed, applyFilters } = require("../matching/pool");
-const { employerCandidateView } = require("../../lib/privacy");
+const { getNextDeckCard, recordNeedReview } = require("./actions");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -19,44 +17,26 @@ function getNeed(req, needId) {
 }
 
 router.get("/needs/:id/deck/next", (req, res, next) => {
-  const need = getNeed(req, req.params.id);
-  if (!need) return next(httpError(404, "not_found"));
-  let items = loadCandidatesForNeed(need, req.user.id, { forDeck: true });
-  items = applyFilters(items, req.query);
-  if (!items.length) return res.json({ card: null });
-  const c = items[0];
-  const card = employerCandidateView(req.user.id, {
-    id: c.id,
-    displayName: c.displayName,
-    categoryLabel: c.categoryLabel,
-    stack: c.stack,
-    backgroundDomains: c.backgroundDomains,
-    explanation: c.explanation.slice(0, 2),
-    taskPhrases: c.taskPhrases,
-    phone: c.phone,
-    contact_email: c.contact_email,
-  }, null);
-  res.json({ card, candidateId: c.id });
+  try {
+    const result = getNextDeckCard(req.user.id, req.params.id, req.query);
+    res.json(result);
+  } catch (e) {
+    next(e);
+  }
 });
 
 router.post("/needs/:id/reviews", (req, res, next) => {
-  const need = getNeed(req, req.params.id);
-  if (!need) return next(httpError(404, "not_found"));
-  const decision = req.body?.decision;
-  const candidateId = req.body?.candidateId;
-  if (!["rejected", "later"].includes(decision) || !candidateId) {
-    return next(httpError(400, "invalid_body"));
+  try {
+    const decision = req.body?.decision;
+    const candidateId = req.body?.candidateId;
+    if (!["rejected", "later"].includes(decision) || !candidateId) {
+      return next(httpError(400, "invalid_body"));
+    }
+    recordNeedReview(req.user.id, req.params.id, candidateId, decision, "web");
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
   }
-  const now = new Date().toISOString();
-  getDb()
-    .prepare(
-      `INSERT INTO need_reviews (id, employer_user_id, need_id, candidate_user_id, decision, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(employer_user_id, need_id, candidate_user_id)
-       DO UPDATE SET decision = excluded.decision, updated_at = excluded.updated_at`
-    )
-    .run(newId(), req.user.id, need.id, candidateId, decision, now);
-  res.json({ ok: true });
 });
 
 router.delete("/needs/:id/reviews/:candidateId", (req, res, next) => {

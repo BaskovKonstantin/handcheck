@@ -12,10 +12,22 @@ function hashIp(ip) {
   return crypto.createHash("sha256").update(`${salt}:${ip || ""}`).digest("hex").slice(0, 16);
 }
 
+const ANSWER_TEXT_MAX = 160;
+const GENERIC_TEXT_MAX = 240;
+
+function looksLikeSecretValue(value) {
+  if (typeof value !== "string" || !value) return false;
+  return SECRET_MASK_RE.test(value);
+}
+
 function maskValue(key, value) {
   const k = String(key || "").toLowerCase();
   if (k.includes("token") || k.includes("password") || k.includes("secret")) return "[скрыто]";
-  if (typeof value === "string" && value.length > 240) return `${value.slice(0, 240)}…`;
+  if (typeof value === "string") {
+    if (looksLikeSecretValue(value)) return "[скрыто]";
+    const maxLen = k.includes("answer") ? ANSWER_TEXT_MAX : GENERIC_TEXT_MAX;
+    if (value.length > maxLen) return `${value.slice(0, maxLen)}…`;
+  }
   return value;
 }
 
@@ -93,6 +105,42 @@ function recordInitialize(ctx, req, params) {
   return sessionId;
 }
 
+function headerSessionId(req) {
+  const raw = req.headers["mcp-session-id"] || req.headers["mcpsessionid"];
+  if (!raw) return null;
+  const id = Array.isArray(raw) ? raw[0] : raw;
+  return String(id || "").trim() || null;
+}
+
+function isPlaceholderClientName(name) {
+  const n = String(name || "").toLowerCase();
+  return !n || n === "http" || n === "unknown";
+}
+
+function resolveMcpSessionId(ctx, req) {
+  const db = getDb();
+  const fromHeader = headerSessionId(req);
+  if (fromHeader) {
+    const row = db
+      .prepare(
+        `SELECT id FROM mcp_client_sessions WHERE id = ? AND api_token_id = ? AND user_id = ?`
+      )
+      .get(fromHeader, ctx.tokenId, ctx.user.id);
+    if (row) return row.id;
+  }
+  const latest = db
+    .prepare(
+      `SELECT id, client_name FROM mcp_client_sessions
+       WHERE api_token_id = ? AND user_id = ?
+       ORDER BY last_seen_at DESC`
+    )
+    .all(ctx.tokenId, ctx.user.id);
+  for (const row of latest) {
+    if (!isPlaceholderClientName(row.client_name)) return row.id;
+  }
+  return null;
+}
+
 function humanToolSummary(toolName, ok, args) {
   const map = {
     whoami: "Проверка аккаунта",
@@ -156,6 +204,7 @@ module.exports = {
   maskArgs,
   upsertClientSession,
   recordInitialize,
+  resolveMcpSessionId,
   humanToolSummary,
   logToolCall,
 };

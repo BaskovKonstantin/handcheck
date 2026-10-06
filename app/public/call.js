@@ -128,13 +128,14 @@ async function init() {
       ]
         .filter(Boolean)
         .join(" · ");
+      const esc = HandCheck.escapeHtml;
       const analysis =
         me.role === "employer" && info.analysisText
-          ? `<section class="panel call-analysis-panel"><h2 class="h2">Внутренний разбор</h2><p>${info.analysisText}</p></section>`
+          ? `<section class="panel call-analysis-panel"><h2 class="h2">Внутренний разбор</h2><p>${esc(info.analysisText)}</p></section>`
           : "";
       roomHost.innerHTML = `<div class="call-ended-wrap">
-        <p class="call-state-banner ended">Звонок с ${who} завершён</p>
-        <p class="invite-meta">${meta}</p>
+        <p class="call-state-banner ended">Звонок с ${esc(who)} завершён</p>
+        <p class="invite-meta">${esc(meta)}</p>
         ${analysis}
         <a class="btn-primary" href="${me.role === "employer" ? "/employer/calls" : "/candidate/calls"}">К списку звонков</a>
       </div>`;

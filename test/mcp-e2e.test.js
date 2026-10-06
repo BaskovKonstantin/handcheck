@@ -220,7 +220,20 @@ describe("MCP e2e", () => {
       `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
        VALUES (?, ?, ?, ?, 100000, 120000, 'MCP log test', 'email', 'sent')`
     ).run(newId(), cafeId, needId, userId);
-    assert.ok(summarizeAiUsageForEmployer(cafeId, userId));
+    const summary = summarizeAiUsageForEmployer(cafeId, userId);
+    assert.ok(summary);
+    assert.ok(!summary.clients.some((c) => c.startsWith("http")));
+    const sessions = db
+      .prepare("SELECT client_name FROM mcp_client_sessions WHERE user_id = ?")
+      .all(userId);
+    assert.ok(!sessions.some((s) => s.client_name === "http"));
+    const linked = db
+      .prepare(
+        `SELECT session_id FROM mcp_tool_calls WHERE user_id = ? AND tool_name = 'submit_answer' AND ok = 1
+         ORDER BY created_at DESC LIMIT 1`
+      )
+      .get(userId);
+    assert.ok(linked?.session_id);
     await transport.close();
   });
 

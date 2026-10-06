@@ -199,14 +199,9 @@ router.get("/past", (req, res) => {
        ORDER BY b.completed_at DESC`
     )
     .all(req.user.id);
-  const cat = db
-    .prepare(
-      `SELECT cc.specialization, cc.grade, c.label FROM candidate_categories cc
-       JOIN categories c ON c.id = cc.category_id WHERE cc.candidate_user_id = ?`
-    )
-    .get(req.user.id);
+  const { scoreBatteryAttempts } = require("../assessment/service");
   const batteryItems = batteries.map((b) => {
-    const passed = cat && cat.specialization === b.specialization && cat.grade === b.claimed_grade;
+    const { passed } = scoreBatteryAttempts(b.id, b.claimed_grade);
     let retakeAt = null;
     if (b.completed_at) {
       const d = new Date(dbDateToIso(b.completed_at));

@@ -48,11 +48,19 @@
       }
 
       async function review(decision, candidateId) {
-        await HandCheck.api(`/api/employer/needs/${cachedNeedId}/reviews`, {
-          method: "POST",
-          body: JSON.stringify({ decision, candidateId }),
-        });
-        await loadRows();
+        try {
+          await HandCheck.api(`/api/employer/needs/${cachedNeedId}/reviews`, {
+            method: "POST",
+            body: JSON.stringify({ decision, candidateId }),
+          });
+          await loadRows();
+        } catch (e) {
+          HandCheck.toast(
+            HandCheck.formatApiError(e) || "Не удалось сохранить решение. Попробуйте ещё раз.",
+            "error"
+          );
+          await loadRows();
+        }
       }
 
       async function loadRows() {
@@ -85,18 +93,19 @@
             );
             return;
           }
+          const esc = HandCheck.escapeHtml;
           rowsEl.innerHTML = data.items
             .map((r) => {
               const invited =
                 r.reviewStatus === "invited"
                   ? '<span class="status-pill accepted">приглашён</span>'
                   : "";
-              const explain = (r.explanation || []).join(" · ");
+              const explain = (r.explanation || []).map(esc).join(" · ");
               const stack = (r.stack || [])
-                .map((s) => `<span class="chip chip-skill">${s}</span>`)
+                .map((s) => `<span class="chip chip-skill">${esc(s)}</span>`)
                 .join("");
               const domains = (r.backgroundDomains || [])
-                .map((d) => `<span class="chip">${d}</span>`)
+                .map((d) => `<span class="chip">${esc(d)}</span>`)
                 .join("");
               const actions =
                 r.reviewStatus === "invited"
@@ -108,8 +117,8 @@
                 </div>`;
               return `<div class="list-row-card list-row-card-rich">
                 <div class="list-row-main">
-                  <strong>${r.displayName || "Кандидат"}</strong>
-                  <span class="category-pill">${r.categoryLabel}</span>
+                  <strong>${esc(r.displayName || "Кандидат")}</strong>
+                  <span class="category-pill">${esc(r.categoryLabel)}</span>
                   ${invited}
                   ${domains ? `<div class="chip-row">${domains}</div>` : ""}
                   ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}

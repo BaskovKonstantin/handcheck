@@ -42,10 +42,15 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
       activityLines: [],
     };
   }
-  const clients = sessions.map((s) => {
-    const ver = s.client_version ? ` ${s.client_version}` : "";
-    return `${s.client_name}${ver}`;
-  });
+  const clients = sessions
+    .filter((s) => {
+      const n = String(s.client_name || "").toLowerCase();
+      return n && n !== "http" && n !== "unknown";
+    })
+    .map((s) => {
+      const ver = s.client_version ? ` ${s.client_version}` : "";
+      return `${s.client_name}${ver}`;
+    });
   const activityLines = [];
   const toolLabels = {
     start_assessment: "Запускал тест через ИИ-клиент",

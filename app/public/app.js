@@ -628,5 +628,6 @@ window.HandCheck = {
   callStatusClass,
   formatSalaryRange,
   formatDateTimeMoscow,
+  escapeHtml,
   LOGO_MARK,
 };

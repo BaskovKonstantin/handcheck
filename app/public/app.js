@@ -104,8 +104,11 @@ function formatApiError(err) {
     const first = Object.values(fields).find((v) => v && String(v).trim());
     if (first) return first;
   }
-  if (err?.status === 413 || code === "file_too_large") {
-    return ERROR_MESSAGES.file_too_large;
+  if (err?.status === 413 || code === "file_too_large" || code === "payload_too_large") {
+    if (code === "payload_too_large") {
+      return err?.data?.details?.message || "Запрос слишком большой. Уменьшите объём данных и повторите.";
+    }
+    return err?.data?.details?.message || ERROR_MESSAGES.file_too_large;
   }
   if (err?.status === 502) {
     return "Сервер не принял файл. Попробуйте меньший размер или повторите позже.";
@@ -311,8 +314,8 @@ function needInactiveBannerHtml() {
   return `<p class="need-inactive-banner invite-meta">Потребность неактивна — просмотр списков и колоды доступен, новые приглашения отправить нельзя.</p>`;
 }
 
-function formatTimeMoscow(iso) {
-  if (!iso) return "";
+function parseMoscowDate(iso) {
+  if (!iso) return null;
   let normalized = iso;
   if (/^\d{4}-\d{2}-\d{2} \d{2}:/.test(iso)) {
     normalized = `${iso.replace(" ", "T")}Z`;
@@ -320,7 +323,16 @@ function formatTimeMoscow(iso) {
     normalized = `${iso}Z`;
   }
   const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return "";
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function moscowDayKey(d) {
+  return d.toLocaleDateString("en-CA", { timeZone: "Europe/Moscow" });
+}
+
+function formatTimeMoscow(iso) {
+  const d = parseMoscowDate(iso);
+  if (!d) return "";
   return d.toLocaleString("ru-RU", {
     timeZone: "Europe/Moscow",
     hour: "2-digit",
@@ -328,19 +340,53 @@ function formatTimeMoscow(iso) {
   });
 }
 
+function formatAuditLogTime(iso) {
+  const d = parseMoscowDate(iso);
+  if (!d) return "";
+  const time = formatTimeMoscow(iso);
+  const todayKey = moscowDayKey(new Date());
+  const dayKey = moscowDayKey(d);
+  if (dayKey === todayKey) return time;
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dayKey === moscowDayKey(yesterday)) return `Вчера, ${time}`;
+  const datePart = d.toLocaleDateString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    day: "numeric",
+    month: "short",
+  });
+  return `${datePart}, ${time}`;
+}
+
 function renderAiUsageSection(aiUsage, { compact = false } = {}) {
   if (!aiUsage || aiUsage.empty) return "";
   const esc = escapeHtml;
   const lines = aiUsage.activityLines || [];
-  const hasData = Boolean(aiUsage.headline) || lines.length > 0;
+  const clientLabel = aiUsage.clientLabel || "";
+  const activityHeadline = aiUsage.activityHeadline || "";
+  const postLines = Array.isArray(aiUsage.postTestLines) ? aiUsage.postTestLines : [];
+  const hasData =
+    Boolean(clientLabel) ||
+    Boolean(activityHeadline) ||
+    postLines.length > 0 ||
+    Boolean(aiUsage.headline) ||
+    lines.length > 0;
   if (!hasData) return "";
   if (compact) {
-    return `<p class="invite-meta">${esc(aiUsage.headline)}</p>`;
+    const bits = [clientLabel, activityHeadline || aiUsage.headline, ...postLines].filter(Boolean);
+    return `<p class="invite-meta">${esc(bits.join(" · "))}</p>`;
   }
+  const clientBlock = clientLabel
+    ? `<p class="ai-usage-client"><span class="status-pill status-pill-asis sent">ИИ-клиент</span> ${esc(clientLabel)}</p>`
+    : "";
+  const activityBlock = activityHeadline
+    ? `<p class="invite-meta">${esc(activityHeadline)}</p>`
+    : "";
+  const postBlock = postLines.map((l) => `<p class="invite-meta">${esc(l)}</p>`).join("");
   const list = lines.length
     ? `<ul class="deck-phrases">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`
     : "";
-  return `<div class="deck-ai-usage panel-soft"><h3 class="h3">Как работает с ИИ</h3><p class="invite-meta">${esc(aiUsage.headline)}</p>${list}</div>`;
+  return `<div class="deck-ai-usage panel-soft"><h3 class="h3">Как работает с ИИ</h3>${clientBlock}${activityBlock}${postBlock}${list}</div>`;
 }
 
 function formatCabinetEmailMarkup(email) {
@@ -823,6 +869,7 @@ window.HandCheck = {
   formatSalaryRange,
   formatDateTimeMoscow,
   formatTimeMoscow,
+  formatAuditLogTime,
   formatRetakeDateMoscow,
   needInactiveBannerHtml,
   formatSpecGradeLabel,

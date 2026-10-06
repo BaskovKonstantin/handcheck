@@ -74,7 +74,7 @@
             if (c.callStatus !== "ended" || !c.callId) return { id: c.callId, text: "" };
             try {
               const a = await HandCheck.api(`/api/calls/${c.callId}/analysis`);
-              return { id: c.callId, text: a.summary_text };
+              return { id: c.callId, text: a.summaryText || a.summary_text };
             } catch {
               return { id: c.callId, text: "" };
             }

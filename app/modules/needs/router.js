@@ -80,6 +80,13 @@ router.put("/needs/:id", (req, res, next) => {
   const parsed = validateNeedBody(merged, { requireTitle: true });
   if (!parsed.ok) return next(httpError(400, "invalid_body", { fields: parsed.fields }));
   const v = parsed.value;
+  if (employerNeedTitleTaken(db, req.user.id, v.title, n.id)) {
+    return next(
+      httpError(409, "need_duplicate_title", {
+        message: "Потребность с таким названием уже есть",
+      })
+    );
+  }
   db.prepare(
     `UPDATE employer_needs SET title = ?, specialization = ?, grade = ?, stack_json = ?, domain_text = ?, notes = ?, active = ?
      WHERE id = ?`

@@ -89,6 +89,18 @@ function createApp() {
     res.status(404).sendFile(path.join(publicDir, "404.html"));
   });
 
+  app.use((err, req, res, next) => {
+    if (err && err.type === "entity.too.large") {
+      return res.status(413).json({
+        error: "payload_too_large",
+        details: {
+          message: "Запрос слишком большой. Уменьшите объём данных и повторите.",
+        },
+      });
+    }
+    next(err);
+  });
+
   app.use(errorHandler);
   return app;
 }

@@ -1821,10 +1821,16 @@ body.has-cabinet-chrome main {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 1.35rem;
   line-height: 1.2;
-  overflow-wrap: normal;
-  word-break: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.ai-usage-client {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
 }
 
 .stat-tile-forest .stat-tile-value {

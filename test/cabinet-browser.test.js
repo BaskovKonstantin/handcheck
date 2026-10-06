@@ -117,6 +117,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       ["/candidate/calls", ".stat-tile, .invite-card, .empty-state"],
       ["/candidate/invitations", ".invite-card, .empty-state"],
       ["/candidate/profile", ".panel, #displayName, .episode-list"],
+      ["/candidate/integrations", "#create-token, .token-list"],
     ];
     for (const [path, sel] of routes) {
       const p = await context.newPage();
@@ -143,6 +144,23 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       await assertCabinetPage(p, path, sel, "cafe@demo.local");
       await p.close();
     }
+    await context.close();
+  });
+
+  it("shows created API token once in integrations UI (P0-1)", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "anna@demo.local");
+    await page.goto(`${BASE}/candidate/integrations`, { waitUntil: "commit", timeout: 30000 });
+    await page.fill("#token-name", "Browser test token");
+    await page.check("#scope-write");
+    await page.click("#create-token", { force: true });
+    await page.waitForFunction(() => {
+      const raw = document.getElementById("token-raw");
+      return raw && raw.textContent.startsWith("hc_");
+    });
+    const token = await page.locator("#token-raw").textContent();
+    assert.match(token, /^hc_/);
     await context.close();
   });
 });

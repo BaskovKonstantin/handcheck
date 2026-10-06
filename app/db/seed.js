@@ -4,15 +4,11 @@ const bcrypt = require("bcryptjs");
 const { newId } = require("../lib/ids");
 const config = require("../config");
 
-const QUICK_RUBRIC = {
-  keys: ["rest", "статус"],
-  breadthKeys: ["идемпотентность"],
-};
-
-const WORK_RUBRIC = {
-  keys: ["rest", "статус"],
-  workItems: [{ id: "auth", phrases: ["авторизац", "токен"] }],
-};
+const {
+  QUICK_RUBRIC,
+  WORK_RUBRIC,
+  seedBatteryTasks,
+} = require("./task-battery-content");
 
 function seedCategories(db) {
   const specs = ["backend", "frontend", "qa"];
@@ -35,24 +31,7 @@ function seedTasks(db) {
     `INSERT INTO tasks (id, type, specialization, grade, form_key, prompt, rubric_json, status, origin)
      VALUES (?, ?, 'backend', 'middle', ?, ?, ?, 'published', 'manual')`
   );
-  for (const form of ["A", "B"]) {
-    for (let i = 1; i <= 4; i++) {
-      ins.run(
-        newId(),
-        "quick",
-        form,
-        `QuickProbe ${form}-${i}: опишите REST API и коды статуса.`,
-        JSON.stringify(QUICK_RUBRIC)
-      );
-    }
-    ins.run(
-      newId(),
-      "work",
-      form,
-      `WorkSim ${form}: спроектируйте сервис с авторизацией по токену и идемпотентными операциями.`,
-      JSON.stringify(WORK_RUBRIC)
-    );
-  }
+  seedBatteryTasks(db, ins);
 }
 
 function seedDemoUsers(db) {

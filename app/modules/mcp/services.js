@@ -14,12 +14,28 @@ const {
   WORK_DEADLINE_MS,
 } = require("../assessment/service");
 const { scoreQuick, scoreWork } = require("../../lib/rubric-score");
+const { createInvitation, respondToInvitation } = require("../invitations/actions");
 
 function mcpError(message, code = "invalid_request") {
   const err = new Error(message);
   err.isMcp = true;
   err.mcpCode = code;
   return err;
+}
+
+function httpErrToMcp(err) {
+  if (!err || !err.status) throw err;
+  const fields = err.details?.fields;
+  if (fields?.salaryRange) throw mcpError(fields.salaryRange, err.code || "invalid_body");
+  const map = {
+    not_found: "Не найдено",
+    invitation_duplicate: "Приглашение уже отправлено — дождитесь ответа кандидата",
+    invitation_final: "Ответ на приглашение уже зафиксирован",
+    candidate_paused: "Кандидат на паузе — новые приглашения не отправляются",
+    candidate_rejected: "Кандидат отклонён по этой потребности",
+    candidate_deferred: "Кандидат в отложенных",
+  };
+  throw mcpError(map[err.code] || err.message || "Ошибка запроса", err.code || "invalid_request");
 }
 
 function getCandidateProfile(userId) {
@@ -210,17 +226,11 @@ function listCandidateInvitations(userId) {
 }
 
 function respondInvitation(userId, invitationId, decision) {
-  const db = getDb();
-  const inv = db
-    .prepare("SELECT * FROM invitations WHERE id = ? AND candidate_user_id = ?")
-    .get(invitationId, userId);
-  if (!inv) throw mcpError("Приглашение не найдено", "not_found");
-  if (!["accept", "decline"].includes(decision)) {
-    throw mcpError("Укажите decision: accept или decline");
+  try {
+    return respondToInvitation(userId, invitationId, decision, "mcp");
+  } catch (e) {
+    httpErrToMcp(e);
   }
-  const status = decision === "accept" ? "accepted" : "declined";
-  db.prepare("UPDATE invitations SET status = ? WHERE id = ?").run(status, inv.id);
-  return { ok: true, status };
 }
 
 function listCandidateCalls(userId) {
@@ -323,6 +333,7 @@ function getDeckNext(userId, needId, filters = {}) {
       backgroundDomains: c.backgroundDomains,
       explanation: c.explanation.slice(0, 2),
       taskPhrases: c.taskPhrases,
+      integrationNote: c.integrationNote,
       phone: c.phone,
       contact_email: c.contact_email,
     },
@@ -354,28 +365,23 @@ function decideCandidate(userId, needId, payload, actionSource = "web") {
   }
 
   if (decision === "invite") {
-    const from = Number(payload.salaryFrom);
-    const to = Number(payload.salaryTo);
-    const offer = String(payload.offerText || "").trim();
-    const channel = String(payload.contactChannel || "email").trim();
-    if (!Number.isInteger(from) || !Number.isInteger(to) || from > to || !offer) {
-      throw mcpError("Для приглашения нужны salaryFrom, salaryTo и offerText");
+    try {
+      const result = createInvitation(
+        userId,
+        {
+          needId,
+          candidateId,
+          salaryFrom: payload.salaryFrom,
+          salaryTo: payload.salaryTo,
+          offerText: payload.offerText,
+          contactChannel: payload.contactChannel || "email",
+        },
+        actionSource
+      );
+      return { ok: true, invitationId: result.id };
+    } catch (e) {
+      httpErrToMcp(e);
     }
-    const avail = db.prepare("SELECT availability FROM candidate_profiles WHERE user_id = ?").get(candidateId);
-    if (avail?.availability === "paused") throw mcpError("Кандидат на паузе", "candidate_paused");
-    const id = newId();
-    db.prepare(
-      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status, action_source)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)`
-    ).run(id, userId, needId, candidateId, from, to, offer, channel, actionSource);
-    const now = new Date().toISOString();
-    db.prepare(
-      `INSERT INTO need_reviews (id, employer_user_id, need_id, candidate_user_id, decision, updated_at, action_source)
-       VALUES (?, ?, ?, ?, 'invited', ?, ?)
-       ON CONFLICT(employer_user_id, need_id, candidate_user_id)
-       DO UPDATE SET decision = 'invited', updated_at = excluded.updated_at, action_source = excluded.action_source`
-    ).run(newId(), userId, needId, candidateId, now, actionSource);
-    return { ok: true, invitationId: id };
   }
   throw mcpError("decision должен быть reject, later или invite");
 }

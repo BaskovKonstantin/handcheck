@@ -6,7 +6,7 @@ const express = require("express");
 const { getDb } = require("./db");
 const { seed } = require("./db/seed");
 const config = require("./config");
-const { attachUser, requireAuth } = require("./middleware/auth");
+const { attachUser, requireAuth, rejectApiTokenOnRest } = require("./middleware/auth");
 const { errorHandler } = require("./middleware/errors");
 const { attachSignaling } = require("./modules/calls/signaling");
 
@@ -30,6 +30,8 @@ function createApp() {
       now: new Date().toISOString(),
     });
   });
+
+  app.use("/api", rejectApiTokenOnRest);
 
   app.get("/api/me", requireAuth, (req, res) => {
     res.json({

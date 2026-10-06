@@ -5,6 +5,7 @@ function formatCallTimestamp(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
     day: "numeric",
     month: "short",
     year: "numeric",

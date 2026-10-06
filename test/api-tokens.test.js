@@ -61,6 +61,22 @@ describe("API tokens", () => {
     assert.equal(mcp.status, 401);
   });
 
+  it("read-only token cannot use REST API (P0-2)", async () => {
+    const agent = request.agent(app);
+    await agent.post("/api/auth/login").send({
+      email: "anna@demo.local",
+      password: "demo-demo-demo",
+    });
+    const created = await agent.post("/api/integrations/tokens").send({
+      name: "read REST",
+      scopes: ["read"],
+    });
+    const res = await request(app)
+      .get("/api/candidate/profile")
+      .set("Authorization", `Bearer ${created.body.token}`);
+    assert.equal(res.status, 403);
+  });
+
   it("write scope required for mutating MCP tools", async () => {
     const { raw, hash } = generateTokenMaterial();
     const { getDb } = require("../app/db");

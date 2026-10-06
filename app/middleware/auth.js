@@ -111,6 +111,14 @@ function requireApiTokenAuth(req, _res, next) {
   next();
 }
 
+/** Personal API tokens are only for /mcp — not the browser REST API. */
+function rejectApiTokenOnRest(req, _res, next) {
+  if (req.authMethod === "api_token") {
+    return next(httpError(403, "forbidden"));
+  }
+  next();
+}
+
 function requireConfirmedEmail(req, _res, next) {
   if (!req.user?.email_confirmed_at) return next(httpError(403, "email_not_confirmed"));
   next();
@@ -139,6 +147,7 @@ module.exports = {
   requireAuth,
   requireSessionAuth,
   requireApiTokenAuth,
+  rejectApiTokenOnRest,
   requireConfirmedEmail,
   setSessionCookie,
   clearSessionCookie,

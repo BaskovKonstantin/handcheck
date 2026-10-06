@@ -111,12 +111,25 @@ async function init() {
   roomHost.innerHTML = HandCheck.skeletonBlocks(2);
 
   try {
-    const info = await HandCheck.api(`/api/calls/for-invitation/${invitationId}`);
+    const [info, me] = await Promise.all([
+      HandCheck.api(`/api/calls/for-invitation/${invitationId}`),
+      HandCheck.api("/api/me"),
+    ]);
     callId = info.callId;
+    if (info.status === "ended") {
+      roomHost.innerHTML = HandCheck.emptyState(
+        "Звонок завершён",
+        info.endedAt
+          ? `Комната закрыта ${HandCheck.formatDateTimeMoscow(info.endedAt)}.`
+          : "Эта комната больше не активна — откройте список звонков в кабинете.",
+        me.role === "employer" ? "/employer/calls" : "/candidate/calls",
+        "К списку звонков"
+      );
+      return;
+    }
     renderRoomShell();
     setBanner("Комната готова — подтвердите согласие и войдите", false);
     const { consent, join, roomErr } = bindRoomControls();
-    const me = await HandCheck.api("/api/me");
     const hasConsent =
       (me.role === "candidate" && info.consentCandidate) ||
       (me.role === "employer" && info.consentEmployer);

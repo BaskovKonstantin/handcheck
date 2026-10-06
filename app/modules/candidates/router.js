@@ -81,26 +81,52 @@ router.put("/availability", (req, res, next) => {
 
 router.get("/category", (req, res) => {
   const db = getDb();
+  const appConfig = require("../../config");
   const cat = db
     .prepare(
       `SELECT cc.*, c.label FROM candidate_categories cc
        JOIN categories c ON c.id = cc.category_id WHERE cc.candidate_user_id = ?`
     )
     .get(req.user.id);
-  if (!cat) return res.json({ label: null, retakeAt: null });
+  const lastBattery = db
+    .prepare(
+      `SELECT specialization, completed_at FROM batteries
+       WHERE candidate_user_id = ? AND completed_at IS NOT NULL
+       ORDER BY completed_at DESC LIMIT 1`
+    )
+    .get(req.user.id);
+  let retakeAt = null;
+  let onCooldown = false;
+  const bumpRetake = (completedAt) => {
+    if (!completedAt) return;
+    const d = new Date(completedAt);
+    d.setDate(d.getDate() + Number(appConfig.GRADE_COOLDOWN_DAYS || 90));
+    retakeAt = d.toISOString();
+    onCooldown = new Date() < d;
+  };
+  if (!cat) {
+    bumpRetake(lastBattery?.completed_at);
+    return res.json({
+      label: null,
+      retakeAt: onCooldown ? retakeAt : null,
+      cooldownActive: onCooldown,
+      lastSpecialization: lastBattery?.specialization || null,
+    });
+  }
   const last = db
     .prepare(
       `SELECT MAX(b.completed_at) AS t FROM batteries b
        WHERE b.candidate_user_id = ? AND b.specialization = ?`
     )
     .get(req.user.id, cat.specialization);
-  let retakeAt = null;
-  if (last?.t) {
-    const d = new Date(last.t);
-    d.setDate(d.getDate() + Number(process.env.GRADE_COOLDOWN_DAYS || 90));
-    retakeAt = d.toISOString();
-  }
-  res.json({ label: cat.label, retakeAt });
+  bumpRetake(last?.t);
+  res.json({
+    label: cat.label,
+    retakeAt,
+    cooldownActive: onCooldown,
+    specialization: cat.specialization,
+    grade: cat.grade,
+  });
 });
 
 router.get("/invitations", (req, res) => {
@@ -164,24 +190,22 @@ router.get("/calls", (req, res) => {
   });
 });
 
+const { respondToInvitation } = require("../invitations/actions");
+
 router.post("/invitations/:id/accept", (req, res, next) => {
-  const db = getDb();
-  const inv = db
-    .prepare("SELECT * FROM invitations WHERE id = ? AND candidate_user_id = ?")
-    .get(req.params.id, req.user.id);
-  if (!inv) return next(httpError(404, "not_found"));
-  db.prepare("UPDATE invitations SET status = 'accepted' WHERE id = ?").run(inv.id);
-  res.json({ ok: true });
+  try {
+    res.json(respondToInvitation(req.user.id, req.params.id, "accept", "web"));
+  } catch (e) {
+    next(e);
+  }
 });
 
 router.post("/invitations/:id/decline", (req, res, next) => {
-  const db = getDb();
-  const inv = db
-    .prepare("SELECT * FROM invitations WHERE id = ? AND candidate_user_id = ?")
-    .get(req.params.id, req.user.id);
-  if (!inv) return next(httpError(404, "not_found"));
-  db.prepare("UPDATE invitations SET status = 'declined' WHERE id = ?").run(inv.id);
-  res.json({ ok: true });
+  try {
+    res.json(respondToInvitation(req.user.id, req.params.id, "decline", "web"));
+  } catch (e) {
+    next(e);
+  }
 });
 
 module.exports = router;

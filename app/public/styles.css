@@ -2459,6 +2459,11 @@ body.deck-page main.column {
   font-weight: 600;
 }
 
+.choice-chip.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .form-field {
   margin-bottom: 1rem;
 }

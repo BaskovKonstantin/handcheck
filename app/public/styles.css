@@ -2685,23 +2685,63 @@ label.consent-option input {
   border: 1px dashed var(--line);
 }
 
-@media (max-width: 480px) {
-  .stat-tile-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.5rem;
+@media (max-width: 599px) {
+  .stat-tile-grid-today {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
 
-  .stat-tile {
-    padding: 0.65rem 0.45rem;
+  .stat-tile-grid-today .stat-tile {
+    padding: 1rem 1.1rem;
   }
 
-  .stat-tile-value {
-    font-size: 1.2rem;
+  .stat-tile-grid-today .stat-tile-value {
+    font-size: 1.75rem;
   }
 
-  .stat-tile-label {
-    font-size: 0.62rem;
+  .stat-tile-grid-today .stat-tile-label {
+    font-size: 0.78rem;
   }
+}
+
+.need-toolbar {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.need-select-wrap {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+
+.need-select-wrap select {
+  min-height: 44px;
+}
+
+.need-create-btn {
+  min-height: 44px;
+  align-self: flex-end;
+}
+
+.need-save-hint {
+  margin: 1rem 0 0.35rem;
+}
+
+.need-save-btn:not(:disabled) {
+  opacity: 1;
+}
+
+.token-row-revoked {
+  opacity: 0.55;
+}
+
+.token-revoked-archive {
+  margin-top: 0.75rem;
+}
+
+.token-list-revoked {
+  margin-top: 0.5rem;
 }
 
 .scope-fieldset {

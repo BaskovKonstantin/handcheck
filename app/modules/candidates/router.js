@@ -72,7 +72,15 @@ router.get("/background", (req, res) => {
       "SELECT id, role_title, domain, industry, note FROM background_episodes WHERE candidate_user_id = ?"
     )
     .all(req.user.id);
-  res.json({ items: rows });
+  res.json({
+    items: rows.map((r) => ({
+      id: r.id,
+      roleTitle: r.role_title,
+      domain: r.domain,
+      industry: r.industry,
+      note: r.note,
+    })),
+  });
 });
 
 router.post("/background", (req, res, next) => {

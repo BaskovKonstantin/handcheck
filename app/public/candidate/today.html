@@ -30,6 +30,10 @@
       const ICON_CALL =
         '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg></span>';
 
+      function isJoinableCallStatus(status) {
+        return status === "ready" || status === "live";
+      }
+
       function formatInviteDate(iso) {
         if (!iso) return "";
         const d = new Date(iso);
@@ -37,7 +41,15 @@
         return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
       }
 
-      function groupAcceptedInvites(items) {
+      function callStatusByInvitation(callItems) {
+        const map = new Map();
+        (callItems || []).forEach((row) => {
+          if (row.invitationId) map.set(row.invitationId, row.callStatus || "ready");
+        });
+        return map;
+      }
+
+      function groupAcceptedInvites(items, statusByInv) {
         const groups = new Map();
         (items || [])
           .filter((i) => i.status === "accepted")
@@ -51,27 +63,42 @@
           .map((list) => {
             const sorted = list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             const primary = sorted[0];
+            const joinable = sorted.filter((inv) =>
+              isJoinableCallStatus(statusByInv.get(inv.id) || "ready")
+            );
             const extra = sorted.length > 1 ? ` · ещё ${sorted.length - 1}` : "";
             const dateStr = formatInviteDate(primary.createdAt);
             const salary = HandCheck.formatSalaryRange(primary.salaryFrom, primary.salaryTo);
             const metaParts = [dateStr, salary].filter(Boolean);
+            const endedOnly = joinable.length === 0 && sorted.length > 0;
+            const roomHref =
+              joinable.length > 1
+                ? "/candidate/calls"
+                : joinable.length === 1
+                  ? `/call/${joinable[0].id}`
+                  : "/candidate/calls";
+            const roomLabel =
+              joinable.length > 1 ? "Все звонки" : joinable.length === 1 ? "Комната" : "Звонки";
             return {
               primary,
               meta: `${metaParts.join(" · ")}${extra}`,
-              roomHref: sorted.length > 1 ? "/candidate/calls" : `/call/${primary.id}`,
-              roomLabel: sorted.length > 1 ? "Все звонки" : "Комната",
+              joinableCount: joinable.length,
+              endedOnly,
+              roomHref,
+              roomLabel,
             };
           })
           .sort((a, b) => new Date(b.primary.createdAt) - new Date(a.primary.createdAt))
           .slice(0, 4);
       }
 
-      function buildUpcomingSteps(invItems, cat) {
+      function buildUpcomingSteps(invItems, cat, callItems) {
+        const statusByInv = callStatusByInvitation(callItems);
         const steps = [];
         if (!cat.label) {
           steps.push({
             tone: "clay",
-            title: "Пройти батарею заданий",
+            title: "Пройти тест",
             meta: "Без теста категория не появится в подборе",
             cta: '<a class="btn-primary btn-sm" href="/candidate/tasks">Начать</a>',
           });
@@ -89,14 +116,25 @@
               cta: '<a class="btn-ghost btn-sm" href="/candidate/invitations">Приглашения</a>',
             });
           });
-        groupAcceptedInvites(invItems).forEach(({ primary, meta, roomHref, roomLabel }) => {
-          steps.push({
-            tone: "forest",
-            title: `Звонок с ${primary.companyName}`,
-            meta: meta || "Приглашение принято — можно войти в комнату",
-            cta: `<a class="btn-primary btn-sm" href="${roomHref}">${roomLabel}</a>`,
-          });
-        });
+        groupAcceptedInvites(invItems, statusByInv).forEach(
+          ({ primary, meta, joinableCount, endedOnly, roomHref, roomLabel }) => {
+            if (joinableCount > 0) {
+              steps.push({
+                tone: "forest",
+                title: `Звонок с ${primary.companyName}`,
+                meta: meta || "Приглашение принято — можно войти в комнату",
+                cta: `<a class="btn-primary btn-sm" href="${roomHref}">${roomLabel}</a>`,
+              });
+            } else if (endedOnly) {
+              steps.push({
+                tone: "muted",
+                title: `Звонок с ${primary.companyName}`,
+                meta: meta ? `${meta} · завершён` : "Звонок завершён",
+                cta: '<a class="btn-ghost btn-sm" href="/candidate/calls">Звонки</a>',
+              });
+            }
+          }
+        );
         if (!steps.length) {
           steps.push({
             tone: "muted",
@@ -111,32 +149,44 @@
       async function render() {
         const seq = HandCheck.nextCabinetPageLoad();
         dash.innerHTML = HandCheck.skeletonBlocks(3);
-        const [cat, inv] = await Promise.all([
+        const [cat, inv, calls] = await Promise.all([
           HandCheck.api("/api/candidate/category"),
           HandCheck.api("/api/candidate/invitations"),
+          HandCheck.api("/api/candidate/calls"),
         ]);
         if (HandCheck.isStaleCabinetPageLoad(seq)) return;
         const items = inv.items || [];
+        const callItems = calls.items || [];
         const pending = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
-        const accepted = items.filter((i) => i.status === "accepted").length;
+        const joinableCount = callItems.filter((r) => isJoinableCallStatus(r.callStatus)).length;
+        const callsHint =
+          joinableCount > 0 ? "принято — можно в комнату" : "нет активных комнат";
         if (!cat.label) {
           dash.innerHTML =
             HandCheck.emptyState(
               "Категория ещё не подтверждена",
-              "Пройдите батарею заданий — специализация и грейд появятся здесь.",
+              "Пройдите тест — специализация и грейд появятся здесь.",
               "/candidate/tasks",
-              "Начать тест"
-            ) + HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat));
+              "Пройти тест"
+            ) + HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat, callItems));
           return;
         }
-        const retake = cat.retakeAt
-          ? `<p class="invite-meta">Пересдача возможна после ${new Date(cat.retakeAt).toLocaleDateString("ru")}</p>`
+        const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
+        const retakeDate = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
+        const retake = retakeDate
+          ? `<p class="invite-meta">Пересдача возможна после ${retakeDate}</p>`
           : "";
+        const improveBtn = onCooldown
+          ? `<button class="btn-ghost btn-sm" type="button" disabled title="Пересдача с ${retakeDate}">Улучшить категорию</button>`
+          : `<a class="btn-primary btn-sm" href="/candidate/tasks">Улучшить категорию</a>`;
         const categoryHint = `<p class="invite-meta">Задания подтверждают навык — при успешной пересдаче категория обновится.</p>
-              <a class="btn-primary btn-sm" href="/candidate/tasks">Улучшить категорию</a>`;
-        const timeline = HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat));
+              ${improveBtn}`;
+        const timeline = HandCheck.timelineSection(
+          "Ближайшие шаги",
+          buildUpcomingSteps(items, cat, callItems)
+        );
         dash.innerHTML = `
-          <div class="stat-tile-grid">
+          <div class="stat-tile-grid stat-tile-grid-today">
             <article class="stat-tile stat-tile-forest">
               <div class="stat-tile-label">${ICON_CAT} Категория</div>
               <div class="stat-tile-value"><span class="category-pill">${cat.label}</span></div>
@@ -151,8 +201,8 @@
             </article>
             <article class="stat-tile stat-tile-ink">
               <div class="stat-tile-label">${ICON_CALL} Звонки</div>
-              <div class="stat-tile-value">${accepted}</div>
-              <p class="invite-meta">принято — можно в комнату</p>
+              <div class="stat-tile-value">${joinableCount}</div>
+              <p class="invite-meta">${callsHint}</p>
               <a class="btn-ghost btn-sm" href="/candidate/calls">Звонки</a>
             </article>
           </div>

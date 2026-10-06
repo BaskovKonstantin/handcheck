@@ -8,12 +8,11 @@
     "start": "node app/server.js",
     "dev": "node --watch app/server.js",
     "test": "node --test test/*.test.js",
-    "test:browser": "RUN_BROWSER=1 node --test test/cabinet-browser.test.js",
     "validate:assessment": "node scripts/validate-assessment.js",
     "validate:matching": "node scripts/validate-matching.js",
     "validate:privacy": "node scripts/validate-privacy.js",
     "validate": "npm run validate:assessment && npm run validate:matching && npm run validate:privacy",
-    "test:browser": "node --test scripts/browser-integrations.test.js"
+    "test:browser": "RUN_BROWSER=1 node --test test/cabinet-browser.test.js && node --test scripts/browser-integrations.test.js"
   },
   "bin": {
     "handcheck-mcp": "./bin/handcheck-mcp.js"

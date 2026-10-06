@@ -3,6 +3,7 @@
 const { describe, it, before, after } = require("node:test");
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
+const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright");
 
@@ -166,7 +167,10 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
         await page.goto(`${BASE}/employer/deck`, { waitUntil: "commit" });
         await page.click("#cabinet-more");
         await page.waitForSelector("#cabinet-more-sheet:not([hidden])");
-        await page.locator(`#cabinet-more-sheet a[href="${path}"]`).click();
+        await page.evaluate((p) => {
+          const link = document.querySelector(`#cabinet-more-sheet a[href="${p}"]`);
+          link?.click();
+        }, path);
         await page.waitForURL(`**${path}`, { timeout: 15000 });
       } else {
         await page.goto(`${BASE}${path}`, { waitUntil: "commit" });
@@ -188,6 +192,51 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     assert.ok(consentBox && consentInput);
     assert.ok(consentInput.x >= consentBox.x - 2);
     assert.ok(consentInput.x < consentBox.x + consentBox.width * 0.35);
+    await context.close();
+  });
+
+  it("candidate today hides room CTA when only ended calls exist", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+    const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+    const { newId } = require("../app/lib/ids");
+    const invId = newId();
+    db.prepare(
+      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status, created_at)
+       VALUES (?, ?, ?, ?, 200000, 250000, 't', 'email', 'accepted', datetime('now'))`
+    ).run(invId, cafe.id, need.id, anna.id);
+    db.prepare("DELETE FROM calls WHERE invitation_id = ?").run(invId);
+    db.prepare(
+      `INSERT INTO calls (id, invitation_id, status, ended_at) VALUES (?, ?, 'ended', datetime('now'))`
+    ).run(newId(), invId);
+    db.close();
+    await login(page, "anna@demo.local");
+    await page.goto(`${BASE}/candidate/today`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".stat-tile-grid-today");
+    const callsValue = await page.locator(".stat-tile-ink .stat-tile-value").textContent();
+    assert.equal(callsValue.trim(), "0");
+    const roomBtn = page.locator('.timeline-section a:has-text("Комната")');
+    assert.equal(await roomBtn.count(), 0);
+    await context.close();
+  });
+
+  it("candidate today at 390 stacks stat tiles in one column", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "anna@demo.local");
+    await page.goto(`${BASE}/candidate/today`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".stat-tile-grid-today .stat-tile");
+    const cols = await page.$eval(".stat-tile-grid-today", (el) => {
+      return window.getComputedStyle(el).gridTemplateColumns;
+    });
+    assert.ok(!cols.includes("110px"), `expected single-column grid, got ${cols}`);
+    const tileCount = await page.locator(".stat-tile-grid-today .stat-tile").count();
+    assert.equal(tileCount, 3);
     await context.close();
   });
 
@@ -228,6 +277,12 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     const lede = await page.locator(".call-room-hero .lede").textContent();
     assert.match(lede || "", /закрыта|итог/i);
     await context.close();
+  });
+
+  it("call room sets live lede after join handler (source check)", () => {
+    const src = fs.readFileSync(path.join(ROOT, "app/public/call.js"), "utf8");
+    assert.match(src, /setCallLede\([\s\S]*эфир/i);
+    assert.match(src, /\/start[\s\S]*setCallLede/);
   });
 
   it("shows created API token once in integrations UI (P0-1)", async () => {

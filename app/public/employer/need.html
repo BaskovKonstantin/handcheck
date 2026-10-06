@@ -19,7 +19,8 @@
       </header>
       <div id="stats"></div>
       <div class="panel" id="form"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
-      <button class="btn-primary" type="button" id="save" disabled>Сохранить</button>
+      <p class="invite-meta need-save-hint" id="save-hint">Измените поля формы, чтобы активировать «Сохранить».</p>
+      <button class="btn-primary need-save-btn" type="button" id="save" disabled>Сохранить</button>
     </main>
     <script src="/app.js"></script>
     <script>
@@ -83,11 +84,11 @@
           .join("");
         const stackStr = (n.stack || []).join(", ");
         formEl.innerHTML = `
-          <div class="form-actions" style="margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
-            <label class="form-label" style="flex:1 1 12rem;margin:0">Активная потребность
+          <div class="form-actions need-toolbar" style="margin-bottom:1rem">
+            <label class="form-label need-select-wrap">Активная потребность
               <select id="need-select">${options}</select>
             </label>
-            <button type="button" class="btn-ghost" id="create-need">Создать потребность</button>
+            <button type="button" class="btn-ghost need-create-btn" id="create-need">Создать потребность</button>
           </div>
           <label>Название <input id="title" value="${HandCheck.escapeHtml(n.title || "")}" /></label>
           <label>Специализация
@@ -107,7 +108,7 @@
           <label>Стек (через запятую) <input id="stack" value="${HandCheck.escapeHtml(stackStr)}" placeholder="node, postgres" /></label>
           <label>Домен <textarea id="domain" rows="3">${HandCheck.escapeHtml(n.domainText || "")}</textarea></label>`;
         snapshot = JSON.stringify(currentPayload());
-        saveBtn.disabled = true;
+        refreshDirty();
         document.getElementById("need-select").onchange = () => {
           activeId = document.getElementById("need-select").value;
           const picked = needs.find((x) => x.id === activeId) || needs[0];
@@ -118,7 +119,7 @@
           document.getElementById("grade").value = picked.grade || "middle";
           document.getElementById("stack").value = (picked.stack || []).join(", ");
           snapshot = JSON.stringify(currentPayload());
-          saveBtn.disabled = true;
+          refreshDirty();
         };
         document.getElementById("create-need").onclick = async () => {
           const title = prompt("Название новой потребности", "Новая потребность");
@@ -157,7 +158,10 @@
       }
 
       function refreshDirty() {
-        saveBtn.disabled = JSON.stringify(currentPayload()) === snapshot;
+        const unchanged = JSON.stringify(currentPayload()) === snapshot;
+        saveBtn.disabled = unchanged;
+        const hint = document.getElementById("save-hint");
+        if (hint) hint.hidden = !unchanged;
       }
 
       async function loadNeedForm() {

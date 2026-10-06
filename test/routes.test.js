@@ -21,7 +21,12 @@ describe("HTML routes", () => {
     app = createApp();
   });
 
-  for (const url of ["/candidate/profile", "/employer/profile"]) {
+  for (const url of [
+    "/candidate/profile",
+    "/employer/profile",
+    "/candidate/integrations",
+    "/employer/integrations",
+  ]) {
     it(`GET ${url} returns 200 HTML`, async () => {
       const res = await request(app).get(url);
       assert.equal(res.status, 200);

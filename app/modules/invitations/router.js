@@ -99,6 +99,7 @@ router.get("/invitations", (req, res) => {
         offerText: r.offer_text,
         contactChannel: r.contact_channel,
         createdAt: r.created_at,
+        viaAiClient: r.action_source === "mcp",
       };
       if (r.status === "accepted") {
         item.candidatePhone = r.phone;

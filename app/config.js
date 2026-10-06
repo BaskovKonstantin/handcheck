@@ -64,4 +64,5 @@ module.exports = {
   LLM_API_KEY: process.env.LLM_API_KEY || "",
   COOKIE_NAME: "handcheck_sid",
   CALLS_DIR: path.join(DATA_DIR, "calls"),
+  MCP_RATE_LIMIT_PER_MIN: Number(process.env.MCP_RATE_LIMIT_PER_MIN || 120),
 };

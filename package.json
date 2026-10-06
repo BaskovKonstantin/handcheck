@@ -12,17 +12,23 @@
     "validate:assessment": "node scripts/validate-assessment.js",
     "validate:matching": "node scripts/validate-matching.js",
     "validate:privacy": "node scripts/validate-privacy.js",
-    "validate": "npm run validate:assessment && npm run validate:matching && npm run validate:privacy"
+    "validate": "npm run validate:assessment && npm run validate:matching && npm run validate:privacy",
+    "test:browser": "node --test scripts/browser-integrations.test.js"
+  },
+  "bin": {
+    "handcheck-mcp": "./bin/handcheck-mcp.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^11.8.1",
     "express": "^4.21.2",
     "multer": "^2.0.2",
-    "ws": "^8.18.1"
+    "ws": "^8.18.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "playwright": "^1.49.1",

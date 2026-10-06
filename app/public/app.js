@@ -2,6 +2,7 @@ const ERROR_MESSAGES = {
   invalid_credentials: "Неверный email или пароль",
   unauthorized: "Войдите в аккаунт",
   forbidden: "Нет доступа",
+  rate_limit: "Слишком много запросов — подождите минуту",
   file_too_large: "Файл слишком большой (максимум 80 МБ)",
   upload_failed: "Не удалось загрузить файл",
   invalid_id: "Некорректный идентификатор",
@@ -169,6 +170,8 @@ const NAV_ICONS = {
   deck: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h14v12H4V6zm2 2v8h10V8H6zm12-1h2v14h-2V7z" fill="currentColor"/></svg>',
   list: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z" fill="currentColor"/></svg>',
   deferred: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V4zm1 5v5l4 2-.8 1.4L11 14V9h2z" fill="currentColor"/></svg>',
+  integrations:
+    '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3H7V7zm0 7h6v3H7v-3zm9 0h2v3h-2v-3zM5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>',
 };
 
 const LINK_ICON = {
@@ -184,6 +187,8 @@ const LINK_ICON = {
   "/employer/profile": "profile",
   "/employer/invitations": "invitations",
   "/employer/calls": "calls",
+  "/candidate/integrations": "integrations",
+  "/employer/integrations": "integrations",
 };
 
 const TAB_PRIMARY = {
@@ -359,6 +364,7 @@ const CANDIDATE_LINKS = [
   { href: "/candidate/tasks", label: "Задания" },
   { href: "/candidate/invitations", label: "Приглашения" },
   { href: "/candidate/calls", label: "Звонки" },
+  { href: "/candidate/integrations", label: "Интеграции" },
 ];
 
 const EMPLOYER_LINKS = [
@@ -369,6 +375,7 @@ const EMPLOYER_LINKS = [
   { href: "/employer/profile", label: "Профиль" },
   { href: "/employer/invitations", label: "Приглашения" },
   { href: "/employer/calls", label: "Звонки" },
+  { href: "/employer/integrations", label: "Интеграции" },
 ];
 
 function candidateNav() {

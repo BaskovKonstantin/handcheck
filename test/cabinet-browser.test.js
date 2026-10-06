@@ -274,6 +274,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     db.close();
     assert.ok(row?.invitation_id, "need ended call in seed");
     await page.goto(`${BASE}/call/${row.invitation_id}`, { waitUntil: "commit" });
+    await page.waitForSelector(".call-result-card", { timeout: 20000 });
     const lede = await page.locator(".call-room-hero .lede").textContent();
     assert.match(lede || "", /закрыта|итог/i);
     await page.waitForSelector(".call-result-card");

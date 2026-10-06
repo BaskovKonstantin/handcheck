@@ -136,7 +136,8 @@ router.get("/invitations", (req, res) => {
 router.get("/calls", (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, c.id AS call_id, c.status AS call_status,
+      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, i.salary_from, i.salary_to,
+              c.id AS call_id, c.status AS call_status,
               c.started_at, c.ended_at, e.company_name, n.title AS need_title
        FROM invitations i
        JOIN employer_profiles e ON e.user_id = i.employer_user_id
@@ -150,6 +151,8 @@ router.get("/calls", (req, res) => {
     items: rows.map((r) => ({
       invitationId: r.invitation_id,
       invitationAt: r.invitation_at,
+      salaryFrom: r.salary_from,
+      salaryTo: r.salary_to,
       callId: r.call_id,
       callStatus: r.call_status || "ready",
       startedAt: r.started_at,

@@ -2306,3 +2306,177 @@ body.deck-page main.column {
   font-weight: 700;
   font-size: 1rem;
 }
+
+.deck-skeleton {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.deck-skeleton-card {
+  min-height: 220px;
+}
+
+.deck-skeleton-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.skeleton-pill {
+  display: inline-block;
+  width: 5.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--line) 60%, var(--card)) 50%, var(--line) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.skeleton-pill-clay {
+  width: 7rem;
+  opacity: 0.85;
+}
+
+.battery-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+
+.battery-step {
+  flex: 1 1 4.5rem;
+  min-width: 4.5rem;
+  padding: 0.55rem 0.4rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  text-align: center;
+  opacity: 0.55;
+}
+
+.battery-step-num {
+  display: block;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--forest);
+}
+
+.battery-step-label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+.battery-step.current {
+  opacity: 1;
+  border-color: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-glow);
+}
+
+.battery-step.done {
+  opacity: 1;
+  background: var(--forest-soft);
+  border-color: color-mix(in srgb, var(--forest) 35%, var(--line));
+}
+
+.battery-step-work .battery-step-num {
+  color: var(--clay);
+}
+
+.choice-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.choice-chip {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.choice-chip:hover {
+  border-color: color-mix(in srgb, var(--forest) 40%, var(--line));
+}
+
+.choice-chip.active {
+  background: var(--forest-soft);
+  border-color: var(--forest);
+  color: var(--forest);
+  font-weight: 600;
+}
+
+.form-field {
+  margin-bottom: 1rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+}
+
+.battery-last-result {
+  padding: 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--forest-soft);
+  margin-bottom: 1rem;
+}
+
+.call-datetime {
+  margin: 0.35rem 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.call-datetime-label {
+  color: var(--muted);
+}
+
+.call-card-ready {
+  border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
+}
+
+.call-card-live .status-pill.live {
+  animation: none;
+}
+
+.calls-archive {
+  margin-top: 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.75rem 1rem;
+  background: color-mix(in srgb, var(--card) 92%, var(--paper));
+}
+
+.calls-archive-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: none;
+}
+
+.calls-archive-summary::-webkit-details-marker {
+  display: none;
+}
+
+.calls-archive[open] .invite-card-grid {
+  margin-top: 1rem;
+}
+
+.call-list-active {
+  margin-top: 0.5rem;
+}

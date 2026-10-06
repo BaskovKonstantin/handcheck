@@ -18,11 +18,10 @@
         </div>
       </header>
       <div id="stats"></div>
-      <div id="list"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
+      <div id="list"></div>
     </main>
     <script src="/app.js"></script>
     <script>
-      HandCheck.employerNav();
       const list = document.getElementById("list");
       const statsEl = document.getElementById("stats");
 
@@ -32,38 +31,40 @@
         return "invite-card-status-sent";
       }
 
-      HandCheck.api("/api/employer/invitations")
-        .then((d) => {
-          const items = d.items || [];
-          const sent = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
-          const accepted = items.filter((i) => i.status === "accepted").length;
-          const declined = items.filter((i) => i.status === "declined").length;
-          statsEl.innerHTML = HandCheck.statTilesHtml([
-            { variant: "clay", label: "Ожидают", value: sent, hint: "Ответ кандидата" },
-            { variant: "forest", label: "Принято", value: accepted, hint: "Контакты открыты" },
-            { variant: "ink", label: "Отклонено", value: declined, hint: "Без контактов" },
-          ]);
-          if (!items.length) {
-            list.innerHTML = HandCheck.emptyState(
-              "Приглашений пока нет",
-              "Откройте колоду и пригласите кандидата с вилкой зарплаты.",
-              "/employer/deck",
-              "В колоду"
-            );
-            return;
-          }
-          list.innerHTML = `<div class="invite-card-grid">${items
-            .map((i) => {
-              const contacts =
-                i.status === "accepted"
-                  ? `<div class="contacts-block"><strong>Контакты кандидата</strong><br>Телефон: ${i.candidatePhone || "—"}<br>Email: ${i.candidateContactEmail || "—"}</div>`
-                  : "";
-              const call =
-                i.status === "accepted"
-                  ? `<a class="btn-primary" href="/call/${i.id}">Комната звонка</a>`
-                  : "";
-              const stCls = HandCheck.invitationStatusClass(i.status);
-              return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
+      async function loadInvitations() {
+        statsEl.innerHTML = HandCheck.skeletonBlocks(3);
+        list.innerHTML = HandCheck.skeletonBlocks(2);
+        const d = await HandCheck.api("/api/employer/invitations");
+        const items = d.items || [];
+        const sent = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
+        const accepted = items.filter((i) => i.status === "accepted").length;
+        const declined = items.filter((i) => i.status === "declined").length;
+        statsEl.innerHTML = HandCheck.statTilesHtml([
+          { variant: "clay", label: "Ожидают", value: sent, hint: "Ответ кандидата" },
+          { variant: "forest", label: "Принято", value: accepted, hint: "Контакты открыты" },
+          { variant: "ink", label: "Отклонено", value: declined, hint: "Без контактов" },
+        ]);
+        if (!items.length) {
+          list.innerHTML = HandCheck.emptyState(
+            "Приглашений пока нет",
+            "Откройте колоду и пригласите кандидата с вилкой зарплаты.",
+            "/employer/deck",
+            "В колоду"
+          );
+          return;
+        }
+        list.innerHTML = `<div class="invite-card-grid">${items
+          .map((i) => {
+            const contacts =
+              i.status === "accepted"
+                ? `<div class="contacts-block"><strong>Контакты кандидата</strong><br>Телефон: ${i.candidatePhone || "—"}<br>Email: ${i.candidateContactEmail || "—"}</div>`
+                : "";
+            const call =
+              i.status === "accepted"
+                ? `<a class="btn-primary" href="/call/${i.id}">Комната звонка</a>`
+                : "";
+            const stCls = HandCheck.invitationStatusClass(i.status);
+            return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
               <div class="invite-card-top">
                 <h3>${i.candidateName}</h3>
                 <span class="status-pill ${stCls}">${HandCheck.invitationStatusLabel(i.status)}</span>
@@ -72,12 +73,15 @@
               ${contacts}
               <div class="invite-actions">${call}</div>
             </article>`;
-            })
-            .join("")}</div>`;
-        })
-        .catch(() => {
+          })
+          .join("")}</div>`;
+      }
+
+      HandCheck.bootCabinetPage("employer", () =>
+        loadInvitations().catch(() => {
           list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
-        });
+        })
+      );
     </script>
   </body>
 </html>

@@ -125,9 +125,17 @@ function setCachedMeEmail(email) {
   }
 }
 
+function escapeHtml(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/"/g, "&quot;");
+}
+
 function formatCabinetEmailMarkup(email) {
   if (email) {
-    return `<span class="cabinet-email" title="${email}">${email}</span>`;
+    const safe = escapeHtml(email);
+    return `<span class="cabinet-email" title="${safe}">${safe}</span>`;
   }
   return `<span class="cabinet-email cabinet-email-skeleton" aria-busy="true" title="Загрузка профиля"></span>`;
 }
@@ -245,9 +253,13 @@ async function mountCabinetShell(links, role) {
   const el = document.getElementById("site-header");
   if (!el) return;
   const placeholder = cabinetMeEmail || getCachedMeEmail();
-  paintCabinetHeader(el, placeholder);
-  ensureCabinetChrome(links, role, placeholder);
-  cabinetNavMounted = true;
+  if (!cabinetNavMounted) {
+    paintCabinetHeader(el, placeholder);
+    ensureCabinetChrome(links, role, placeholder);
+    cabinetNavMounted = true;
+  } else if (placeholder) {
+    updateCabinetEmails(placeholder);
+  }
   try {
     const me = await api("/api/me");
     cabinetMeEmail = me.email || "";
@@ -256,6 +268,26 @@ async function mountCabinetShell(links, role) {
   } catch {
     window.location.href = "/auth";
   }
+}
+
+/**
+ * Start page data fetch in parallel with /api/me (cabinet shell).
+ * Must be used instead of awaiting candidateNav/employerNav before API calls.
+ */
+function bootCabinetPage(role, loadFn) {
+  const run = () => {
+    try {
+      const result = loadFn();
+      if (result && typeof result.then === "function") {
+        result.catch(() => {});
+      }
+    } catch (_e) {
+      /* page-specific catch handlers */
+    }
+  };
+  run();
+  if (role === "employer") void employerNav();
+  else void candidateNav();
 }
 
 function timelineSection(title, items) {
@@ -319,7 +351,7 @@ function employerNav() {
 function setLoading(el, on) {
   if (!el) return;
   if (on) {
-    el.innerHTML = '<p class="loading"><span class="loading-dot"></span>Загрузка…</p>';
+    el.innerHTML = skeletonBlocks(2);
   }
 }
 
@@ -330,6 +362,21 @@ function skeletonBlocks(count = 3) {
         `<div class="skeleton-card" aria-hidden="true"><div class="skeleton-line skeleton-line-lg"></div><div class="skeleton-line"></div><div class="skeleton-line skeleton-line-sm"></div></div>`
     )
     .join("");
+}
+
+function deckSkeleton() {
+  return `<div class="deck-skeleton" aria-busy="true" aria-label="Загрузка карточки">
+    <div class="skeleton-card deck-skeleton-card">
+      <div class="skeleton-line skeleton-line-lg"></div>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line skeleton-line-sm"></div>
+    </div>
+    <div class="deck-skeleton-actions">
+      <span class="skeleton-pill"></span>
+      <span class="skeleton-pill"></span>
+      <span class="skeleton-pill skeleton-pill-clay"></span>
+    </div>
+  </div>`;
 }
 
 function invitationStatusClass(status) {
@@ -449,8 +496,10 @@ window.HandCheck = {
   formatApiError,
   candidateNav,
   employerNav,
+  bootCabinetPage,
   setLoading,
   skeletonBlocks,
+  deckSkeleton,
   emptyState,
   emptyStateActions,
   getDeckEmptyState,

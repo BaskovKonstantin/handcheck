@@ -107,9 +107,11 @@
         list.innerHTML = html.join("");
       }
 
-      HandCheck.employerNav().then(render).catch(() => {
-        list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
-      });
+      HandCheck.bootCabinetPage("employer", () =>
+        render().catch(() => {
+          list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
+        })
+      );
     </script>
   </body>
 </html>

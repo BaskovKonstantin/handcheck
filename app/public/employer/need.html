@@ -23,12 +23,14 @@
     </main>
     <script src="/app.js"></script>
     <script>
-      HandCheck.employerNav();
       let snapshot = "";
       const statsEl = document.getElementById("stats");
       const formEl = document.getElementById("form");
 
-      HandCheck.api("/api/employer/needs").then((d) => {
+      async function loadNeedForm() {
+        statsEl.innerHTML = HandCheck.skeletonBlocks(3);
+        formEl.innerHTML = HandCheck.skeletonBlocks(1);
+        const d = await HandCheck.api("/api/employer/needs");
         const n = d.items[0] || {};
         const spec = n.specialization || "backend";
         const grade = n.grade || "middle";
@@ -56,6 +58,7 @@
           <label>Название <input id="title" value="${(n.title || "").replace(/"/g, "&quot;")}" /></label>
           <label>Домен <textarea id="domain">${n.domainText || ""}</textarea></label>`;
         snapshot = JSON.stringify({ title: n.title, domain: n.domainText });
+        document.getElementById("save").disabled = true;
         document.querySelectorAll("input,textarea").forEach((el) => {
           el.addEventListener("input", () => {
             const cur = JSON.stringify({
@@ -65,7 +68,9 @@
             document.getElementById("save").disabled = cur === snapshot;
           });
         });
-      });
+      }
+
+      HandCheck.bootCabinetPage("employer", () => loadNeedForm());
       document.getElementById("save").onclick = async () => {
         const needs = await HandCheck.api("/api/employer/needs");
         const id = needs.items[0]?.id;

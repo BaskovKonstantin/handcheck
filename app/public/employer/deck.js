@@ -36,7 +36,25 @@ function setDeckVisible(showCard) {
   if (emptyHost) emptyHost.hidden = showCard;
 }
 
+function showDeckLoading() {
+  const cardEl = document.getElementById("deck-card");
+  const actions = document.getElementById("deck-actions");
+  const roundActions = document.getElementById("deck-actions-round");
+  if (cardEl) {
+    cardEl.hidden = true;
+    cardEl.innerHTML = "";
+  }
+  if (actions) actions.hidden = true;
+  if (roundActions) roundActions.hidden = true;
+  const emptyHost = document.getElementById("deck-empty");
+  if (emptyHost) {
+    emptyHost.hidden = false;
+    emptyHost.innerHTML = HandCheck.deckSkeleton();
+  }
+}
+
 async function loadNeed() {
+  showDeckLoading();
   const needs = await HandCheck.api("/api/employer/needs");
   needId = needs.items[0]?.id;
   if (!needId) {
@@ -93,9 +111,15 @@ async function loadCard() {
   const cardEl = document.getElementById("deck-card");
   const actions = document.getElementById("deck-actions");
   const empty = document.getElementById("empty");
+  const emptyHost = document.getElementById("deck-empty");
+  if (emptyHost) {
+    emptyHost.hidden = true;
+    emptyHost.innerHTML = "";
+  }
   if (!data.card) {
     cardEl.innerHTML = "";
     cardEl.className = "deck-card";
+    cardEl.hidden = true;
     actions.hidden = true;
     const roundActions = document.getElementById("deck-actions-round");
     if (roundActions) roundActions.hidden = true;
@@ -103,14 +127,12 @@ async function loadCard() {
     setDeckVisible(false);
     let invited = 0;
     try {
-      const qs = window.location.search;
       const matches = await HandCheck.api(`/api/employer/needs/${needId}/matches${qs}`);
       invited = matches.items?.filter((i) => i.reviewStatus === "invited").length || 0;
     } catch {
       invited = 0;
     }
     const meta = HandCheck.getDeckEmptyState({ invitedInMatches: invited });
-    const emptyHost = document.getElementById("deck-empty");
     emptyHost.hidden = false;
     emptyHost.innerHTML = HandCheck.emptyStateActions(meta.title, meta.help, meta.actions);
     candidateId = null;
@@ -132,92 +154,109 @@ function animateExit(cls) {
   return new Promise((r) => setTimeout(r, 320));
 }
 
-document.getElementById("invite-open-round")?.addEventListener("click", () => {
-  document.getElementById("invite-open")?.click();
-});
-
-document.querySelectorAll("[data-decision]").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    if (!candidateId) return;
-    btn.disabled = true;
-    const d = btn.dataset.decision;
-    const cls = d === "rejected" ? "exit-left" : "exit-down";
-    await animateExit(cls);
-    try {
-      await HandCheck.api(`/api/employer/needs/${needId}/reviews`, {
-        method: "POST",
-        body: JSON.stringify({ candidateId, decision: d }),
-      });
-      if (d === "later") HandCheck.toast("Кандидат отложен", "info");
-      if (d === "rejected") HandCheck.toast("Отказ отправлен", "info");
-    } catch (e) {
-      HandCheck.toast(HandCheck.formatApiError(e), "error");
-    }
-    btn.disabled = false;
-    await loadCard();
+function bindDeckUi() {
+  document.getElementById("invite-open-round")?.addEventListener("click", () => {
+    document.getElementById("invite-open")?.click();
   });
-});
 
-const sheet = document.getElementById("sheet");
-document.getElementById("invite-open").onclick = () => {
-  showSalaryError(null);
-  document.getElementById("invite-err").hidden = true;
-  sheet.classList.remove("hidden");
-};
-document.getElementById("invite-cancel").onclick = () => sheet.classList.add("hidden");
-sheet.addEventListener("click", (e) => {
-  if (e.target === sheet) sheet.classList.add("hidden");
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") sheet.classList.add("hidden");
-});
-
-document.getElementById("invite-send").onclick = async () => {
-  const err = document.getElementById("invite-err");
-  err.hidden = true;
-  const fromVal = document.getElementById("salary-from").value;
-  const toVal = document.getElementById("salary-to").value;
-  const salaryMsg = validateSalaryRange(fromVal, toVal);
-  if (salaryMsg) {
-    showSalaryError(salaryMsg);
-    return;
-  }
-  showSalaryError(null);
-  const from = Number(fromVal);
-  const to = Number(toVal);
-  const btn = document.getElementById("invite-send");
-  btn.disabled = true;
-  try {
-    await HandCheck.api("/api/employer/invitations", {
-      method: "POST",
-      body: JSON.stringify({
-        needId,
-        candidateId,
-        salaryFrom: from,
-        salaryTo: to,
-        offerText: document.getElementById("offer-text").value,
-        contactChannel: document.getElementById("contact-channel").value,
-      }),
+  document.querySelectorAll("[data-decision]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!candidateId) return;
+      btn.disabled = true;
+      const d = btn.dataset.decision;
+      const cls = d === "rejected" ? "exit-left" : "exit-down";
+      await animateExit(cls);
+      try {
+        await HandCheck.api(`/api/employer/needs/${needId}/reviews`, {
+          method: "POST",
+          body: JSON.stringify({ candidateId, decision: d }),
+        });
+        if (d === "later") HandCheck.toast("Кандидат отложен", "info");
+        if (d === "rejected") HandCheck.toast("Отказ отправлен", "info");
+      } catch (e) {
+        HandCheck.toast(HandCheck.formatApiError(e), "error");
+      }
+      btn.disabled = false;
+      await loadCard();
     });
-    sheet.classList.add("hidden");
-    HandCheck.toast("Приглашение отправлено", "success");
-    await animateExit("exit-right");
-    await loadCard();
-  } catch (e) {
-    const msg = HandCheck.formatApiError(e);
-    if (e?.data?.details?.fields?.salaryRange) {
-      showSalaryError(msg);
-    } else {
-      err.hidden = false;
-      err.textContent = msg;
-    }
-  } finally {
-    btn.disabled = false;
-  }
-};
+  });
 
-HandCheck.employerNav();
-loadNeed().catch(() => {
-  document.getElementById("empty").hidden = false;
-  document.getElementById("empty").textContent = "Не удалось загрузить колоду";
-});
+  const sheet = document.getElementById("sheet");
+  const inviteOpen = document.getElementById("invite-open");
+  if (inviteOpen) {
+    inviteOpen.onclick = () => {
+      showSalaryError(null);
+      document.getElementById("invite-err").hidden = true;
+      sheet.classList.remove("hidden");
+    };
+  }
+  const inviteCancel = document.getElementById("invite-cancel");
+  if (inviteCancel) {
+    inviteCancel.onclick = () => sheet.classList.add("hidden");
+  }
+  sheet?.addEventListener("click", (e) => {
+    if (e.target === sheet) sheet.classList.add("hidden");
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") sheet.classList.add("hidden");
+  });
+
+  const inviteSend = document.getElementById("invite-send");
+  if (inviteSend) {
+    inviteSend.onclick = async () => {
+      const err = document.getElementById("invite-err");
+      err.hidden = true;
+      const fromVal = document.getElementById("salary-from").value;
+      const toVal = document.getElementById("salary-to").value;
+      const salaryMsg = validateSalaryRange(fromVal, toVal);
+      if (salaryMsg) {
+        showSalaryError(salaryMsg);
+        return;
+      }
+      showSalaryError(null);
+      const from = Number(fromVal);
+      const to = Number(toVal);
+      const btn = document.getElementById("invite-send");
+      btn.disabled = true;
+      try {
+        await HandCheck.api("/api/employer/invitations", {
+          method: "POST",
+          body: JSON.stringify({
+            needId,
+            candidateId,
+            salaryFrom: from,
+            salaryTo: to,
+            offerText: document.getElementById("offer-text").value,
+            contactChannel: document.getElementById("contact-channel").value,
+          }),
+        });
+        sheet.classList.add("hidden");
+        HandCheck.toast("Приглашение отправлено", "success");
+        await animateExit("exit-right");
+        await loadCard();
+      } catch (e) {
+        const msg = HandCheck.formatApiError(e);
+        if (e?.data?.details?.fields?.salaryRange) {
+          showSalaryError(msg);
+        } else {
+          err.hidden = false;
+          err.textContent = msg;
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  }
+}
+
+HandCheck.bootCabinetPage("employer", () =>
+  loadNeed().catch(() => {
+    const emptyEl = document.getElementById("empty");
+    if (emptyEl) {
+      emptyEl.hidden = false;
+      emptyEl.textContent = "Не удалось загрузить колоду";
+    }
+  })
+);
+
+bindDeckUi();

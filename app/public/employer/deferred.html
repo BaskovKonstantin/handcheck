@@ -18,16 +18,27 @@
         </div>
       </header>
       <div id="stats"></div>
-      <div id="list"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
+      <div id="list"></div>
     </main>
     <script src="/app.js"></script>
     <script>
-      HandCheck.employerNav();
       const list = document.getElementById("list");
       const statsEl = document.getElementById("stats");
 
-      HandCheck.api("/api/employer/needs").then(async (needs) => {
+      async function loadDeferred() {
+        statsEl.innerHTML = HandCheck.skeletonBlocks(2);
+        list.innerHTML = HandCheck.skeletonBlocks(2);
+        const needs = await HandCheck.api("/api/employer/needs");
         const id = needs.items[0]?.id;
+        if (!id) {
+          list.innerHTML = HandCheck.emptyState(
+            "Нет потребности",
+            "Сначала опишите потребность.",
+            "/employer/need",
+            "К потребности"
+          );
+          return;
+        }
         const d = await HandCheck.api(`/api/employer/needs/${id}/deferred`);
         const count = (d.items || []).length;
         statsEl.innerHTML = HandCheck.statTilesHtml([
@@ -75,7 +86,9 @@
             location.reload();
           };
         });
-      });
+      }
+
+      HandCheck.bootCabinetPage("employer", () => loadDeferred());
     </script>
   </body>
 </html>

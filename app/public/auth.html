@@ -8,7 +8,7 @@
   </head>
   <body class="auth-page">
     <main class="column auth-column">
-      <a class="logo" href="/">HandCheck</a>
+      <a class="logo" href="/" id="auth-logo">HandCheck</a>
       <header class="page-header">
         <h1>Вход и регистрация</h1>
         <p class="lede">Демо: anna@demo.local или cafe@demo.local, пароль из .env.example. Код подтверждения 000000.</p>
@@ -34,6 +34,7 @@
     </main>
     <script src="/app.js"></script>
     <script>
+      document.getElementById("auth-logo").innerHTML = `${HandCheck.LOGO_MARK}<span>HandCheck</span>`;
       const q = new URLSearchParams(location.search);
       if (q.get("role")) document.getElementById("role").value = q.get("role");
       const err = document.getElementById("err");

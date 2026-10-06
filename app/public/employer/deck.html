@@ -26,8 +26,11 @@
     <div class="invite-sheet hidden" id="sheet">
       <div class="invite-panel">
         <h2>Приглашение</h2>
-        <label>От <input type="number" id="salary-from" /></label>
-        <label>До <input type="number" id="salary-to" /></label>
+        <div class="salary-range">
+          <label>От <input type="number" id="salary-from" min="0" step="1" /></label>
+          <label>До <input type="number" id="salary-to" min="0" step="1" /></label>
+          <p class="field-error" id="salary-range-err" hidden></p>
+        </div>
         <label>Текст оффера <textarea id="offer-text" rows="3"></textarea></label>
         <label>Канал связи <input id="contact-channel" maxlength="64" /></label>
         <p class="field-error" id="invite-err" hidden></p>

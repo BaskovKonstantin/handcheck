@@ -24,17 +24,25 @@ router.post("/invitations", (req, res, next) => {
     const to = Number(salaryTo);
     const offer = String(offerText || "").trim();
     const channel = String(contactChannel || "").trim();
+    const fields = {};
+    if (!Number.isInteger(from) || from < 0) {
+      fields.salaryRange = "Укажите целое число в поле «От»";
+    }
+    if (!Number.isInteger(to) || to < 0) {
+      fields.salaryRange = fields.salaryRange || "Укажите целое число в поле «До»";
+    }
+    if (Number.isInteger(from) && Number.isInteger(to) && from > to) {
+      fields.salaryRange = "Вилка зарплаты: «От» не может быть больше «До»";
+    }
     if (
       !needId ||
       !candidateId ||
-      !Number.isInteger(from) ||
-      !Number.isInteger(to) ||
-      from > to ||
       !offer ||
       !channel ||
-      channel.length > 64
+      channel.length > 64 ||
+      Object.keys(fields).length
     ) {
-      throw httpError(400, "invalid_body");
+      throw httpError(400, "invalid_body", Object.keys(fields).length ? { fields } : undefined);
     }
     const db = getDb();
     const need = db

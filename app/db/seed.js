@@ -85,7 +85,14 @@ function seedDemoUsers(db) {
   db.prepare(
     `INSERT INTO background_episodes (id, candidate_user_id, role_title, domain, industry, note)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(newId(), annaId, "официант", "обслуживание гостей", "HoReCa", "");
+  ).run(
+    newId(),
+    annaId,
+    "backend-разработчик",
+    "автоматизация работы официанта в ресторане",
+    "HoReCa",
+    "опыт зала + переход в разработку"
+  );
 
   db.prepare(
     `INSERT INTO employer_profiles (user_id, company_name, description, industry, contact_email)

@@ -14,7 +14,7 @@
         <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
         <div class="cabinet-page-hero-inner">
           <h1>Тест</h1>
-          <p class="lede">4 коротких ответа и одна рабочая задача. Результат — категория, не балл.</p>
+          <p class="lede">8 коротких ответов (минута на каждый) и мини-проект на неделю. Результат — категория, не балл.</p>
         </div>
       </header>
       <div id="panel" class="panel"></div>
@@ -35,21 +35,48 @@
         { value: "senior", label: "Senior" },
       ];
 
-      function batteryStepIndicator(currentIndex, total) {
+      const QUICK_COUNT = 8;
+
+      function batteryStepIndicator(currentIndex) {
         const steps = [];
-        for (let i = 0; i < 4; i += 1) {
+        for (let i = 0; i < QUICK_COUNT; i += 1) {
           const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "";
           steps.push(`<li class="battery-step ${state}" aria-current="${i === currentIndex ? "step" : "false"}">
             <span class="battery-step-num">${i + 1}</span>
             <span class="battery-step-label">Короткий ${i + 1}</span>
           </li>`);
         }
-        const workState = currentIndex >= 4 ? (currentIndex === 4 ? "current" : "done") : "";
+        const workState =
+          currentIndex >= QUICK_COUNT ? (currentIndex === QUICK_COUNT ? "current" : "done") : "";
         steps.push(`<li class="battery-step battery-step-work ${workState}">
-          <span class="battery-step-num">5</span>
-          <span class="battery-step-label">Рабочая</span>
+          <span class="battery-step-num">${QUICK_COUNT + 1}</span>
+          <span class="battery-step-label">Мини-проект</span>
         </li>`);
         return `<ol class="battery-steps" aria-label="Шаги батареи">${steps.join("")}</ol>`;
+      }
+
+      function formatCountdown(ms) {
+        if (ms <= 0) return "0:00";
+        const totalSec = Math.ceil(ms / 1000);
+        const d = Math.floor(totalSec / 86400);
+        const h = Math.floor((totalSec % 86400) / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        if (d > 0) return `${d} д ${h} ч`;
+        if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        return `${m}:${String(s).padStart(2, "0")}`;
+      }
+
+      async function postTelemetry(events) {
+        if (!events.length) return;
+        try {
+          await HandCheck.api("/api/assessment/events", {
+            method: "POST",
+            body: JSON.stringify({ events }),
+          });
+        } catch {
+          /* ignore */
+        }
       }
 
       function isChoiceAvailable(field, value) {
@@ -155,7 +182,7 @@
         const next = attempts.find((a) => !a.submitted);
         if (!next) {
           panel.innerHTML =
-            batteryStepIndicator(5, 5) +
+            batteryStepIndicator(QUICK_COUNT + 1) +
             HandCheck.emptyState(
               "Тест завершён",
               category.label
@@ -190,9 +217,14 @@
           cur.battery.claimedGrade
         );
         const answerMax = t.answerMax || 4000;
+        const timerLabel =
+          t.type === "quick"
+            ? "Минута на ответ"
+            : "Неделя на мини-проект";
         panel.innerHTML = `
-          ${batteryStepIndicator(stepIndex, 5)}
+          ${batteryStepIndicator(stepIndex)}
           <p class="invite-meta">${HandCheck.escapeHtml(metaLine)}</p>
+          <p class="battery-timer" id="timer-line" aria-live="polite"><span class="battery-timer-label">${timerLabel}:</span> <strong id="timer-val">—</strong></p>
           <p>${HandCheck.escapeHtml(t.prompt)}</p>
           <textarea id="answer" rows="8" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
           <p class="invite-meta" id="answer-len">0 / ${answerMax} символов</p>
@@ -207,7 +239,40 @@
         };
         syncLen();
         ta.addEventListener("input", syncLen);
+        let firstInputSent = false;
+        const telemetryQueue = [];
+        const enqueueEvent = (event_type, payload) => {
+          telemetryQueue.push({ attemptId, event_type, payload });
+          if (telemetryQueue.length >= 4) postTelemetry(telemetryQueue.splice(0));
+        };
+        ta.addEventListener("paste", (ev) => {
+          const clip = ev.clipboardData?.getData("text") || "";
+          enqueueEvent("paste", { length: clip.length, chars: clip.length });
+        });
+        ta.addEventListener("input", () => {
+          if (!firstInputSent && ta.value.length > 0) {
+            firstInputSent = true;
+            enqueueEvent("first_input", { length: ta.value.length });
+          }
+        });
+        ta.addEventListener("focus", () => enqueueEvent("focus", null));
+        ta.addEventListener("blur", () => enqueueEvent("blur", null));
         let submitting = false;
+        const deadlineMs = t.deadlineAt ? new Date(t.deadlineAt).getTime() : null;
+        const timerVal = document.getElementById("timer-val");
+        let tickTimer = null;
+        const syncDeadlineUi = () => {
+          if (!deadlineMs) return;
+          const left = deadlineMs - Date.now();
+          timerVal.textContent = formatCountdown(left);
+          if (t.type === "quick" && left <= 0 && !submitting) {
+            document.getElementById("submit").click();
+          }
+        };
+        if (deadlineMs) {
+          syncDeadlineUi();
+          tickTimer = setInterval(syncDeadlineUi, 250);
+        }
         const persistDraft = async () => {
           if (submitting) return;
           const text = ta.value;
@@ -240,6 +305,8 @@
           }
           submitting = true;
           if (draftTimer) clearInterval(draftTimer);
+          if (tickTimer) clearInterval(tickTimer);
+          await postTelemetry(telemetryQueue.splice(0));
           try {
             await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
               method: "POST",
@@ -248,6 +315,13 @@
             localStorage.removeItem(draftKey);
             await init();
           } catch (e) {
+            if (e.data?.error === "quick_time_expired") {
+              err.hidden = false;
+              err.textContent = HandCheck.formatApiError(e);
+              localStorage.removeItem(draftKey);
+              await init();
+              return;
+            }
             err.hidden = false;
             err.textContent = HandCheck.formatApiError(e);
           } finally {

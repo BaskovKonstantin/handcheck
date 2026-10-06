@@ -20,7 +20,7 @@
 
 ## Rev.5 (implemented)
 
-Modular monolith with SQLite `/data`, sessions in DB, assessment battery 4+1, matching rank  
+Modular monolith with SQLite `/data`, sessions in DB, assessment battery 8+1, matching rank  
 `0.60*test_score + 0.15*motivation + 0.10*fsp_boost + 0.15*domain_boost`, deck, calls + WS signaling, `createApp()` export.
 
 See `docs/IMPLEMENTATION-PLAN-rev5.md`.

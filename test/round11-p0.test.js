@@ -140,15 +140,12 @@ describe("round 11 P0 fixes", () => {
       )
       .all()
       .map((r) => r.prompt);
-    assert.equal(prompts.length, 4);
-    assert.equal(new Set(prompts).size, 4);
+    assert.equal(prompts.length, 8);
+    assert.equal(new Set(prompts).size, 8);
     assert.doesNotMatch(prompts.join(" "), /QuickProbe|WorkSim/);
 
-    const realistic =
-      "Спроектирую HTTP API с версионированием в пути, пагинацией через cursor, валидацией входа и кодами ошибок 400/404/409. " +
-      "Для оплаты использую idempotency-key в заголовке, транзакции в Postgres и очередь уведомлений. " +
-      "Кэш ответов в Redis с TTL и инвалидацией по ключам сущностей.";
-    const quickScores = [1, 2, 3, 4].map(() => scoreQuick(realistic, QUICK_RUBRIC));
+    const realistic = require("../scripts/fixtures/canonical-answer-ab.json").quickAnswer;
+    const quickScores = Array.from({ length: 8 }, () => scoreQuick(realistic, QUICK_RUBRIC));
     const workScore = scoreWork(realistic, WORK_RUBRIC);
     const agg = aggregateBattery(quickScores, workScore);
     assert.ok(agg.test_score >= cutoffForGrade("middle"));
@@ -206,8 +203,8 @@ describe("task battery content", () => {
       .prepare(`SELECT prompt FROM tasks WHERE type = 'quick' AND status = 'published'`)
       .all()
       .map((r) => r.prompt);
-    assert.ok(prompts.length >= 4);
-    assert.equal(new Set(prompts).size, 4);
+    assert.ok(prompts.length >= 16);
+    assert.equal(new Set(prompts).size, 8);
     assert.doesNotMatch(prompts.join("\n"), /QuickProbe|WorkSim/);
     if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb);
   });

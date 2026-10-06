@@ -10,10 +10,9 @@ const {
   assertBatteryComplete,
   lastSpecializationAttempt,
   cooldownActive,
-  finalizeBattery,
-  WORK_DEADLINE_MS,
 } = require("../assessment/service");
-const { scoreQuick, scoreWork } = require("../../lib/rubric-score");
+const { submitAttemptAnswer: coreSubmitAttemptAnswer } = require("../../lib/assessment-submit");
+const { ensureAttemptTimerStarted, deadlineAtIso } = require("../../lib/assessment-timing");
 const { createInvitation, respondToInvitation } = require("../invitations/actions");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
@@ -138,7 +137,7 @@ function listAssessmentTasks(userId) {
   const attempts = db
     .prepare(
       `SELECT a.id, a.submitted_at, t.type, t.prompt FROM attempts a
-       JOIN tasks t ON t.id = a.task_id WHERE a.battery_id = ? ORDER BY a.opened_at`
+       JOIN tasks t ON t.id = a.task_id WHERE a.battery_id = ? ORDER BY a.rowid`
     )
     .all(battery.id);
   return {
@@ -158,14 +157,35 @@ function listAssessmentTasks(userId) {
 }
 
 function getAssessmentTask(userId, attemptId) {
-  const row = getDb()
+  const db = getDb();
+  const row = db
     .prepare(
-      `SELECT a.id, a.battery_id, a.answer_text, a.submitted_at, t.prompt, t.type FROM attempts a JOIN tasks t ON t.id = a.task_id
+      `SELECT a.id, a.battery_id, a.answer_text, a.submitted_at, a.opened_at, t.prompt, t.type FROM attempts a JOIN tasks t ON t.id = a.task_id
        WHERE a.id = ? AND a.candidate_user_id = ?`
     )
     .get(attemptId, userId);
   if (!row) throw mcpError("Задание не найдено", "not_found");
-  const out = { id: row.id, prompt: row.prompt, type: row.type, batteryId: row.battery_id };
+  let openedAt = row.opened_at;
+  if (!row.submitted_at) {
+    try {
+      const started = ensureAttemptTimerStarted(db, userId, row.id);
+      openedAt = started.opened_at || started.started_at;
+    } catch (e) {
+      if (e.code === "not_current_task") {
+        throw mcpError("Сначала завершите предыдущий шаг теста", "not_current_task");
+      }
+      throw e;
+    }
+  }
+  const out = {
+    id: row.id,
+    prompt: row.prompt,
+    type: row.type,
+    batteryId: row.battery_id,
+    openedAt,
+    deadlineAt: openedAt ? deadlineAtIso(openedAt, row.type) : null,
+    quickLimitSeconds: row.type === "quick" ? 60 : undefined,
+  };
   if (!row.submitted_at) {
     out.draftText = String(row.answer_text || "");
   }
@@ -193,14 +213,11 @@ function startAssessment(userId, specialization, grade, actionSource = "web") {
   ).run(batteryId, userId, specialization, grade, formKey, now);
   const ins = db.prepare(
     `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, opened_at, action_source)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, NULL, ?)`
   );
   for (const t of [...quick, work]) {
     const attemptId = newId();
-    ins.run(attemptId, userId, t.id, batteryId, formKey, now, actionSource);
-    db.prepare(
-      `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'opened_at', NULL)`
-    ).run(attemptId);
+    ins.run(attemptId, userId, t.id, batteryId, formKey, actionSource);
   }
   return listAssessmentTasks(userId);
 }
@@ -222,33 +239,33 @@ function submitAttemptAnswer(userId, attemptId, answerText, actionSource = "web"
   if (options.requireWork && a.type !== "work") {
     throw mcpError("Для короткого задания используйте submit_answer", "invalid_body");
   }
-  if (a.type === "work") {
-    const opened = new Date(a.opened_at).getTime();
-    if (Date.now() > opened + WORK_DEADLINE_MS) {
-      throw mcpError("Время на рабочее задание истекло", "deadline_passed");
+  try {
+    const result = coreSubmitAttemptAnswer(db, userId, a, answerText, { actionSource });
+    if (result.batteryComplete) {
+      return {
+        batteryComplete: true,
+        category: getCandidateCategory(userId),
+        pass: result.passed,
+        timedOut: false,
+      };
     }
+    return { batteryComplete: false, timedOut: false };
+  } catch (e) {
+    if (e.code === "quick_time_expired") {
+      throw mcpError(
+        e.details?.message || "Время на короткий ответ истекло (лимит — одна минута)",
+        "quick_time_expired"
+      );
+    }
+    if (e.code === "deadline_passed") {
+      throw mcpError(e.details?.message || "Срок на мини-проект истёк", "deadline_passed");
+    }
+    if (e.code === "invalid_body") throw mcpError(e.details?.fields?.answerText || "Некорректный ответ", "invalid_body");
+    if (e.code === "not_current_task") {
+      throw mcpError("Сначала завершите предыдущий шаг теста", "not_current_task");
+    }
+    throw e;
   }
-  const parsed = validateAnswerText(answerText, a.type);
-  if (!parsed.ok) throw mcpError(parsed.fields.answerText, "invalid_body");
-  const text = parsed.value;
-  const rubric = JSON.parse(a.rubric_json);
-  const scores = a.type === "quick" ? scoreQuick(text, rubric) : scoreWork(text, rubric);
-  const now = new Date().toISOString();
-  db.prepare(
-    `UPDATE attempts SET answer_text = ?, knowledge = ?, breadth = ?, submitted_at = ?, action_source = ? WHERE id = ?`
-  ).run(text, scores.knowledge, scores.breadth, now, actionSource, a.id);
-  db.prepare(
-    `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'submit', ?)`
-  ).run(a.id, JSON.stringify({ length: text.length, source: actionSource }));
-
-  const pending = db
-    .prepare(`SELECT COUNT(*) AS c FROM attempts WHERE battery_id = ? AND submitted_at IS NULL`)
-    .get(a.battery_id).c;
-  if (pending === 0) {
-    const result = finalizeBattery(a.battery_id, userId, a.claimed_grade);
-    return { batteryComplete: true, category: getCandidateCategory(userId), pass: result.passed };
-  }
-  return { batteryComplete: false };
 }
 
 function listCandidateInvitations(userId) {

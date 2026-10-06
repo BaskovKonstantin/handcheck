@@ -85,11 +85,17 @@ async function main() {
   const attempts = db
     .prepare("SELECT id, task_id FROM attempts WHERE battery_id = ?")
     .all(batteryId);
-  for (const at of attempts) {
-    const t = db.prepare("SELECT type FROM tasks WHERE id = ?").get(at.task_id);
+  while (true) {
+    const cur = await agent.get("/api/assessment/battery/current");
+    const next = cur.body.battery?.attempts?.find((a) => !a.submitted);
+    if (!next) break;
+    await agent.get(`/api/assessment/tasks/${next.id}`);
+    const t = db.prepare("SELECT type FROM tasks WHERE id = ?").get(
+      db.prepare("SELECT task_id FROM attempts WHERE id = ?").get(next.id).task_id
+    );
     const ans = t.type === "quick" ? strong.quickAnswer : strong.workAnswer;
     const sub = await agent
-      .post(`/api/assessment/tasks/${at.id}/submit`)
+      .post(`/api/assessment/tasks/${next.id}/submit`)
       .send({ answerText: ans });
     const body = JSON.stringify(sub.body);
     assert.ok(!body.includes("test_score"), "A4 failed: leaked score");

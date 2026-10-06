@@ -13,7 +13,8 @@ const ERROR_MESSAGES = {
   network_error: "Не удалось связаться с сервером",
   timeout: "Сервер долго не отвечает",
   cooldown: "Пересдача по этой специализации пока недоступна",
-  deadline_passed: "Время на рабочую задачу истекло",
+  deadline_passed: "Срок на мини-проект истёк",
+  quick_time_expired: "Время на короткий ответ истекло (лимит — одна минута)",
   candidate_paused: "Кандидат на паузе — новые приглашения не отправляются",
   candidate_rejected: "Кандидат отклонён по этой потребности",
   candidate_deferred: "Кандидат в отложенных — верните его в подбор",
@@ -95,6 +96,7 @@ function formatApiError(err) {
       ? `${ERROR_MESSAGES.cooldown}. Повторная попытка с ${when}`
       : ERROR_MESSAGES.cooldown;
   }
+  if (err?.data?.message) return err.data.message;
   if (err?.data?.details?.message) return err.data.details.message;
   if (fields?.salaryRange) return fields.salaryRange;
   if (fields?.offerText) return fields.offerText;

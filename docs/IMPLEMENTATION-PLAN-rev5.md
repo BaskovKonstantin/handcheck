@@ -17,7 +17,7 @@
 - Палитра HandCheck: paper `#F7F4EE`, card `#FFFCF8`, ink `#1A2332`, muted `#5E6A7A`, line `#E4DDD2`, clay `#C2410C`, clay-hover `#9A3412`, forest `#1F4D3A`, forest-soft `#E5F0EA`, danger `#9F2D2D`, on-clay `#FFFFFF`. **Не** индиго Mercor `#4F46E5`.
 - Композиция UI — референс Mercor (шапка, герой, метрики, row-link, три шага), копирайт **русский**.
 - Категория только после теста; UI **не показывает** score, integrity, test_score, rank, числовой рейтинг.
-- Батарея: 4× QuickProbe + 1× WorkSim, форма A или B случайно из **published** tasks.
+- Батарея: 8× QuickProbe + 1× WorkSim (мини-проект), форма A или B случайно из **published** tasks.
 - Повтор той же specialization — cooldown `GRADE_COOLDOWN_DAYS=90`. Смена грейда — отдельная попытка, **без** принудительного даунгрейда текущей категории при fail.
 - Rank внутри категории: `0.60*test_score + 0.15*motivation + 0.10*fsp_boost + 0.15*domain_boost`.
 - Контакты и комната звонка — только после `invitation.status=accepted`.
@@ -169,7 +169,7 @@ handcheck/
 - Seed-специализации: `backend`, `frontend`, `qa`. Грейды: `junior`, `middle`, `senior`. Девять категорий.
 - `tasks`: type `quick|work`, specialization, grade, form_key `A|B` NULL у draft, prompt, rubric_json, status `draft|published`, origin `manual|llm`.
 
-**Seed backend × middle, формы A и B, обе published:** ровно **4** QuickProbe и **1** WorkSim на форму. Минимум спецификации — 2 quick; батарея требует 4, поэтому seed сразу полный. Если у формы меньше 4 published quick или нет work, `battery/start` отвечает **409** `battery_incomplete`.
+**Seed backend × middle, формы A и B, обе published:** ровно **8** QuickProbe и **1** WorkSim на форму. Минимум спецификации — 2 quick; батарея требует 8, поэтому seed сразу полный. Если у формы меньше 8 published quick или нет work, `battery/start` отвечает **409** `battery_incomplete`.
 
 `rubric_json`:
 
@@ -214,9 +214,9 @@ Quick использует `keys` и `breadthKeys`. Work использует `k
 
 1. Кандидат выбирает specialization + claimed grade.
 2. Cooldown на **всю специализацию**, не на пару specialization+grade. Пока не прошло `GRADE_COOLDOWN_DAYS` от последнего `submitted_at` этой специализации, новая батарея того же направления — **409**, даже если заявлен другой грейд.
-3. `form_key` A или B выбирается один раз на батарею. Все пять заданий — published и этой формы.
-4. QuickProbe: ориентир 90 секунд только в UI. Сервер по таймеру не обрывает.
-5. WorkSim: дедлайн 60 минут от серверного `opened_at`. Черновик каждые 10 секунд и по blur.
+3. `form_key` A или B выбирается один раз на батарею. Все девять заданий — published и этой формы.
+4. QuickProbe: **жёсткий лимит 60 секунд** на пункт от серверного `opened_at` (таймер стартует при выдаче задания). Просроченный submit — **409** `quick_time_expired`, текст ответа сохраняется и учитывается в скоринге; событие `quick_timeout` в `attempt_events`.
+5. WorkSim (мини-проект): дедлайн **7 суток** от серверного `opened_at` рабочего задания. Черновик каждые 10 секунд и по blur.
 6. Submit WorkSim после дедлайна — **409**. `finish_bonus = 0`. Если дедлайн вышел и work не сдан, батарея закрывается как «не подтверждено». Старая категория остаётся.
 7. Pass записывает новую категорию. Fail **не** понижает уже записанную категорию. После cooldown успешный другой грейд заменяет категорию и ставит `grade_changed_at`.
 
@@ -273,7 +273,7 @@ Fail: ответ API — «не подтверждено» + дата перес
 
 Ровно три фразы, без процентов и без порога «высокий knowledge»:
 
-1. Все 4 quick сданы → «Короткие ответы по API сданы». Иначе → «Короткие ответы сданы не все».
+1. Все 8 quick сданы → «Короткие ответы по API сданы». Иначе → «Короткие ответы сданы не все».
 2. Work сдан до дедлайна → «Рабочая задача доведена до конца». Иначе → «Рабочая задача не сдана».
 3. Был draft → «По ходу задачи были промежуточные черновики». Иначе → «Задача сдана одним ответом».
 
@@ -786,7 +786,7 @@ Validators работают по `DB_PATH=./data/handcheck-dev.sqlite`: migrate 
 - [x] `lib/rubric-score.js`, `motivation.js`, `integrity.js`
 - [x] `modules/assessment/router.js` — start battery, draft, submit, events
 - [x] `lib/task-phrases.js`
-- [x] Seed: 4 quick + 1 work на формы A и B, test_score Анны = test_score Бориса
+- [x] Seed: 8 quick + 1 work на формы A и B, test_score Анны = test_score Бориса
 - [x] `test/rubric-score.test.js`
 
 ### Commit 4 — matching + deck + invitations
@@ -857,7 +857,7 @@ SMTP_URL=
 | design.md + tokens + лендинг | §10, commit 1 |
 | Движение и цикл U1–U9 | §10.1, §11.7, commit 6 |
 | Состояние экранов: URL, сервер, память | §10.2, §11.8 |
-| Батарея 4+1, cutoff, cooldown специализации | §4.1–4.2 |
+| Батарея 8+1, cutoff, cooldown специализации | §4.1–4.2 |
 | Telemetry скрыта, integrity из трёх сигналов | §4.4, §7.3 |
 | Rank и domain_boost с леммами | §5 |
 | Колода без фото, later/rejected | §5.7 |

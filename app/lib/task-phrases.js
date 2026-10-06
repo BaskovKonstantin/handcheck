@@ -1,9 +1,11 @@
 "use strict";
 
+const { BATTERY_QUICK_COUNT } = require("./assessment-timing");
+
 function buildTaskPhrases({ quickSubmittedCount, workSubmittedOnTime, hadDraft }) {
   const phrases = [];
   phrases.push(
-    quickSubmittedCount >= 4
+    quickSubmittedCount >= BATTERY_QUICK_COUNT
       ? "Короткие ответы по API сданы"
       : "Короткие ответы сданы не все"
   );

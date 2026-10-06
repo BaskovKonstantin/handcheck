@@ -10,8 +10,10 @@ const {
 const { computeMotivation } = require("../../lib/motivation");
 const { computeIntegrityFromWorkEvents } = require("../../lib/integrity");
 const config = require("../../config");
-
-const WORK_DEADLINE_MS = 60 * 60 * 1000;
+const {
+  BATTERY_QUICK_COUNT,
+  WORK_DEADLINE_MS,
+} = require("../../lib/assessment-timing");
 
 function getPublishedBatteryTasks(specialization, grade, formKey) {
   const db = getDb();
@@ -29,7 +31,7 @@ function getPublishedBatteryTasks(specialization, grade, formKey) {
 }
 
 function assertBatteryComplete(quick, work) {
-  if (quick.length < 4 || !work) {
+  if (quick.length < BATTERY_QUICK_COUNT || !work) {
     const err = new Error("battery_incomplete");
     err.status = 409;
     err.code = "battery_incomplete";
@@ -114,19 +116,25 @@ function finalizeBattery(batteryId, userId, claimedGrade) {
   }
 
   let motivation = 0;
-  let integrity = 0;
-  if (workAttempt) {
+  const integrityParts = [];
+  for (const a of attempts) {
     const events = db
       .prepare("SELECT * FROM attempt_events WHERE attempt_id = ? ORDER BY created_at")
-      .all(workAttempt.id);
-    motivation = computeMotivation(
-      events,
-      workAttempt.opened_at,
-      workAttempt.submitted_at,
-      WORK_DEADLINE_MS
-    );
-    integrity = computeIntegrityFromWorkEvents(events);
+      .all(a.id);
+    if (events.length) integrityParts.push(computeIntegrityFromWorkEvents(events));
+    if (a.type === "work" && workAttempt) {
+      motivation = computeMotivation(
+        events,
+        workAttempt.opened_at,
+        workAttempt.submitted_at,
+        WORK_DEADLINE_MS
+      );
+    }
   }
+  const integrity =
+    integrityParts.length > 0
+      ? integrityParts.reduce((s, v) => s + v, 0) / integrityParts.length
+      : 0;
 
   const now = new Date().toISOString();
   db.prepare("UPDATE batteries SET completed_at = ? WHERE id = ?").run(now, batteryId);
@@ -197,4 +205,5 @@ module.exports = {
   scoreBatteryAttempts,
   finalizeBattery,
   WORK_DEADLINE_MS,
+  BATTERY_QUICK_COUNT,
 };

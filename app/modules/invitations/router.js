@@ -99,7 +99,7 @@ router.get("/candidates/:candidateId/contacts", (req, res, next) => {
     )
     .get(req.user.id, req.params.candidateId);
   if (!row) return next(httpError(403, "forbidden"));
-  res.json({ phone: row.phone, contact_email: row.contact_email });
+  res.json({ phone: row.phone, contactEmail: row.contact_email });
 });
 
 module.exports = router;

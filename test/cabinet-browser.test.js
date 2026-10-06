@@ -136,7 +136,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       ["/employer/invitations", ".stat-tile, .invite-card, .empty-state"],
       ["/employer/list", ".list-row-card, .empty-state"],
       ["/employer/calls", ".invite-card, .empty-state, .stat-tile"],
-      ["/employer/need", ".panel, .form-field, .empty-state"],
+      ["/employer/need", "#need-select, #title, .stat-tile"],
       ["/employer/deferred", ".stat-tile, .empty-state, .invite-card"],
     ];
     for (const [path, sel] of routes) {
@@ -174,6 +174,59 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       assert.equal(new URL(page.url()).pathname, path);
       assert.ok(await page.locator("#cabinet-aside").count());
     }
+    await context.close();
+  });
+
+  it("integrations page uses step layout and aligned consent checkbox", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "anna@demo.local");
+    await page.goto(`${BASE}/candidate/integrations`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".integrations-steps");
+    const consentBox = await page.locator("label.consent-option").boundingBox();
+    const consentInput = await page.locator("#logging-consent").boundingBox();
+    assert.ok(consentBox && consentInput);
+    assert.ok(consentInput.x >= consentBox.x - 2);
+    assert.ok(consentInput.x < consentBox.x + consentBox.width * 0.35);
+    await context.close();
+  });
+
+  it("ended call room updates hero lede", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    let row = db
+      .prepare(
+        `SELECT i.id AS invitation_id FROM invitations i
+         JOIN calls c ON c.invitation_id = i.id
+         WHERE c.status = 'ended' LIMIT 1`
+      )
+      .get();
+    if (!row?.invitation_id) {
+      const { newId } = require("../app/lib/ids");
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 100000, 120000, 'browser', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      const callId = newId();
+      db.prepare(
+        `INSERT INTO calls (id, invitation_id, status, ended_at, transcript_text)
+         VALUES (?, ?, 'ended', datetime('now'), 'демо')`
+      ).run(callId, invId);
+      row = { invitation_id: invId };
+    }
+    db.close();
+    assert.ok(row?.invitation_id, "need ended call in seed");
+    await page.goto(`${BASE}/call/${row.invitation_id}`, { waitUntil: "commit" });
+    const lede = await page.locator(".call-room-hero .lede").textContent();
+    assert.match(lede || "", /закрыта|итог/i);
     await context.close();
   });
 

@@ -14,77 +14,187 @@
         <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
         <div class="cabinet-page-hero-inner">
           <h1>Потребность</h1>
-          <p class="lede">Название и домен задачи задают подбор и доменный бонус в колоде — без рейтингов по резюме.</p>
+          <p class="lede">Название, специализация, грейд, стек и домен задают подбор и доменный бонус в колоде.</p>
         </div>
       </header>
       <div id="stats"></div>
       <div class="panel" id="form"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
-      <button class="btn-primary" id="save" disabled>Сохранить</button>
+      <button class="btn-primary" type="button" id="save" disabled>Сохранить</button>
     </main>
     <script src="/app.js"></script>
     <script>
+      const SPEC_LABEL = { backend: "Backend", frontend: "Frontend", qa: "QA" };
+      const GRADE_LABEL = { junior: "Junior", middle: "Middle", senior: "Senior" };
+      let needs = [];
+      let activeId = null;
       let snapshot = "";
+
       const statsEl = document.getElementById("stats");
       const formEl = document.getElementById("form");
+      const saveBtn = document.getElementById("save");
 
-      async function loadNeedForm() {
-        statsEl.innerHTML = HandCheck.skeletonBlocks(3);
-        formEl.innerHTML = HandCheck.skeletonBlocks(1);
-        const d = await HandCheck.api("/api/employer/needs");
-        const n = d.items[0] || {};
+      function currentPayload() {
+        const stackRaw = document.getElementById("stack")?.value || "";
+        const stack = stackRaw
+          .split(/[,;]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        return {
+          title: document.getElementById("title")?.value || "",
+          domainText: document.getElementById("domain")?.value || "",
+          specialization: document.getElementById("spec")?.value || "backend",
+          grade: document.getElementById("grade")?.value || "middle",
+          stack,
+        };
+      }
+
+      function paintTiles(n) {
         const spec = n.specialization || "backend";
         const grade = n.grade || "middle";
-        const SPEC_LABEL = { backend: "Backend", frontend: "Frontend", qa: "QA" };
-        const GRADE_LABEL = { junior: "Junior", middle: "Middle", senior: "Senior" };
+        const stack = (n.stack || []).join(", ") || "—";
         statsEl.innerHTML = HandCheck.statTilesHtml([
           {
             variant: "forest",
             label: "Специализация",
             value: SPEC_LABEL[spec] || spec,
-            hint: "Из потребности в подборе",
+            hint: "Категория кандидатов в колоде",
           },
           {
             variant: "clay",
             label: "Грейд",
             value: GRADE_LABEL[grade] || grade,
-            hint: "Категория кандидатов",
+            hint: "Уровень подбора",
           },
           {
             variant: "ink",
-            label: "Домен",
-            value: (n.domainText || "—").slice(0, 28) + ((n.domainText || "").length > 28 ? "…" : ""),
-            hint: "Учитывается в доменном бонусе",
+            label: "Стек",
+            value: stack,
+            hint: "Фильтр и подсказки в списке",
           },
         ]);
+      }
+
+      function paintForm(n) {
+        const options = needs
+          .map(
+            (item) =>
+              `<option value="${item.id}"${item.id === n.id ? " selected" : ""}>${HandCheck.escapeHtml(item.title || "Без названия")}</option>`
+          )
+          .join("");
+        const stackStr = (n.stack || []).join(", ");
         formEl.innerHTML = `
-          <label>Название <input id="title" value="${(n.title || "").replace(/"/g, "&quot;")}" /></label>
-          <label>Домен <textarea id="domain">${n.domainText || ""}</textarea></label>`;
-        snapshot = JSON.stringify({ title: n.title, domain: n.domainText });
-        document.getElementById("save").disabled = true;
-        document.querySelectorAll("input,textarea").forEach((el) => {
-          el.addEventListener("input", () => {
-            const cur = JSON.stringify({
-              title: document.getElementById("title").value,
-              domain: document.getElementById("domain").value,
-            });
-            document.getElementById("save").disabled = cur === snapshot;
+          <div class="form-actions" style="margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem">
+            <label class="form-label" style="flex:1 1 12rem;margin:0">Активная потребность
+              <select id="need-select">${options}</select>
+            </label>
+            <button type="button" class="btn-ghost" id="create-need">Создать потребность</button>
+          </div>
+          <label>Название <input id="title" value="${HandCheck.escapeHtml(n.title || "")}" /></label>
+          <label>Специализация
+            <select id="spec">
+              <option value="backend"${specSel(n.specialization, "backend")}>Backend</option>
+              <option value="frontend"${specSel(n.specialization, "frontend")}>Frontend</option>
+              <option value="qa"${specSel(n.specialization, "qa")}>QA</option>
+            </select>
+          </label>
+          <label>Грейд
+            <select id="grade">
+              <option value="junior"${specSel(n.grade, "junior")}>Junior</option>
+              <option value="middle"${specSel(n.grade, "middle")}>Middle</option>
+              <option value="senior"${specSel(n.grade, "senior")}>Senior</option>
+            </select>
+          </label>
+          <label>Стек (через запятую) <input id="stack" value="${HandCheck.escapeHtml(stackStr)}" placeholder="node, postgres" /></label>
+          <label>Домен <textarea id="domain" rows="3">${HandCheck.escapeHtml(n.domainText || "")}</textarea></label>`;
+        snapshot = JSON.stringify(currentPayload());
+        saveBtn.disabled = true;
+        document.getElementById("need-select").onchange = () => {
+          activeId = document.getElementById("need-select").value;
+          const picked = needs.find((x) => x.id === activeId) || needs[0];
+          paintTiles(picked);
+          document.getElementById("title").value = picked.title || "";
+          document.getElementById("domain").value = picked.domainText || "";
+          document.getElementById("spec").value = picked.specialization || "backend";
+          document.getElementById("grade").value = picked.grade || "middle";
+          document.getElementById("stack").value = (picked.stack || []).join(", ");
+          snapshot = JSON.stringify(currentPayload());
+          saveBtn.disabled = true;
+        };
+        document.getElementById("create-need").onclick = async () => {
+          const title = prompt("Название новой потребности", "Новая потребность");
+          if (!title || !title.trim()) return;
+          const res = await HandCheck.api("/api/employer/needs", {
+            method: "POST",
+            body: JSON.stringify({
+              title: title.trim(),
+              specialization: "backend",
+              grade: "middle",
+              domainText: "",
+              stack: [],
+            }),
           });
+          const d = await HandCheck.api("/api/employer/needs");
+          needs = d.items || [];
+          activeId = res.id;
+          const picked = needs.find((x) => x.id === activeId) || needs[0];
+          paintTiles(picked);
+          paintForm(picked);
+          bindDirty();
+        };
+        bindDirty();
+      }
+
+      function specSel(value, expected) {
+        return (value || "backend") === expected ? " selected" : "";
+      }
+
+      function bindDirty() {
+        formEl.querySelectorAll("input,textarea,select").forEach((el) => {
+          if (el.id === "need-select") return;
+          el.addEventListener("input", refreshDirty);
+          el.addEventListener("change", refreshDirty);
         });
       }
 
+      function refreshDirty() {
+        saveBtn.disabled = JSON.stringify(currentPayload()) === snapshot;
+      }
+
+      async function loadNeedForm() {
+        statsEl.innerHTML = HandCheck.skeletonBlocks(3);
+        formEl.innerHTML = HandCheck.skeletonBlocks(1);
+        const d = await HandCheck.api("/api/employer/needs");
+        needs = d.items || [];
+        if (!needs.length) {
+          const res = await HandCheck.api("/api/employer/needs", {
+            method: "POST",
+            body: JSON.stringify({
+              title: "Моя потребность",
+              specialization: "backend",
+              grade: "middle",
+              domainText: "",
+              stack: [],
+            }),
+          });
+          const again = await HandCheck.api("/api/employer/needs");
+          needs = again.items || [];
+          activeId = res.id;
+        }
+        const n = needs.find((x) => x.id === activeId) || needs[0];
+        activeId = n.id;
+        paintTiles(n);
+        paintForm(n);
+      }
+
       HandCheck.bootCabinetPage("employer", () => loadNeedForm());
-      document.getElementById("save").onclick = async () => {
-        const needs = await HandCheck.api("/api/employer/needs");
-        const id = needs.items[0]?.id;
-        await HandCheck.api(`/api/employer/needs/${id}`, {
+      saveBtn.onclick = async () => {
+        const body = currentPayload();
+        await HandCheck.api(`/api/employer/needs/${activeId}`, {
           method: "PUT",
-          body: JSON.stringify({
-            title: document.getElementById("title").value,
-            domainText: document.getElementById("domain").value,
-          }),
+          body: JSON.stringify(body),
         });
         HandCheck.toast("Потребность сохранена", "success");
-        location.reload();
+        await loadNeedForm();
       };
     </script>
   </body>

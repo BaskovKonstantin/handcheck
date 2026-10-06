@@ -1207,13 +1207,14 @@ body.has-cabinet-chrome main {
   }
 
   .cabinet-aside {
-    display: block;
+    display: flex;
+    flex-direction: column;
     position: fixed;
     left: 0;
     top: 0;
     bottom: 0;
     width: 15rem;
-    padding: 5.5rem 0.75rem 1.5rem;
+    padding: 1.15rem 0.75rem 1rem;
     border-right: 1px solid var(--line);
     background: var(--card);
     z-index: 10;
@@ -1223,6 +1224,9 @@ body.has-cabinet-chrome main {
     display: flex;
     flex-direction: column;
     gap: 0.15rem;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
   }
 
   .cabinet-aside .cabinet-nav-link {
@@ -2569,6 +2573,87 @@ body.deck-page main.column {
 
 .scope-fieldset .scope-option span {
   color: var(--ink);
+}
+
+label.scope-option,
+label.consent-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+label.scope-option input,
+label.consent-option input {
+  width: auto;
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.integrations-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.integrations-step-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--forest);
+  margin-bottom: 0.35rem;
+}
+
+.integrations-client-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.integrations-client-tabs button {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.integrations-client-tabs button.active {
+  background: var(--forest-soft);
+  border-color: var(--forest);
+  color: var(--forest);
+  font-weight: 600;
+}
+
+.audit-row-main {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.audit-row-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.audit-row-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.stat-tile-value.stat-tile-value-sm {
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+#save:not(:disabled) {
+  opacity: 1;
 }
 
 .copy-row {

@@ -51,14 +51,10 @@ function createInvitation(employerUserId, body, actionSource = "web") {
   const { fields, from, to } = parseSalaryRange(salaryFrom, salaryTo);
   const offer = String(offerText || "").trim();
   const channel = String(contactChannel || "").trim();
-  if (
-    !needId ||
-    !candidateId ||
-    !offer ||
-    !channel ||
-    channel.length > 64 ||
-    Object.keys(fields).length
-  ) {
+  if (!offer) fields.offerText = "Напишите текст приглашения";
+  if (!channel) fields.contactChannel = "Укажите канал связи";
+  else if (channel.length > 64) fields.contactChannel = "Канал связи слишком длинный";
+  if (!needId || !candidateId || Object.keys(fields).length) {
     throw httpError(400, "invalid_body", Object.keys(fields).length ? { fields } : undefined);
   }
   const db = getDb();

@@ -1,6 +1,5 @@
 # HandCheck session
 
-- Branch: cursor/round11-fixes-9805 (round 11 prod fixes after PR #11)
+- Branch: cursor/round16-findings-fixes-16fb (round 16 P0+P1 from FINDINGS.md)
 - Prod: https://handcheck.baski.pro
 - Demo password: demo-demo-demo
-- Round 11 PR screenshots: handcheck-ui/round11/pr/

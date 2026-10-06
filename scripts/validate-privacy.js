@@ -69,7 +69,7 @@ async function main() {
   await annaAgent.post(`/api/candidate/invitations/${invId}/accept`);
 
   const contacts = await cafeAgent.get(`/api/employer/candidates/${annaId}/contacts`);
-  assert.ok(contacts.body.phone && contacts.body.contact_email, "P2 failed");
+  assert.ok(contacts.body.phone && contacts.body.contactEmail, "P2 failed");
   console.log("P2 pass");
 
   const inv2 = newId();

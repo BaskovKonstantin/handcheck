@@ -7,6 +7,7 @@ const { requireRole } = require("../../middleware/require-role");
 const { createInvitation } = require("./actions");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { httpError } = require("../../middleware/errors");
+const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -40,7 +41,7 @@ router.get("/invitations", (req, res) => {
       const item = {
         id: r.id,
         candidateId: r.candidate_user_id,
-        candidateName: r.display_name,
+        candidateName: publicCandidateDisplayName(r.display_name),
         needTitle: r.need_title,
         salaryFrom: r.salary_from,
         salaryTo: r.salary_to,
@@ -83,7 +84,7 @@ router.get("/calls", (req, res) => {
       callStatus: r.call_status || "ready",
       startedAt: dbDateToIso(r.started_at),
       endedAt: dbDateToIso(r.ended_at),
-      candidateName: r.display_name,
+      candidateName: publicCandidateDisplayName(r.display_name),
       needTitle: r.need_title,
       salaryFrom: r.salary_from,
       salaryTo: r.salary_to,

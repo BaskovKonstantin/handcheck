@@ -21,6 +21,13 @@ const ERROR_MESSAGES = {
   invitation_duplicate: "Приглашение уже отправлено — дождитесь ответа кандидата",
   invitation_final: "Ответ на приглашение уже зафиксирован",
   battery_incomplete: "Батарея заданий для выбранной категории пока не готова",
+  email_taken: "Этот email уже зарегистрирован",
+  invalid_code: "Неверный код подтверждения",
+  already_submitted: "Ответ уже отправлен",
+  call_not_live: "Комната звонка ещё не открыта",
+  invalid_recording: "Некорректный файл записи",
+  invalid_availability: "Выберите доступность",
+  candidate_not_in_pool: "Кандидат не подходит под эту потребность",
 };
 
 const API_TIMEOUT_MS = 14000;
@@ -48,6 +55,24 @@ function formatRetakeDateMoscow(iso) {
   });
 }
 
+function formatApiFieldErrors(err) {
+  const fields = err?.data?.details?.fields;
+  return fields && typeof fields === "object" ? fields : {};
+}
+
+function applyFieldErrors(root, fieldMap, err) {
+  const fields = { ...fieldMap, ...formatApiFieldErrors(err) };
+  if (!root) return fields;
+  Object.entries(fields).forEach(([key, message]) => {
+    const el = root.querySelector(`[data-field-error="${key}"], #${key}-err, #err-${key}`);
+    if (el) {
+      el.hidden = false;
+      el.textContent = message;
+    }
+  });
+  return fields;
+}
+
 function formatApiError(err) {
   const code = err?.data?.error || err?.message;
   const fields = err?.data?.details?.fields;
@@ -62,6 +87,10 @@ function formatApiError(err) {
   if (fields?.offerText) return fields.offerText;
   if (fields?.contactChannel) return fields.contactChannel;
   if (fields?.tokenName) return fields.tokenName;
+  if (fields) {
+    const first = Object.values(fields).find((v) => v && String(v).trim());
+    if (first) return first;
+  }
   if (err?.status === 413 || code === "file_too_large") {
     return ERROR_MESSAGES.file_too_large;
   }
@@ -222,17 +251,34 @@ function persistEmployerNeedId(needId) {
   }
 }
 
+function needSwitcherOptionLabel(n) {
+  const esc = escapeHtml;
+  const spec = n.specialization ? ` · ${n.specialization}` : "";
+  const grade = n.grade ? ` ${n.grade}` : "";
+  const inactive = n.active ? "" : " (неактивна)";
+  return `${esc(n.title || "Без названия")}${esc(spec)}${esc(grade)}${inactive}`;
+}
+
 function employerNeedSwitcherHtml(needs, selectedId) {
   const esc = escapeHtml;
+  const selected = needs.find((n) => n.id === selectedId);
   const active = needs.filter((n) => n.active);
-  const pool = active.length ? active : needs;
-  const options = pool
+  const pool = [...active];
+  if (selected && !selected.active && !pool.some((n) => n.id === selected.id)) {
+    pool.push(selected);
+  }
+  const list = pool.length ? pool : needs;
+  const options = list
     .map(
       (n) =>
-        `<option value="${n.id}"${n.id === selectedId ? " selected" : ""}>${esc(n.title || "Без названия")}</option>`
+        `<option value="${esc(n.id)}"${n.id === selectedId ? " selected" : ""}>${needSwitcherOptionLabel(n)}</option>`
     )
     .join("");
-  return `<div class="need-switcher-bar"><label class="form-label need-switcher">Потребность
+  const banner =
+    selected && !selected.active
+      ? `<p class="need-inactive-banner invite-meta">Потребность неактивна — кандидаты не увидят её в подборе, но вы можете просматривать списки.</p>`
+      : "";
+  return `${banner}<div class="need-switcher-bar"><label class="form-label need-switcher">Потребность
     <select id="employer-need-switch">${options}</select></label></div>`;
 }
 
@@ -255,14 +301,11 @@ function joinMetaParts(parts) {
 }
 
 function renderAiUsageSection(aiUsage, { compact = false } = {}) {
-  if (!aiUsage) return "";
+  if (!aiUsage || aiUsage.empty) return "";
   const esc = escapeHtml;
   const lines = aiUsage.activityLines || [];
   const hasData = Boolean(aiUsage.headline) || lines.length > 0;
-  if (!hasData) {
-    if (compact) return `<span class="chip chip-muted">ИИ-клиенты не использовались</span>`;
-    return "";
-  }
+  if (!hasData) return "";
   if (compact) {
     return `<p class="invite-meta">${esc(aiUsage.headline)}</p>`;
   }
@@ -490,10 +533,10 @@ function isStaleCabinetPageLoad(seq) {
 }
 
 function timelineSection(title, items) {
-  if (!items?.length) {
-    return `<section class="timeline-section"><h2 class="timeline-heading">${title}</h2><p class="invite-meta">Пока ничего нового — держите профиль открытым и проверяйте приглашения.</p></section>`;
-  }
   const esc = escapeHtml;
+  if (!items?.length) {
+    return `<section class="timeline-section"><h2 class="timeline-heading">${esc(title)}</h2><p class="invite-meta">Пока ничего нового — держите профиль открытым и проверяйте приглашения.</p></section>`;
+  }
   const rows = items
     .map(
       (it) => `<li class="timeline-item">
@@ -506,17 +549,22 @@ function timelineSection(title, items) {
       </li>`
     )
     .join("");
-  return `<section class="timeline-section"><h2 class="timeline-heading">${title}</h2><ol class="timeline-list">${rows}</ol></section>`;
+  return `<section class="timeline-section"><h2 class="timeline-heading">${esc(title)}</h2><ol class="timeline-list">${rows}</ol></section>`;
 }
 
 function statTilesHtml(tiles) {
+  const esc = escapeHtml;
   return `<div class="stat-tile-grid">${tiles
     .map(
-      (t) => `<article class="stat-tile stat-tile-${t.variant || "forest"}">
-      <div class="stat-tile-label">${t.icon || ""}${t.label}</div>
-      <div class="stat-tile-value">${t.value}</div>
-      ${t.hint ? `<p class="invite-meta">${t.hint}</p>` : ""}
-      ${t.link ? `<a class="btn-ghost btn-sm" href="${t.link.href}">${t.link.label}</a>` : ""}
+      (t) => `<article class="stat-tile stat-tile-${esc(t.variant || "forest")}">
+      <div class="stat-tile-label">${t.icon || ""}${esc(t.label)}</div>
+      <div class="stat-tile-value">${esc(t.value)}</div>
+      ${t.hint ? `<p class="invite-meta">${esc(t.hint)}</p>` : ""}
+      ${
+        t.link
+          ? `<a class="btn-ghost btn-sm" href="${esc(t.link.href)}">${esc(t.link.label)}</a>`
+          : ""
+      }
     </article>`
     )
     .join("")}</div>`;
@@ -717,6 +765,8 @@ function initials(name) {
 window.HandCheck = {
   api,
   formatApiError,
+  formatApiFieldErrors,
+  applyFieldErrors,
   candidateNav,
   employerNav,
   bootCabinetPage,

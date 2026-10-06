@@ -109,7 +109,7 @@
               </div>
               <p class="invite-meta" style="margin-top:0">${esc(c.needTitle || "")}</p>
               <p class="salary-hero salary-hero-sm">${salary}</p>
-              <a class="btn-primary btn-sm" href="${esc(c.roomUrl)}">Комната</a>
+              <a class="btn-primary btn-sm" href="${esc(c.roomUrl)}">${c.callStatus === "ended" ? "Итог" : "Комната"}</a>
               ${analysisBlock}
             </article>`);
           }

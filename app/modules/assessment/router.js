@@ -20,6 +20,7 @@ const {
   WORK_DEADLINE_MS,
 } = require("./service");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
+const { validateAnswerText } = require("../../lib/assessment-answer");
 
 const router = express.Router();
 
@@ -117,10 +118,12 @@ router.patch("/tasks/:attemptId/draft", (req, res, next) => {
 
 router.post("/tasks/:attemptId/submit", (req, res, next) => {
   try {
-    const text = String(req.body?.answerText || "");
     const db = getDb();
     const a = loadAttemptForSubmit(req.params.attemptId, req.user.id);
     assertAttemptMutable(a);
+    const parsed = validateAnswerText(req.body?.answerText, a.type);
+    if (!parsed.ok) throw httpError(400, "invalid_body", { fields: parsed.fields });
+    const text = parsed.value;
     if (a.type === "work") {
       const opened = new Date(a.opened_at).getTime();
       if (Date.now() > opened + WORK_DEADLINE_MS) throw httpError(409, "deadline_passed");

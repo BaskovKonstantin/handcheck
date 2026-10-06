@@ -1,5 +1,5 @@
 # HandCheck session
 
-- Branch: cursor/round16-findings-fixes-16fb (round 16 P0+P1 from FINDINGS.md)
+- Branch: cursor/round22-findings-fixes-797b (round 22 P0–P2 from FINDINGS)
 - Prod: https://handcheck.baski.pro
 - Demo password: demo-demo-demo

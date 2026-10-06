@@ -5,6 +5,7 @@ const { newId } = require("../../lib/ids");
 const { httpError } = require("../../middleware/errors");
 
 const { parseSalaryRange } = require("../../lib/salary-range");
+const { assertCandidateInNeedPool } = require("../../lib/invitation-pool");
 
 function findActiveInvitation(db, needId, candidateId) {
   return db
@@ -39,6 +40,15 @@ function createInvitation(employerUserId, body, actionSource = "web") {
     .prepare("SELECT * FROM employer_needs WHERE id = ? AND employer_user_id = ?")
     .get(needId, employerUserId);
   if (!need) throw httpError(404, "not_found");
+  const company = db
+    .prepare("SELECT company_name FROM employer_profiles WHERE user_id = ?")
+    .get(employerUserId);
+  if (!String(company?.company_name || "").trim()) {
+    throw httpError(400, "invalid_body", {
+      fields: { companyName: "Заполните профиль компании" },
+    });
+  }
+  assertCandidateInNeedPool(employerUserId, need, candidateId);
   const avail = db
     .prepare("SELECT availability FROM candidate_profiles WHERE user_id = ?")
     .get(candidateId);

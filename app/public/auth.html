@@ -124,7 +124,7 @@
         tabRegister.setAttribute("aria-selected", !isLogin ? "true" : "false");
         roleWrap.hidden = isLogin;
         primaryBtn.textContent = isLogin ? "Войти" : "Зарегистрироваться";
-        confirmBlock.hidden = isLogin;
+        confirmBlock.hidden = true;
         err.hidden = true;
         document.getElementById("password").autocomplete = isLogin ? "current-password" : "new-password";
       }
@@ -176,15 +176,24 @@
       document.getElementById("confirm").onclick = async () => {
         err.hidden = true;
         try {
+          const email = document.getElementById("email").value.trim();
           await HandCheck.api("/api/auth/confirm", {
             method: "POST",
             body: JSON.stringify({
-              email: document.getElementById("email").value,
+              email,
               code: document.getElementById("code").value,
             }),
           });
-          setMode("login");
-          showErr("Email подтверждён — нажмите «Войти».", true);
+          const loginRes = await HandCheck.api("/api/auth/login", {
+            method: "POST",
+            body: JSON.stringify({
+              email,
+              password: document.getElementById("password").value,
+            }),
+          });
+          cacheEmail(loginRes.user?.email || email);
+          location.href =
+            loginRes.user?.role === "employer" ? "/employer/deck" : "/candidate/today";
         } catch (e) {
           showErr(HandCheck.formatApiError(e));
         }

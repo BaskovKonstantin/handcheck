@@ -131,7 +131,7 @@ function renderCard(data) {
       <ul class="deck-phrases">${phrases}</ul>
       ${
         explainLines
-          ? `<div class="deck-explain"><svg class="inline-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 3a1 1 0 1 1-1 1 1 1 0 0 1 1-1zm2 8H6v-1h1V8H6V7h3v4h1v1z" fill="currentColor"/></svg><ul class="deck-explain-lines">${explainLines}</ul></div>`
+          ? `<div class="deck-explain"><svg class="inline-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 3a1 1 0 1 1-1 1 1 1 0 0 1 1-1zm2 8H6v-1h1V8H6V7h3v4h1v1z" fill="currentColor"/></svg><ul class="deck-explain-lines deck-explain-lines-plain">${explainLines}</ul></div>`
           : ""
       }
       ${(() => {

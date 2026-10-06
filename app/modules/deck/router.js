@@ -9,6 +9,7 @@ const { httpError } = require("../../middleware/errors");
 const { loadCandidatesForNeed, applyFilters } = require("../matching/pool");
 const { employerCandidateView } = require("../../lib/privacy");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
+const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -48,9 +49,12 @@ router.post("/needs/:id/reviews", (req, res, next) => {
   if (!need) return next(httpError(404, "not_found"));
   const decision = req.body?.decision;
   const candidateId = req.body?.candidateId;
-  if (!["rejected", "later"].includes(decision) || !candidateId) {
-    return next(httpError(400, "invalid_body"));
+  const fields = {};
+  if (!candidateId) fields.candidateId = "Укажите кандидата";
+  if (!["rejected", "later"].includes(decision)) {
+    fields.decision = "Решение должно быть «Отложить» или «Отказать»";
   }
+  if (Object.keys(fields).length) return next(httpError(400, "invalid_body", { fields }));
   const now = new Date().toISOString();
   getDb()
     .prepare(
@@ -96,7 +100,7 @@ router.get("/needs/:id/deferred", (req, res, next) => {
   res.json({
     items: rows.map((r) => ({
       candidateId: r.candidate_user_id,
-      displayName: r.display_name,
+      displayName: publicCandidateDisplayName(r.display_name),
       categoryLabel: r.label,
     })),
   });

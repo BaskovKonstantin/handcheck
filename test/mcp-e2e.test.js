@@ -219,8 +219,7 @@ describe("MCP e2e", () => {
     );
     assert.ok(employerMayViewCandidateAiUsage(cafeId, demo5Id));
     const poolSummary = summarizeAiUsageForEmployer(cafeId, demo5Id);
-    assert.ok(poolSummary);
-    assert.match(poolSummary.headline, /Пока нет записей/i);
+    assert.equal(poolSummary, null);
     const needId = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafeId).id;
     db.prepare(
       `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)

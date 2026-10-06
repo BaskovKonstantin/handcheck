@@ -77,16 +77,22 @@
       }
 
       function paintForm(n) {
+        const specGrade = (item) => {
+          const s = item.specialization || "backend";
+          const g = item.grade || "middle";
+          const inactive = item.active ? "" : " (неактивна)";
+          return ` · ${s} ${g}${inactive}`;
+        };
         const options = needs
           .map(
             (item) =>
-              `<option value="${item.id}"${item.id === n.id ? " selected" : ""}>${HandCheck.escapeHtml(item.title || "Без названия")}</option>`
+              `<option value="${item.id}"${item.id === n.id ? " selected" : ""}>${HandCheck.escapeHtml(item.title || "Без названия")}${HandCheck.escapeHtml(specGrade(item))}</option>`
           )
           .join("");
         const stackStr = (n.stack || []).join(", ");
         formEl.innerHTML = `
           <div class="form-actions need-toolbar" style="margin-bottom:1rem">
-            <label class="form-label need-select-wrap">Активная потребность
+            <label class="form-label need-select-wrap">Выбранная потребность
               <select id="need-select">${options}</select>
             </label>
             <button type="button" class="btn-ghost need-create-btn" id="create-need">Создать потребность</button>
@@ -163,6 +169,9 @@
             needs = d.items || [];
             activeId = res.id;
             HandCheck.persistEmployerNeedId(activeId);
+            const p = new URLSearchParams(location.search);
+            p.set("need", activeId);
+            history.replaceState({}, "", `${location.pathname}?${p.toString()}`);
             const picked = needs.find((x) => x.id === activeId) || needs[0];
             paintTiles(picked);
             paintForm(picked);
@@ -225,12 +234,16 @@
       HandCheck.bootCabinetPage("employer", () => loadNeedForm());
       saveBtn.onclick = async () => {
         const body = currentPayload();
-        await HandCheck.api(`/api/employer/needs/${activeId}`, {
-          method: "PUT",
-          body: JSON.stringify(body),
-        });
-        HandCheck.toast("Потребность сохранена", "success");
-        await loadNeedForm();
+        try {
+          await HandCheck.api(`/api/employer/needs/${activeId}`, {
+            method: "PUT",
+            body: JSON.stringify(body),
+          });
+          HandCheck.toast("Потребность сохранена", "success");
+          await loadNeedForm();
+        } catch (e) {
+          HandCheck.toast(HandCheck.formatApiError(e), "error");
+        }
       };
     </script>
   </body>

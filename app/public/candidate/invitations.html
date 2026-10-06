@@ -41,6 +41,14 @@
               i.status === "accepted"
                 ? `<div class="contacts-block"><strong>Контакты компании</strong><br>Email: ${esc(i.employerContactEmail || "—")}<br>Канал: ${esc(i.contactChannel || "—")}</div>`
                 : "";
+            const dateStr = i.createdAt
+              ? new Date(i.createdAt).toLocaleDateString("ru-RU", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : "";
+            const needLine = [i.needTitle, i.needCategory].filter(Boolean).join(" · ");
             const actions =
               i.status === "sent" || i.status === "viewed"
                 ? `<div class="invite-actions">
@@ -48,14 +56,19 @@
                 <button class="btn-ghost" data-id="${esc(i.id)}" data-a="decline">Отклонить</button>
               </div>`
                 : i.status === "accepted"
-                  ? `<a class="btn-primary" href="/call/${esc(i.id)}">Перейти к звонку</a>`
+                  ? i.callStatus === "ended"
+                    ? `<a class="btn-primary" href="/call/${esc(i.id)}">Итог звонка</a>`
+                    : `<a class="btn-primary" href="/call/${esc(i.id)}">Перейти к звонку</a>`
                   : "";
             const stCls = HandCheck.invitationStatusClass(i.status);
+            const companyTitle = esc(i.companyName || "Компания");
             return `<article class="invite-card invite-card-expressive">
               <div class="invite-card-top">
-                <h3>${esc(i.companyName)}</h3>
+                <h3>${companyTitle}</h3>
                 <span class="status-pill ${stCls}">${HandCheck.invitationStatusLabel(i.status)}</span>
               </div>
+              ${needLine ? `<p class="invite-meta invite-need-line">${esc(needLine)}</p>` : ""}
+              ${dateStr ? `<p class="invite-meta">${esc(dateStr)}</p>` : ""}
               <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
               <p class="invite-offer-text">${esc(i.offerText || "")}</p>${contacts}${actions}</article>`;
           })

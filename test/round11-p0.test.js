@@ -178,9 +178,11 @@ describe("round 11 P0 fixes", () => {
     const battery = await agent.get("/api/assessment/battery/current");
     assert.ok(battery.body.battery);
     for (const step of battery.body.battery.attempts) {
-      await agent.post(`/api/assessment/tasks/${step.id}/submit`).send({
-        answerText: "короткий ответ без нужных тем",
-      });
+      const task = await agent.get(`/api/assessment/tasks/${step.id}`);
+      const base = "короткий ответ без нужных тем";
+      const answerText =
+        task.body.type === "work" ? `${base} ${"подробнее ".repeat(8)}` : base;
+      await agent.post(`/api/assessment/tasks/${step.id}/submit`).send({ answerText });
     }
     const cat = await agent.get("/api/candidate/category");
     assert.equal(cat.body.label, null);

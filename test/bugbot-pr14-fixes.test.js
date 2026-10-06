@@ -52,10 +52,12 @@ async function completeBattery(agent, specialization, grade, mode) {
   const battery = await agent.get("/api/assessment/battery/current");
   assert.ok(battery.body.battery, "expected active battery");
   for (const a of battery.body.battery.attempts) {
+    const task = await agent.get(`/api/assessment/tasks/${a.id}`);
     let answerText = "не знаю";
     if (mode === "pass") {
-      const task = await agent.get(`/api/assessment/tasks/${a.id}`);
       answerText = task.body.type === "work" ? answers.workAnswer : answers.quickAnswer;
+    } else if (task.body.type === "work") {
+      answerText = `${"не знаю ".repeat(12)}`;
     }
     await agent.post(`/api/assessment/tasks/${a.id}/submit`).send({ answerText });
   }

@@ -52,8 +52,9 @@ function attachSignaling(server) {
       }
       set.add(ws);
       ws.on("message", (data) => {
+        const text = Buffer.isBuffer(data) ? data.toString("utf8") : String(data);
         for (const peer of set) {
-          if (peer !== ws && peer.readyState === 1) peer.send(data);
+          if (peer !== ws && peer.readyState === 1) peer.send(text);
         }
       });
       ws.on("close", () => {

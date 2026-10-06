@@ -51,13 +51,17 @@
     let pollTimer = null;
     let ended = false;
 
+    let recordingHasData = false;
+    let transcriptWarn = "";
+
     function emit(patch) {
       if (typeof onState === "function") {
         onState({
           peerConnected: Boolean(remoteStream?.getTracks?.().some((t) => t.readyState === "live")),
-          recording: Boolean(recorder && recorder.state === "recording"),
+          recording: Boolean(recorder && recorder.state === "recording" && recordingHasData),
           speechAvailable: Boolean(speech),
           speechNote: speechNoteShown ? "Расшифровка недоступна в этом браузере" : "",
+          transcriptWarn,
           ...patch,
         });
       }
@@ -125,8 +129,16 @@
     async function connectSignaling() {
       if (ws) return;
       ws = new WebSocket(wsUrl(callId));
-      ws.onmessage = (ev) => {
-        const msg = parseSignal(ev.data);
+      ws.onmessage = async (ev) => {
+        let raw = ev.data;
+        if (typeof Blob !== "undefined" && raw instanceof Blob) {
+          raw = await raw.text();
+        } else if (raw instanceof ArrayBuffer) {
+          raw = new TextDecoder().decode(raw);
+        } else if (typeof raw !== "string") {
+          raw = String(raw);
+        }
+        const msg = parseSignal(raw);
         if (msg) handleSignal(msg);
       };
       ws.onopen = async () => {
@@ -165,10 +177,16 @@
           HandCheck.api(`/api/calls/${callId}/transcript-chunk`, {
             method: "POST",
             body: JSON.stringify({ text }),
-          }).catch(() => {});
+          }).catch(() => {
+            transcriptWarn = "Не удалось сохранить реплику — проверьте соединение";
+            emit({});
+          });
         }
       };
-      speech.onerror = () => {};
+      speech.onerror = () => {
+        speechNoteShown = true;
+        emit({});
+      };
       try {
         speech.start();
       } catch {
@@ -187,10 +205,16 @@
       recorderChunks = [];
       recorder = new MediaRecorder(stream, { mimeType: mime });
       recorder.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size > 0) recorderChunks.push(ev.data);
+        if (ev.data && ev.data.size > 0) {
+          recorderChunks.push(ev.data);
+          if (!recordingHasData) {
+            recordingHasData = true;
+            emit({ recording: true });
+          }
+        }
       };
       recorder.start(1000);
-      emit({ recording: true });
+      emit({ recording: false });
     }
 
     async function uploadRecording() {
@@ -265,7 +289,12 @@
             recorder.stop();
           });
         }
-        await uploadRecording().catch(() => {});
+        try {
+          await uploadRecording();
+        } catch (err) {
+          emit({ recordingUploadError: err?.message || "upload_failed" });
+          throw err;
+        }
         if (ws) {
           ws.close();
           ws = null;

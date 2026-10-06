@@ -501,7 +501,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
             this.state = "recording";
             if (this.ondataavailable) {
               this.ondataavailable({
-                data: new Blob([webmHeader], { type: "video/webm" }),
+                data: new Blob([webmHeader], { type: "video/webm;codecs=vp9,opus" }),
               });
             }
           }
@@ -509,7 +509,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
             this.state = "inactive";
             if (this.ondataavailable) {
               this.ondataavailable({
-                data: new Blob([webmHeader], { type: "video/webm" }),
+                data: new Blob([webmHeader], { type: "video/webm;codecs=vp9,opus" }),
               });
             }
             if (this.onstop) this.onstop();

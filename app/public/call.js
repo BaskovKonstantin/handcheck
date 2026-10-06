@@ -138,14 +138,20 @@ function updateRecordingLabel(state) {
   } else if (state.recordingUnavailable) {
     recLabel.textContent = "Запись недоступна в этом браузере";
     recDot?.classList.remove("live");
+  } else if (state.recordingPreparing) {
+    recLabel.textContent = "Подготовка записи…";
+    recDot?.classList.remove("live");
   } else {
     recLabel.textContent = "Запись выключена";
     recDot?.classList.remove("live");
   }
   const speechNote = document.getElementById("speech-note");
-  if (speechNote && state.speechNote) {
-    speechNote.hidden = false;
-    speechNote.textContent = state.speechNote;
+  if (speechNote) {
+    const note = [state.speechNote, state.transcriptWarn].filter(Boolean).join(" ");
+    if (note) {
+      speechNote.hidden = false;
+      speechNote.textContent = note;
+    }
   }
 }
 
@@ -165,12 +171,12 @@ function updatePeerUi(state) {
   }
 }
 
-function setLivePanel(peerName, consentLocked) {
+function setConnectingPanel(peerName, consentLocked) {
   const title = document.getElementById("panel-title");
   const consent = document.getElementById("consent");
   const consentWrap = document.getElementById("consent-wrap");
   const peerLine = document.getElementById("peer-line");
-  if (title) title.textContent = "В эфире";
+  if (title) title.textContent = "Подключение к собеседнику…";
   if (peerLine && peerName) {
     peerLine.hidden = false;
     peerLine.textContent = `Собеседник: ${peerName}`;
@@ -180,6 +186,26 @@ function setLivePanel(peerName, consentLocked) {
     consent.disabled = true;
     if (consentWrap) consentWrap.style.opacity = "0.85";
   }
+}
+
+function setLivePanel(peerName) {
+  const title = document.getElementById("panel-title");
+  const peerLine = document.getElementById("peer-line");
+  if (title) title.textContent = "В эфире";
+  if (peerLine && peerName) {
+    peerLine.hidden = false;
+    peerLine.textContent = `Собеседник: ${peerName}`;
+  }
+}
+
+let roomPeerName = "";
+let roomLiveUi = false;
+
+function applyLiveUiIfReady(state, peerName) {
+  if (roomLiveUi || !state.peerConnected) return;
+  roomLiveUi = true;
+  setLivePanel(peerName || roomPeerName);
+  setBanner("Эфир — соединение с собеседником установлено", true);
 }
 
 async function handleRemoteEnded() {
@@ -244,8 +270,15 @@ function bindRoomControls(info, me) {
           handleRemoteEnded();
         },
         onState: (state) => {
-          updateRecordingLabel(state);
+          const preparing =
+            !state.recording &&
+            !state.recordingUnavailable &&
+            callSession &&
+            document.getElementById("end") &&
+            !document.getElementById("end").hidden;
+          updateRecordingLabel({ ...state, recordingPreparing: preparing });
           updatePeerUi(state);
+          applyLiveUiIfReady(state, peerName);
           const rs = callSession?.getRemoteStream();
           if (rs && remote && state.peerConnected) {
             if (remote.srcObject !== rs) remote.srcObject = rs;
@@ -258,11 +291,13 @@ function bindRoomControls(info, me) {
       placeholder.hidden = true;
       video.classList.add("live");
 
-      setLivePanel(peerName, true);
+      roomPeerName = peerName;
+      roomLiveUi = false;
+      setConnectingPanel(peerName, true);
       setCallLede(
-        "Разговор в эфире. Запись идёт только пока активен индикатор записи — завершите звонок, когда закончите."
+        "Ожидаем собеседника. Запись начнётся после появления данных — индикатор «Запись активна» включится только при реальной записи."
       );
-      setBanner("Эфир — соединение с собеседником", true);
+      setBanner("Подключение — ждём собеседника в комнате", false);
       join.hidden = true;
       endBtn.hidden = false;
       timerEl.hidden = false;
@@ -276,7 +311,6 @@ function bindRoomControls(info, me) {
       }, 1000);
 
       await callSession.enterLive(invitationId);
-      updateRecordingLabel({ recording: false, recordingUnavailable: false });
     } catch (e) {
       roomErr.hidden = false;
       roomErr.textContent = HandCheck.formatApiError(e);

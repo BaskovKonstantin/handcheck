@@ -343,6 +343,7 @@ router.get("/:id/recording", (req, res, next) => {
   }
   const filePath = path.join(call.recording_path || "", `${side}.webm`);
   if (!fs.existsSync(filePath)) return next(httpError(404, "not_found"));
+  res.type("video/webm");
   res.sendFile(filePath);
 });
 

@@ -156,8 +156,7 @@ function buildActivityLines(calls, stats) {
 
   const startCall = sorted.find((c) => c.tool_name === "start_assessment");
   if (startCall) {
-    const tail = startCall.intent_text ? ` — «${String(startCall.intent_text).slice(0, 120)}»` : "";
-    lines.push(`Начал тест через ИИ-клиент${tail}`);
+    lines.push("Начал тест через ИИ-клиент");
   }
 
   if (quickMcp > 0) {
@@ -193,6 +192,9 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
 
   let calls = [];
   if (window) {
+    const fromSlack = new Date(window.from);
+    fromSlack.setMinutes(fromSlack.getMinutes() - 5);
+    const fromIso = fromSlack.toISOString();
     calls = db
       .prepare(
         `SELECT tool_name, intent_text, created_at FROM mcp_tool_calls
@@ -201,38 +203,42 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
            AND created_at >= ? AND created_at <= ?
          ORDER BY created_at ASC`
       )
-      .all(candidateUserId, window.from, window.to);
+      .all(candidateUserId, fromIso, window.to);
   }
 
-  const sessions = db
+  let sessions = db
     .prepare(
       `SELECT s.client_name, s.client_version, s.last_seen_at, t.client_where
        FROM mcp_client_sessions s
        LEFT JOIN api_tokens t ON t.id = s.api_token_id
        WHERE s.user_id = ?
-       ORDER BY s.last_seen_at DESC LIMIT 5`
+       ORDER BY s.last_seen_at DESC LIMIT 20`
     )
     .all(candidateUserId);
 
-  const clients = [...new Set(sessions.map(formatClientLabel).filter(Boolean))];
+  let inWindowSessions = sessions;
+  let postWindowSessions = [];
+  if (window) {
+    inWindowSessions = sessions.filter(
+      (s) => s.last_seen_at >= window.from && s.last_seen_at <= window.to
+    );
+    postWindowSessions = sessions.filter((s) => s.last_seen_at > window.to);
+  }
+
+  const clients = [...new Set(inWindowSessions.map(formatClientLabel).filter(Boolean))];
+  const postClients = [...new Set(postWindowSessions.map(formatClientLabel).filter(Boolean))];
   const activityLines = buildActivityLines(calls, stats);
   const activityHeadline = activityHeadlineFromBattery(stats);
 
-  if (!clients.length && !activityLines.length && !activityHeadline) {
-    return {
-      headline: "Пока нет записей об использовании ИИ-клиентов для теста.",
-      clients: [],
-      activityLines: [],
-      empty: true,
-    };
+  if (!clients.length && !postClients.length && !activityLines.length && !activityHeadline) {
+    return null;
   }
 
-  const clientPart = clients.length
-    ? `Подключались клиенты: ${clients.join("; ")}.`
-    : activityLines.length || activityHeadline
-      ? "Есть действия через ИИ-клиент, но без сохранённого имени клиента."
-      : "";
-  const headline = [clientPart, activityHeadline].filter(Boolean).join(" ");
+  const clientPart = clients.length ? `Подключались клиенты: ${clients.join("; ")}.` : "";
+  const postPart = postClients.length
+    ? `Подключал ИИ-клиент после теста: ${postClients.join("; ")}.`
+    : "";
+  const headline = [clientPart, activityHeadline, postPart].filter(Boolean).join(" ");
 
   return {
     headline,

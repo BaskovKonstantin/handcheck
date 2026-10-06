@@ -14,7 +14,7 @@
         <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
         <div class="cabinet-page-hero-inner">
           <h1>Профиль</h1>
-          <p class="lede">Имя, контакты и эпизоды опыта влияют на подбор. Оценки и рейтинги нигде не показываются.</p>
+          <p class="lede">Имя и эпизоды опыта влияют на подбор. Оценки и рейтинги нигде не показываются.</p>
         </div>
       </header>
       <div id="main"></div>
@@ -42,7 +42,7 @@
             <label>Доступность
               <select id="availability">
                 <option value="open" ${profile.availability === "open" ? "selected" : ""}>Открыт к приглашениям</option>
-                <option value="paused" ${profile.availability === "paused" ? "selected" : ""}>Пауза (новые инвайты не приходят)</option>
+                <option value="paused" ${profile.availability === "paused" ? "selected" : ""}>Пауза (новые приглашения не приходят)</option>
               </select>
             </label>
             <p class="field-error" id="prof-err" hidden></p>
@@ -58,7 +58,7 @@
                   `<div class="episode-item" data-id="${esc(e.id)}"><strong>${esc(e.roleTitle)}</strong> · ${esc(e.industry)}<br><span class="invite-meta">${esc(e.domain)}</span>
                   <button type="button" class="btn-ghost btn-sm del-ep" data-id="${e.id}">Удалить</button></div>`
               )
-              .join("") || '<p class="invite-meta">Пока нет эпизодов — добавьте хотя бы один для доменного совпадения.</p>'}</div>
+              .join("") || '<p class="invite-meta">Пока нет эпизодов — добавьте хотя бы один, чтобы работодатели видели ваш опыт в отрасли.</p>'}</div>
             <label>Роль <input id="ep-role" /></label>
             <label>Домен <input id="ep-domain" /></label>
             <label>Отрасль <input id="ep-industry" /></label>

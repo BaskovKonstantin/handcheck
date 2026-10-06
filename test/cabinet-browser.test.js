@@ -380,6 +380,73 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     assert.match(src, /\/start[\s\S]*setCallLede/);
   });
 
+  it("round22: employer need stat tile escapes stack XSS", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    const needs = await page.evaluate(async () => {
+      const r = await fetch("/api/employer/needs", { credentials: "include" });
+      return (await r.json()).items;
+    });
+    const needId = needs[0].id;
+    const payload = '<img src=x onerror="document.title=\'x22\'">';
+    await page.evaluate(
+      async ({ id, stack }) => {
+        await fetch(`/api/employer/needs/${id}`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stack }),
+        });
+      },
+      { id: needId, stack: ["Node.js", payload] }
+    );
+    await page.goto(`${BASE}/employer/need?need=${needId}`, { waitUntil: "commit" });
+    await page.waitForSelector(".stat-tile-value");
+    const title = await page.title();
+    assert.notEqual(title, "x22");
+    const html = await page.locator(".stat-tile-value").nth(2).innerHTML();
+    assert.ok(!html.includes("<img"));
+    await context.close();
+  });
+
+  it("round22: auth register shows password length error", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/auth?mode=register`, { waitUntil: "commit" });
+    await page.click("#tab-register");
+    await page.fill("#email", `r22pw-${Date.now()}@demo.local`);
+    await page.fill("#password", "short");
+    await page.click("#primary-action", { force: true });
+    await page.waitForSelector("#err:not([hidden])");
+    const err = await page.locator("#err").textContent();
+    assert.match(err, /8 символов/);
+    await context.close();
+  });
+
+  it("round22: tasks empty submit shows validation error", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+    db.prepare(
+      "UPDATE batteries SET completed_at = datetime('now') WHERE candidate_user_id = ? AND completed_at IS NULL"
+    ).run(boris.id);
+    db.close();
+    await login(page, "boris@demo.local");
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit" });
+    await page.click("#start", { force: true });
+    await page.waitForSelector("#submit");
+    await page.fill("#answer", "   ");
+    await page.click("#submit", { force: true });
+    await page.waitForSelector("#err:not([hidden])");
+    const err = await page.locator("#err").textContent();
+    assert.match(err, /Напишите ответ/i);
+    await context.close();
+  });
+
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

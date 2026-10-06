@@ -6,6 +6,7 @@ const { buildTaskPhrases } = require("../../lib/task-phrases");
 const { buildExplanation } = require("./explain");
 const { buildIntegrationNoteForBattery } = require("../../lib/ai-usage-summary");
 const { stackMatchesFilter } = require("../../lib/stack-normalize");
+const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
 
 function loadCandidatesForNeed(need, employerUserId, options = {}) {
   const forDeck = options.forDeck === true;
@@ -36,7 +37,15 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
         `SELECT decision FROM need_reviews WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?`
       )
       .get(employerUserId, need.id, r.user_id);
-    const decision = rejected?.decision;
+    let decision = rejected?.decision;
+    const lastInv = db
+      .prepare(
+        `SELECT status FROM invitations
+         WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?
+         ORDER BY created_at DESC LIMIT 1`
+      )
+      .get(employerUserId, need.id, r.user_id);
+    if (lastInv?.status === "declined") decision = "declined";
     if (decision === "rejected") continue;
     if (decision === "later") continue;
     if (forDeck && decision === "invited") continue;
@@ -88,7 +97,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
     out.push({
       id: r.user_id,
       reviewDecision: decision || null,
-      displayName: r.display_name,
+      displayName: publicCandidateDisplayName(r.display_name),
       categoryLabel: r.category_label,
       stack: JSON.parse(r.stack_json || "[]"),
       phone: r.phone,
@@ -148,6 +157,7 @@ function publicMatchShape(c) {
     integrationNote: c.integrationNote,
   };
   if (c.reviewDecision === "invited") row.reviewStatus = "invited";
+  else if (c.reviewDecision === "declined") row.reviewStatus = "declined";
   else if (c.reviewDecision === "later") row.reviewStatus = "later";
   else if (c.reviewDecision === "rejected") row.reviewStatus = "rejected";
   return row;

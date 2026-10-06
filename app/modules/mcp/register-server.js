@@ -205,7 +205,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
         description: "Принять или отклонить приглашение.",
         ...writeToolExtra(z, {
           invitationId: z.string(),
-          decision: z.enum(["accept", "decline"]),
+          decision: z.string(),
         }),
       },
       wrapTool(ctx, "respond_invitation", true, (args) =>
@@ -240,7 +240,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
         ...writeToolExtra(z, {
           title: z.string(),
           specialization: z.string().optional(),
-          grade: z.enum(["junior", "middle", "senior"]).optional(),
+          grade: z.string().optional(),
           stack: z.array(z.string()).optional(),
           domainText: z.string().optional(),
           notes: z.string().optional(),
@@ -259,7 +259,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
             needId: z.string(),
             title: z.string().optional(),
             specialization: z.string().optional(),
-            grade: z.enum(["junior", "middle", "senior"]).optional(),
+            grade: z.string().optional(),
             stack: z.array(z.string()).optional(),
             domainText: z.string().optional(),
             notes: z.string().optional(),
@@ -293,7 +293,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
         ...writeToolExtra(z, {
           needId: z.string(),
           candidateId: z.string(),
-          decision: z.enum(["reject", "later", "invite"]),
+          decision: z.string(),
           salaryFrom: z.number().int().optional(),
           salaryTo: z.number().int().optional(),
           offerText: z.string().optional(),

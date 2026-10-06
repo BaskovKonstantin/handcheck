@@ -7,6 +7,14 @@ const TITLE_MAX = 120;
 const DOMAIN_MAX = 1000;
 const STACK_MAX_ITEMS = 20;
 const STACK_ITEM_MAX = 40;
+const NOTES_MAX = 2000;
+
+function parseActiveFlag(value) {
+  if (value === undefined) return undefined;
+  if (value === true || value === 1 || value === "1" || value === "true") return true;
+  if (value === false || value === 0 || value === "0" || value === "false") return false;
+  return null;
+}
 
 function normalizeStackInput(stack) {
   if (stack === undefined || stack === null) return { stack: undefined, fields: {} };
@@ -80,14 +88,24 @@ function validateNeedBody(body, { requireTitle = true } = {}) {
   const stackNorm = normalizeStackInput(b.stack);
   Object.assign(fields, stackNorm.fields);
 
+  let notes = b.notes !== undefined ? String(b.notes || "") : undefined;
+  if (notes !== undefined && notes.length > NOTES_MAX) {
+    fields.notes = `Заметки — не длиннее ${NOTES_MAX} символов`;
+  }
+
+  let active = parseActiveFlag(b.active);
+  if (b.active !== undefined && active === null) {
+    fields.active = "Укажите, активна ли потребность (да или нет)";
+  }
+
   const value = {
     title,
     specialization,
     grade,
     domainText,
     stack: stackNorm.stack,
-    notes: b.notes !== undefined ? String(b.notes || "") : undefined,
-    active: b.active,
+    notes,
+    active: active === undefined ? undefined : active,
   };
 
   return { ok: Object.keys(fields).length === 0, fields, value };
@@ -96,6 +114,8 @@ function validateNeedBody(body, { requireTitle = true } = {}) {
 module.exports = {
   validateNeedBody,
   normalizeStackInput,
+  parseActiveFlag,
   VALID_SPECIALIZATIONS,
   VALID_GRADES,
+  NOTES_MAX,
 };

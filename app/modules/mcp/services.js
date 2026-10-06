@@ -23,6 +23,8 @@ const {
   validateOptionalPhone,
 } = require("../../lib/validation");
 const { validateNeedBody } = require("../../lib/need-validation");
+const { validateAnswerText } = require("../../lib/assessment-answer");
+const { dbDateToIso } = require("../../lib/db-datetime");
 
 function mcpError(message, code = "invalid_request") {
   const err = new Error(message);
@@ -42,6 +44,7 @@ function httpErrToMcp(err) {
     candidate_paused: "Кандидат на паузе — новые приглашения не отправляются",
     candidate_rejected: "Кандидат отклонён по этой потребности",
     candidate_deferred: "Кандидат в отложенных",
+    candidate_not_in_pool: "Кандидат не подходит под эту потребность",
   };
   throw mcpError(map[err.code] || err.message || "Ошибка запроса", err.code || "invalid_request");
 }
@@ -217,7 +220,9 @@ function submitAttemptAnswer(userId, attemptId, answerText, actionSource = "web"
       throw mcpError("Время на рабочее задание истекло", "deadline_passed");
     }
   }
-  const text = String(answerText || "");
+  const parsed = validateAnswerText(answerText, a.type);
+  if (!parsed.ok) throw mcpError(parsed.fields.answerText, "invalid_body");
+  const text = parsed.value;
   const rubric = JSON.parse(a.rubric_json);
   const scores = a.type === "quick" ? scoreQuick(text, rubric) : scoreWork(text, rubric);
   const now = new Date().toISOString();
@@ -253,13 +258,17 @@ function listCandidateInvitations(userId) {
     offerText: r.offer_text,
     status: r.status,
     companyName: r.company_name,
-    createdAt: r.created_at,
+    createdAt: dbDateToIso(r.created_at),
   }));
 }
 
 function respondInvitation(userId, invitationId, decision) {
+  const d = String(decision || "").trim().toLowerCase();
+  if (!["accept", "decline"].includes(d)) {
+    throw mcpError("Решение должно быть accept или decline", "invalid_body");
+  }
   try {
-    return respondToInvitation(userId, invitationId, decision, "mcp");
+    return respondToInvitation(userId, invitationId, d === "accept" ? "accept" : "decline", "mcp");
   } catch (e) {
     httpErrToMcp(e);
   }
@@ -403,9 +412,12 @@ function decideCandidate(userId, needId, payload, actionSource = "web") {
     .prepare("SELECT * FROM employer_needs WHERE id = ? AND employer_user_id = ?")
     .get(needId, userId);
   if (!need) throw mcpError("Потребность не найдена", "not_found");
-  const decision = payload.decision;
+  const decision = String(payload.decision || "").trim().toLowerCase();
   const candidateId = payload.candidateId;
   if (!candidateId) throw mcpError("Укажите candidateId");
+  if (!["reject", "later", "invite"].includes(decision)) {
+    throw mcpError("Решение должно быть reject, later или invite", "invalid_body");
+  }
 
   if (decision === "reject" || decision === "later") {
     const mapped = decision === "reject" ? "rejected" : "later";
@@ -467,7 +479,7 @@ function listEmployerInvitations(userId) {
     salaryTo: r.salary_to,
     status: r.status,
     viaAiClient: r.action_source === "mcp",
-    createdAt: r.created_at,
+    createdAt: dbDateToIso(r.created_at),
   }));
 }
 

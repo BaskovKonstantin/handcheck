@@ -183,24 +183,36 @@
         panel.innerHTML = `
           ${batteryStepIndicator(stepIndex, 5)}
           <p class="invite-meta">${cur.battery.specialization} · ${cur.battery.claimedGrade} · форма ${cur.battery.formKey}</p>
-          <p>${t.prompt}</p>
-          <textarea id="answer" rows="8">${restored}</textarea>
+          <p>${HandCheck.escapeHtml(t.prompt)}</p>
+          <textarea id="answer" rows="8">${HandCheck.escapeHtml(restored)}</textarea>
           <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
           <button class="btn-primary" id="submit">Отправить ответ</button>
           <p class="field-error" id="err" hidden></p>`;
         if (restored) document.getElementById("draft-note").hidden = false;
         const ta = document.getElementById("answer");
+        let submitting = false;
         ta.addEventListener("blur", async () => {
+          if (submitting) return;
           const text = ta.value;
           localStorage.setItem(draftKey, JSON.stringify({ text, at: Date.now() }));
-          await HandCheck.api(`/api/assessment/tasks/${attemptId}/draft`, {
-            method: "PATCH",
-            body: JSON.stringify({ answerText: text }),
-          });
+          try {
+            await HandCheck.api(`/api/assessment/tasks/${attemptId}/draft`, {
+              method: "PATCH",
+              body: JSON.stringify({ answerText: text }),
+            });
+          } catch {
+            /* ignore draft race after submit */
+          }
         });
         document.getElementById("submit").onclick = async () => {
           const err = document.getElementById("err");
           err.hidden = true;
+          const attemptsLeft = attempts.filter((a) => !a.submitted).length;
+          if (attemptsLeft === 1) {
+            const ok = window.confirm("Это последний ответ в тесте. Отправить и завершить батарею?");
+            if (!ok) return;
+          }
+          submitting = true;
           try {
             await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
               method: "POST",
@@ -211,6 +223,8 @@
           } catch (e) {
             err.hidden = false;
             err.textContent = HandCheck.formatApiError(e);
+          } finally {
+            submitting = false;
           }
         };
       }

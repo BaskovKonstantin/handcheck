@@ -13,6 +13,7 @@ const {
   validateBackgroundEpisode,
 } = require("../../lib/validation");
 const { shouldMarkUserAsTest } = require("../../lib/is-test-user");
+const { normalizeStackInput } = require("../../lib/need-validation");
 const { dbDateToIso } = require("../../lib/db-datetime");
 
 const router = express.Router();
@@ -43,7 +44,12 @@ router.put("/profile", (req, res, next) => {
       Object.assign(fields, v.fields);
       if (!v.fields.displayName) displayName = v.displayName;
     }
-    const stack = Array.isArray(req.body?.stack) ? req.body.stack : JSON.parse(existing.stack_json || "[]");
+    let stack = Array.isArray(req.body?.stack) ? req.body.stack : JSON.parse(existing.stack_json || "[]");
+    if (req.body?.stack !== undefined) {
+      const stackNorm = normalizeStackInput(req.body.stack);
+      Object.assign(fields, stackNorm.fields);
+      if (!stackNorm.fields.stack) stack = stackNorm.stack || [];
+    }
     let phone = existing.phone || "";
     if (req.body?.phone !== undefined) {
       const v = validateOptionalPhone(req.body.phone);
@@ -112,7 +118,13 @@ router.delete("/background/:id", (req, res) => {
 
 router.put("/availability", (req, res, next) => {
   const v = req.body?.availability;
-  if (!["open", "paused"].includes(v)) return next(httpError(400, "invalid_availability"));
+  if (!["open", "paused"].includes(v)) {
+    return next(
+      httpError(400, "invalid_availability", {
+        fields: { availability: "Выберите «Открыт к приглашениям» или «Пауза»" },
+      })
+    );
+  }
   getDb()
     .prepare("UPDATE candidate_profiles SET availability = ? WHERE user_id = ?")
     .run(v, req.user.id);
@@ -173,9 +185,13 @@ router.get("/invitations", (req, res) => {
   const rows = getDb()
     .prepare(
       `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.contact_channel, i.status, i.created_at,
-              e.company_name, e.contact_email AS employer_contact_email
+              e.company_name, e.contact_email AS employer_contact_email,
+              n.title AS need_title, n.specialization, n.grade,
+              c.status AS call_status
        FROM invitations i
        JOIN employer_profiles e ON e.user_id = i.employer_user_id
+       JOIN employer_needs n ON n.id = i.need_id
+       LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.candidate_user_id = ? ORDER BY i.created_at DESC`
     )
     .all(req.user.id);
@@ -189,6 +205,9 @@ router.get("/invitations", (req, res) => {
         contactChannel: r.contact_channel,
         status: r.status,
         companyName: r.company_name,
+        needTitle: r.need_title,
+        needCategory: `${r.specialization} × ${r.grade}`,
+        callStatus: r.call_status || null,
         createdAt: dbDateToIso(r.created_at),
       };
       if (r.status === "accepted") {

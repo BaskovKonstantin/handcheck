@@ -126,12 +126,13 @@
 
       HandCheck.bootCabinetPage("candidate", () =>
         load().catch(() => {
-        main.innerHTML = HandCheck.loadErrorState(
-          "Не удалось загрузить профиль",
-          "Проверьте соединение или повторите запрос.",
-          load
-        );
-      });
+          main.innerHTML = HandCheck.loadErrorState(
+            "Не удалось загрузить профиль",
+            "Проверьте соединение или повторите запрос.",
+            load
+          );
+        })
+      );
     </script>
   </body>
 </html>

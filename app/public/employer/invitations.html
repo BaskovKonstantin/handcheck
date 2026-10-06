@@ -63,11 +63,15 @@
               i.status === "accepted"
                 ? `<a class="btn-primary" href="/call/${i.id}">Комната звонка</a>`
                 : "";
+            const aiBadge = i.viaAiClient
+              ? `<span class="status-pill sent">через ИИ-клиент</span>`
+              : "";
             const stCls = HandCheck.invitationStatusClass(i.status);
             return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
               <div class="invite-card-top">
                 <h3>${i.candidateName}</h3>
                 <span class="status-pill ${stCls}">${HandCheck.invitationStatusLabel(i.status)}</span>
+                ${aiBadge}
               </div>
               <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
               ${contacts}

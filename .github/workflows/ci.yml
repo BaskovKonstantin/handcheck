@@ -31,3 +31,12 @@ jobs:
         env:
           DEMO_MODE: "1"
           DEMO_PASSWORD: demo-demo-demo
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
+
+      - name: Browser smoke
+        run: npm run test:browser
+        env:
+          DEMO_MODE: "1"
+          DEMO_PASSWORD: demo-demo-demo

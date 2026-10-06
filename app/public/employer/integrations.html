@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Интеграции — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Интеграции</h1>
+          <p class="lede">
+            Подключите ИИ-клиент к HandCheck: колода, приглашения и разбор звонков — с вашими правами работодателя.
+          </p>
+        </div>
+      </header>
+      <div id="main"></div>
+    </main>
+    <script src="/app.js"></script>
+    <script src="/integrations.js"></script>
+    <script>
+      HandCheck.bootCabinetPage("employer", () => HandCheckIntegrations.mount("employer"));
+    </script>
+  </body>
+</html>

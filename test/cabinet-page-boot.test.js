@@ -63,6 +63,12 @@ const CABINET_PAGES = [
     apis: ["/api/candidate/profile"],
     role: "candidate",
   },
+  {
+    file: "candidate/integrations.html",
+    apis: ["/api/integrations/config"],
+    role: "candidate",
+    alsoCheck: "integrations.js",
+  },
 ];
 
 function readPublic(rel) {
@@ -79,8 +85,9 @@ describe("cabinet page data loading", () => {
   for (const page of CABINET_PAGES) {
     it(`${page.file} references its API and does not block on nav().then only`, () => {
       const src = readPublic(page.file);
+      const extra = page.alsoCheck ? readPublic(page.alsoCheck) : "";
       for (const api of page.apis) {
-        assert.ok(src.includes(api), `expected ${api} in ${page.file}`);
+        assert.ok(src.includes(api) || extra.includes(api), `expected ${api} in ${page.file}`);
       }
       const blocksOnNav = new RegExp(
         `${page.role}Nav\\(\\)\\s*\\.then\\(\\s*(?:async\\s*)?\\(\\)\\s*=>\\s*\\{[^}]*${page.apis[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,

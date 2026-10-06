@@ -16,6 +16,8 @@ function migrate(dbPath) {
   db.pragma("synchronous = NORMAL");
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
   db.exec(schema);
+  const { applyPatches } = require("./patches");
+  applyPatches(db);
   return db;
 }
 

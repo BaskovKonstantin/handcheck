@@ -95,7 +95,8 @@ CREATE TABLE IF NOT EXISTS attempts (
   breadth REAL,
   opened_at TEXT,
   started_at TEXT,
-  submitted_at TEXT
+  submitted_at TEXT,
+  action_source TEXT NOT NULL DEFAULT 'web' CHECK (action_source IN ('web', 'mcp'))
 );
 
 CREATE TABLE IF NOT EXISTS attempt_events (
@@ -151,6 +152,7 @@ CREATE TABLE IF NOT EXISTS need_reviews (
   candidate_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   decision TEXT NOT NULL CHECK (decision IN ('rejected', 'later', 'invited')),
   updated_at TEXT NOT NULL,
+  action_source TEXT NOT NULL DEFAULT 'web' CHECK (action_source IN ('web', 'mcp')),
   UNIQUE (employer_user_id, need_id, candidate_user_id)
 );
 
@@ -164,6 +166,7 @@ CREATE TABLE IF NOT EXISTS invitations (
   offer_text TEXT NOT NULL,
   contact_channel TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('sent', 'viewed', 'accepted', 'declined')),
+  action_source TEXT NOT NULL DEFAULT 'web' CHECK (action_source IN ('web', 'mcp')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -191,3 +194,28 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_candidate ON invitations(candidate_user_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_employer_candidate_status
   ON invitations(employer_user_id, candidate_user_id, status);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  token_prefix TEXT NOT NULL,
+  scopes_json TEXT NOT NULL DEFAULT '["read"]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_used_at TEXT,
+  revoked_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS mcp_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  api_token_id TEXT REFERENCES api_tokens(id) ON DELETE SET NULL,
+  tool_name TEXT NOT NULL,
+  ok INTEGER NOT NULL,
+  result_summary TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_audit_user ON mcp_audit_log(user_id, created_at DESC);

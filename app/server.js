@@ -51,6 +51,8 @@ function createApp() {
   app.use("/api/assessment", require("./modules/assessment/router"));
   app.use("/api/assessment", require("./modules/tasks/router"));
   app.use("/api/calls", require("./modules/calls/router"));
+  app.use("/api/integrations", require("./modules/integrations/router"));
+  app.use("/mcp", require("./modules/mcp/router"));
 
   const publicDir = path.join(__dirname, "public");
   const routes = [
@@ -62,6 +64,7 @@ function createApp() {
     ["/candidate/invitations", "candidate/invitations.html"],
     ["/candidate/calls", "candidate/calls.html"],
     ["/candidate/profile", "candidate/profile.html"],
+    ["/candidate/integrations", "candidate/integrations.html"],
     ["/employer/need", "employer/need.html"],
     ["/employer/deck", "employer/deck.html"],
     ["/employer/list", "employer/list.html"],
@@ -69,6 +72,7 @@ function createApp() {
     ["/employer/invitations", "employer/invitations.html"],
     ["/employer/calls", "employer/calls.html"],
     ["/employer/profile", "employer/profile.html"],
+    ["/employer/integrations", "employer/integrations.html"],
   ];
   for (const [url, file] of routes) {
     app.get(url, (_req, res) => res.sendFile(path.join(publicDir, file)));

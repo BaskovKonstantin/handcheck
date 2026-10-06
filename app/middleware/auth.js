@@ -4,6 +4,7 @@ const { getDb } = require("../db");
 const config = require("../config");
 const { httpError } = require("./errors");
 const { isRequestSecure } = require("../lib/request-secure");
+const { hashToken, parseBearerAuthorization } = require("../lib/api-token");
 
 function parseCookies(req) {
   const header = req.headers.cookie || "";
@@ -34,21 +35,79 @@ function loadSession(req) {
   return row;
 }
 
+function loadUserById(userId) {
+  const db = getDb();
+  return db
+    .prepare("SELECT id, email, role, email_confirmed_at FROM users WHERE id = ?")
+    .get(userId);
+}
+
+function loadApiToken(rawToken) {
+  const db = getDb();
+  const hash = hashToken(rawToken);
+  const row = db
+    .prepare(
+      `SELECT t.*, u.email, u.role, u.email_confirmed_at
+       FROM api_tokens t JOIN users u ON u.id = t.user_id
+       WHERE t.token_hash = ? AND t.revoked_at IS NULL`
+    )
+    .get(hash);
+  if (!row) return null;
+  db.prepare("UPDATE api_tokens SET last_used_at = datetime('now') WHERE id = ?").run(row.id);
+  return row;
+}
+
 function attachUser(req, _res, next) {
   req.session = loadSession(req);
-  req.user = req.session
-    ? {
-        id: req.session.user_id,
-        email: req.session.email,
-        role: req.session.role,
-        email_confirmed_at: req.session.email_confirmed_at,
-      }
-    : null;
+  req.authMethod = null;
+  req.apiToken = null;
+  if (req.session) {
+    req.user = {
+      id: req.session.user_id,
+      email: req.session.email,
+      role: req.session.role,
+      email_confirmed_at: req.session.email_confirmed_at,
+    };
+    req.authMethod = "session";
+    return next();
+  }
+  const bearer = parseBearerAuthorization(req.headers.authorization);
+  if (bearer) {
+    const tokenRow = loadApiToken(bearer);
+    if (tokenRow) {
+      req.user = {
+        id: tokenRow.user_id,
+        email: tokenRow.email,
+        role: tokenRow.role,
+        email_confirmed_at: tokenRow.email_confirmed_at,
+      };
+      req.apiToken = {
+        id: tokenRow.id,
+        scopes_json: tokenRow.scopes_json,
+        name: tokenRow.name,
+      };
+      req.authMethod = "api_token";
+    }
+  }
+  if (!req.user) req.user = null;
   next();
 }
 
 function requireAuth(req, _res, next) {
   if (!req.user) return next(httpError(401, "unauthorized"));
+  next();
+}
+
+function requireSessionAuth(req, _res, next) {
+  if (!req.user || req.authMethod !== "session") return next(httpError(401, "unauthorized"));
+  next();
+}
+
+function requireApiTokenAuth(req, _res, next) {
+  if (!req.user || req.authMethod !== "api_token") {
+    return next(httpError(401, "unauthorized"));
+  }
+  if (!req.user.email_confirmed_at) return next(httpError(403, "email_not_confirmed"));
   next();
 }
 
@@ -78,10 +137,13 @@ function clearSessionCookie(res, req) {
 module.exports = {
   attachUser,
   requireAuth,
+  requireSessionAuth,
+  requireApiTokenAuth,
   requireConfirmedEmail,
   setSessionCookie,
   clearSessionCookie,
   parseCookies,
   loadSession,
+  loadUserById,
   isRequestSecure,
 };

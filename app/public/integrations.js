@@ -67,6 +67,51 @@
       </div>`;
   }
 
+  function clientTabPanels(cfg, tokenPlaceholder) {
+    const token = tokenPlaceholder || "hc_ВАШ_ТОКЕН";
+    const cursorJson = filledCursorSnippet(cfg, token);
+    const claudeCmd = filledClaudeCommand(cfg, token);
+    return `
+      <div class="integrations-client-tabs" role="tablist">
+        <button type="button" class="active" data-client-tab="cursor">Cursor</button>
+        <button type="button" data-client-tab="claude-code">Claude Code</button>
+        <button type="button" data-client-tab="claude-desktop">Claude Desktop</button>
+      </div>
+      <div class="client-tab-panel" data-client-panel="cursor">
+        <p class="invite-meta">Вставьте в <code>.cursor/mcp.json</code> (подставьте свой токен):</p>
+        <div class="copy-row copy-row-block">
+          <pre id="tab-cursor-snippet" class="code-pre">${escapeHtml(cursorJson)}</pre>
+          ${copyButton("tab-cursor-snippet")}
+        </div>
+      </div>
+      <div class="client-tab-panel" data-client-panel="claude-code" hidden>
+        <div class="copy-row copy-row-block">
+          <pre id="tab-claude-cmd" class="code-pre">${escapeHtml(claudeCmd)}</pre>
+          ${copyButton("tab-claude-cmd")}
+        </div>
+      </div>
+      <div class="client-tab-panel" data-client-panel="claude-desktop" hidden>
+        <p class="invite-meta">URL сервера:</p>
+        <div class="copy-row copy-row-block">
+          <code id="tab-desktop-url" class="code-block">${escapeHtml(cfg.mcpUrl)}</code>
+          ${copyButton("tab-desktop-url")}
+        </div>
+      </div>`;
+  }
+
+  function bindClientTabs(root) {
+    const tabs = root.querySelectorAll("[data-client-tab]");
+    const panels = root.querySelectorAll("[data-client-panel]");
+    tabs.forEach((btn) => {
+      btn.onclick = () => {
+        tabs.forEach((t) => t.classList.toggle("active", t === btn));
+        panels.forEach((p) => {
+          p.hidden = p.dataset.clientPanel !== btn.dataset.clientTab;
+        });
+      };
+    });
+  }
+
   async function loadAll(main, justCreatedToken) {
     main.innerHTML = HandCheck.skeletonBlocks(3);
     const [cfg, tokens, audit] = await Promise.all([
@@ -92,54 +137,67 @@
       })
       .join("");
     const auditRows = (audit.items || [])
-      .map(
-        (a) =>
-          `<li class="audit-row"><span class="invite-meta">${HandCheck.formatDateTimeMoscow(a.at)}</span> · ${
-            a.ok ? "успех" : "ошибка"
-          } — ${escapeHtml(a.text || a.tool)}</li>`
-      )
+      .map((a) => {
+        const status = a.ok ? "Успешно" : "Ошибка";
+        const intent = a.intent ? `<p class="audit-row-meta">Запрос: ${escapeHtml(a.intent)}</p>` : "";
+        return `<li class="audit-row">
+          <span class="invite-meta">${HandCheck.formatDateTimeMoscow(a.at)}</span>
+          <div class="audit-row-main">
+            <p class="audit-row-title">${escapeHtml(a.text || a.tool)}</p>
+            <p class="audit-row-meta">${escapeHtml(a.client || "ИИ-клиент")} · ${status}</p>
+            ${intent}
+          </div>
+        </li>`;
+      })
       .join("");
 
     main.innerHTML = `
-      <section class="panel">
-        <h2 class="h2">Подключение</h2>
-        <p class="invite-meta">URL MCP-сервера</p>
-        <div class="copy-row copy-row-block">
-          <code id="mcp-url" class="code-block">${escapeHtml(cfg.mcpUrl)}</code>
-          ${copyButton("mcp-url")}
-        </div>
-      </section>
-      <section class="panel" style="margin-top:1.25rem">
-        <h2 class="h2">Новый токен</h2>
-        <label>Название (например, «Cursor на ноутбуке»)
-          <input id="token-name" maxlength="80" />
-        </label>
-        <label>Где подключаете (Cursor / Claude Desktop / Claude Code / другое)
-          <input id="client-where" maxlength="120" placeholder="Cursor на рабочем ноутбуке" />
-        </label>
-        <label class="scope-option consent-option">
-          <input type="checkbox" id="logging-consent" />
-          <span>Согласен на запись имени клиента, вызовов инструментов (аргументы без секретов) и краткого intent для улучшения продукта</span>
-        </label>
-        <fieldset class="scope-fieldset">
-          <legend>Права</legend>
-          <label class="scope-option"><input type="checkbox" id="scope-read" checked /> <span>Чтение</span></label>
-          <label class="scope-option"><input type="checkbox" id="scope-write" /> <span>Запись</span></label>
-        </fieldset>
-        <p class="field-error" id="token-err" hidden></p>
-        ${renderTokenOnce(justCreatedToken, cfg)}
-        <button type="button" class="btn-primary" id="create-token">Создать токен</button>
-      </section>
-      <section class="panel" style="margin-top:1.25rem">
-        <h2 class="h2">Ваши токены</h2>
-        <ul class="token-list">${tokenRows || '<li class="invite-meta">Пока нет токенов.</li>'}</ul>
-      </section>
-      <section class="panel" style="margin-top:1.25rem">
-        <h2 class="h2">Журнал действий ИИ-клиентов</h2>
-        <ul class="audit-list">${auditRows || '<li class="invite-meta">Вызовов пока не было.</li>'}</ul>
-      </section>`;
+      <div class="integrations-steps">
+        <section class="panel">
+          <span class="integrations-step-badge">Шаг 1</span>
+          <h2 class="h2">Токен и подключение</h2>
+          <p class="invite-meta">URL MCP-сервера</p>
+          <div class="copy-row copy-row-block">
+            <code id="mcp-url" class="code-block">${escapeHtml(cfg.mcpUrl)}</code>
+            ${copyButton("mcp-url")}
+          </div>
+          <h3 class="h3" style="margin-top:1rem">Новый токен</h3>
+          <label>Название (например, «Cursor на ноутбуке»)
+            <input id="token-name" maxlength="80" />
+          </label>
+          <label>Где подключаете (Cursor / Claude Desktop / Claude Code / другое)
+            <input id="client-where" maxlength="120" placeholder="Cursor на рабочем ноутбуке" />
+          </label>
+          <label class="scope-option consent-option">
+            <input type="checkbox" id="logging-consent" />
+            <span>Согласен на запись имени клиента, вызовов инструментов (аргументы без секретов) и краткого описания запроса для улучшения продукта</span>
+          </label>
+          <fieldset class="scope-fieldset">
+            <legend>Права</legend>
+            <label class="scope-option"><input type="checkbox" id="scope-read" checked /> <span>Чтение</span></label>
+            <label class="scope-option"><input type="checkbox" id="scope-write" /> <span>Запись</span></label>
+          </fieldset>
+          <p class="field-error" id="token-err" hidden></p>
+          ${renderTokenOnce(justCreatedToken, cfg)}
+          <button type="button" class="btn-primary" id="create-token">Создать токен</button>
+          <h3 class="h3" style="margin-top:1.25rem">Ваши токены</h3>
+          <ul class="token-list">${tokenRows || '<li class="invite-meta">Пока нет токенов.</li>'}</ul>
+        </section>
+        <section class="panel">
+          <span class="integrations-step-badge">Шаг 2</span>
+          <h2 class="h2">Клиент</h2>
+          <p class="invite-meta">Выберите среду и скопируйте готовую конфигурацию.</p>
+          ${clientTabPanels(cfg, justCreatedToken || null)}
+        </section>
+        <section class="panel">
+          <span class="integrations-step-badge">Шаг 3</span>
+          <h2 class="h2">Журнал действий ИИ-клиентов</h2>
+          <ul class="audit-list">${auditRows || '<li class="invite-meta">Вызовов пока не было.</li>'}</ul>
+        </section>
+      </div>`;
 
     bindCopyButtons(main);
+    bindClientTabs(main);
 
     document.getElementById("create-token").onclick = async () => {
       const err = document.getElementById("token-err");

@@ -5,6 +5,11 @@ let timerTick = null;
 
 const roomHost = document.getElementById("room-host");
 
+function setCallLede(text) {
+  const lede = document.querySelector(".call-room-hero .lede");
+  if (lede) lede.textContent = text;
+}
+
 function setBanner(text, live) {
   const banner = document.getElementById("state-banner");
   if (!banner) return;
@@ -133,18 +138,29 @@ async function init() {
         me.role === "employer" && info.analysisText
           ? `<section class="panel call-analysis-panel"><h2 class="h2">Внутренний разбор</h2><p>${esc(info.analysisText)}</p></section>`
           : "";
+      setCallLede("Комната закрыта. Ниже — итог созвона и внутренний разбор для работодателя.");
       roomHost.innerHTML = `<div class="call-ended-wrap">
         <p class="call-state-banner ended">Звонок с ${esc(who)} завершён</p>
         <p class="invite-meta">${esc(meta)}</p>
         ${analysis}
         <a class="btn-primary" href="${me.role === "employer" ? "/employer/calls" : "/candidate/calls"}">К списку звонков</a>
       </div>`;
-      const hero = document.querySelector(".cabinet-page-hero .lede");
-      if (hero) hero.textContent = "Комната закрыта. Контекст звонка и итог ниже.";
       return;
     }
     renderRoomShell();
-    setBanner("Комната готова — подтвердите согласие и войдите", false);
+    if (info.status === "live") {
+      setCallLede("Разговор в эфире. Запись ведётся после вашего согласия при входе.");
+    } else {
+      setCallLede(
+        "Согласие на запись обязательно. После принятого приглашения войдите в комнату и подтвердите запись."
+      );
+    }
+    setBanner(
+      info.status === "live"
+        ? "Эфир — разговор записывается"
+        : "Комната готова — подтвердите согласие и войдите",
+      info.status === "live"
+    );
     const { consent, join, roomErr } = bindRoomControls();
     const hasConsent =
       (me.role === "candidate" && info.consentCandidate) ||

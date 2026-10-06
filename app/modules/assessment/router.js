@@ -10,6 +10,7 @@ const {
   scoreQuick,
   scoreWork,
 } = require("../../lib/rubric-score");
+const config = require("../../config");
 const {
   getPublishedBatteryTasks,
   assertBatteryComplete,
@@ -31,7 +32,14 @@ router.post("/battery/start", (req, res, next) => {
     if (!specialization || !grade) throw httpError(400, "invalid_body");
     const db = getDb();
     const last = lastSpecializationAttempt(req.user.id, specialization);
-    if (cooldownActive(last?.completed_at)) throw httpError(409, "cooldown");
+    if (cooldownActive(last?.completed_at)) {
+      const retake = new Date(last.completed_at);
+      retake.setDate(retake.getDate() + Number(config.GRADE_COOLDOWN_DAYS || 90));
+      throw httpError(409, "cooldown", {
+        message: "Пересдача по этой специализации пока недоступна",
+        retakeAt: retake.toISOString(),
+      });
+    }
     const formKey = Math.random() < 0.5 ? "A" : "B";
     const { quick, work } = getPublishedBatteryTasks(specialization, grade, formKey);
     assertBatteryComplete(quick, work);

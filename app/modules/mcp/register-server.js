@@ -4,6 +4,13 @@ const { getDb } = require("../../db");
 const { scopesAllow } = require("../../lib/api-token");
 const services = require("./services");
 const { logToolCall } = require("../../lib/mcp-telemetry");
+const {
+  readToolExtra,
+  writeToolExtra,
+  mergeSchema,
+  SCOPE_ERR_WRITE,
+  SCOPE_ERR_READ,
+} = require("./tool-meta");
 
 function writeAudit(ctx, toolName, ok, summary) {
   getDb()
@@ -31,12 +38,12 @@ function wrapTool(ctx, name, needWrite, fn, meta = {}) {
   return async (args) => {
     const started = Date.now();
     if (needWrite && !scopesAllow(ctx.scopesJson, "write")) {
-      const err = toolError("Недостаточно прав: для этого действия нужен scope «write».");
+      const err = toolError(SCOPE_ERR_WRITE);
       logToolCall(ctx, name, args, { ...err, durationMs: Date.now() - started });
       return err;
     }
     if (!scopesAllow(ctx.scopesJson, "read")) {
-      const err = toolError("Недостаточно прав: нужен scope «read».");
+      const err = toolError(SCOPE_ERR_READ);
       logToolCall(ctx, name, args, { ...err, durationMs: Date.now() - started });
       return err;
     }
@@ -62,8 +69,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "whoami",
       {
         description: "Текущий пользователь HandCheck: email, роль, подтверждение почты.",
-        inputSchema: {},
-        annotations: { readOnlyHint: true },
+        ...readToolExtra(z),
       },
     wrapTool(ctx, "whoami", false, async () => ({
       email: ctx.user.email,
@@ -76,7 +82,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
   if (role === "candidate") {
     server.registerTool(
       "get_my_profile",
-      { description: "Профиль кандидата без скрытых оценок.", inputSchema: {} },
+      {
+        description: "Профиль кандидата без скрытых оценок.",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "get_my_profile", false, () => services.getCandidateProfile(ctx.user.id))
     );
 
@@ -84,13 +93,17 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "update_my_profile",
       {
         description: "Обновить имя, контакты, стек и доступность.",
-        inputSchema: {
-          displayName: z.string().optional(),
-          phone: z.string().optional(),
-          contactEmail: z.string().optional(),
-          stack: z.array(z.string()).optional(),
-          availability: z.enum(["open", "paused"]).optional(),
-        },
+        ...writeToolExtra(
+          z,
+          {
+            displayName: z.string().optional(),
+            phone: z.string().optional(),
+            contactEmail: z.string().optional(),
+            stack: z.array(z.string()).optional(),
+            availability: z.enum(["open", "paused"]).optional(),
+          },
+          { idempotent: true }
+        ),
       },
       wrapTool(ctx, "update_my_profile", true, (args) =>
         services.updateCandidateProfile(ctx.user.id, args)
@@ -99,13 +112,19 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
 
     server.registerTool(
       "get_my_category",
-      { description: "Текущая категория после теста (без числовых баллов).", inputSchema: {} },
+      {
+        description: "Текущая категория после теста (без числовых баллов).",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "get_my_category", false, () => services.getCandidateCategory(ctx.user.id))
     );
 
     server.registerTool(
       "list_tasks",
-      { description: "Активная батарея заданий и список попыток.", inputSchema: {} },
+      {
+        description: "Активная батарея заданий и список попыток.",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "list_tasks", false, () => services.listAssessmentTasks(ctx.user.id))
     );
 
@@ -113,7 +132,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "get_task",
       {
         description: "Текст одного задания по attemptId.",
-        inputSchema: { attemptId: z.string().describe("ID попытки из list_tasks") },
+        ...readToolExtra(z),
+        inputSchema: mergeSchema(z, {
+          attemptId: z.string().describe("ID попытки из list_tasks"),
+        }),
       },
       wrapTool(ctx, "get_task", false, (args) =>
         services.getAssessmentTask(ctx.user.id, args.attemptId)
@@ -124,10 +146,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "start_assessment",
       {
         description: "Начать батарею QuickProbe + WorkSim для specialization × grade.",
-        inputSchema: {
+        ...writeToolExtra(z, {
           specialization: z.string(),
           grade: z.enum(["junior", "middle", "senior"]),
-        },
+        }),
       },
       wrapTool(ctx, "start_assessment", true, (args) =>
         services.startAssessment(ctx.user.id, args.specialization, args.grade, "mcp")
@@ -138,12 +160,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "submit_answer",
       {
         description: "Отправить ответ на короткое задание (quick).",
-        inputSchema: {
+        ...writeToolExtra(z, {
           attemptId: z.string(),
           answerText: z.string(),
-          intent: z.string().optional().describe("Кратко: что попросил пользователь у ассистента"),
-        },
-        annotations: { destructiveHint: true },
+        }),
       },
       wrapTool(ctx, "submit_answer", true, (args) =>
         services.submitAttemptAnswer(ctx.user.id, args.attemptId, args.answerText, "mcp", {
@@ -156,12 +176,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "submit_work_task",
       {
         description: "Отправить ответ на рабочее задание (work).",
-        inputSchema: {
+        ...writeToolExtra(z, {
           attemptId: z.string(),
           answerText: z.string(),
-          intent: z.string().optional().describe("Кратко: что попросил пользователь у ассистента"),
-        },
-        annotations: { destructiveHint: true },
+        }),
       },
       wrapTool(ctx, "submit_work_task", true, (args) =>
         services.submitAttemptAnswer(ctx.user.id, args.attemptId, args.answerText, "mcp", {
@@ -172,7 +190,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
 
     server.registerTool(
       "list_invitations",
-      { description: "Входящие приглашения работодателей.", inputSchema: {} },
+      {
+        description: "Входящие приглашения работодателей.",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "list_invitations", false, () =>
         services.listCandidateInvitations(ctx.user.id)
       )
@@ -182,10 +203,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "respond_invitation",
       {
         description: "Принять или отклонить приглашение.",
-        inputSchema: {
+        ...writeToolExtra(z, {
           invitationId: z.string(),
           decision: z.enum(["accept", "decline"]),
-        },
+        }),
       },
       wrapTool(ctx, "respond_invitation", true, (args) =>
         services.respondInvitation(ctx.user.id, args.invitationId, args.decision)
@@ -194,7 +215,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
 
     server.registerTool(
       "list_calls",
-      { description: "Звонки по принятым приглашениям.", inputSchema: {} },
+      {
+        description: "Звонки по принятым приглашениям.",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "list_calls", false, () => services.listCandidateCalls(ctx.user.id))
     );
   }
@@ -202,7 +226,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
   if (role === "employer") {
     server.registerTool(
       "list_needs",
-      { description: "Список потребностей работодателя.", inputSchema: {} },
+      {
+        description: "Список потребностей работодателя.",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "list_needs", false, () => services.listEmployerNeeds(ctx.user.id))
     );
 
@@ -210,14 +237,14 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "create_need",
       {
         description: "Создать новую потребность.",
-        inputSchema: {
+        ...writeToolExtra(z, {
           title: z.string(),
           specialization: z.string().optional(),
           grade: z.enum(["junior", "middle", "senior"]).optional(),
           stack: z.array(z.string()).optional(),
           domainText: z.string().optional(),
           notes: z.string().optional(),
-        },
+        }),
       },
       wrapTool(ctx, "create_need", true, (args) => services.createEmployerNeed(ctx.user.id, args))
     );
@@ -226,16 +253,20 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "update_need",
       {
         description: "Обновить потребность по id.",
-        inputSchema: {
-          needId: z.string(),
-          title: z.string().optional(),
-          specialization: z.string().optional(),
-          grade: z.enum(["junior", "middle", "senior"]).optional(),
-          stack: z.array(z.string()).optional(),
-          domainText: z.string().optional(),
-          notes: z.string().optional(),
-          active: z.boolean().optional(),
-        },
+        ...writeToolExtra(
+          z,
+          {
+            needId: z.string(),
+            title: z.string().optional(),
+            specialization: z.string().optional(),
+            grade: z.enum(["junior", "middle", "senior"]).optional(),
+            stack: z.array(z.string()).optional(),
+            domainText: z.string().optional(),
+            notes: z.string().optional(),
+            active: z.boolean().optional(),
+          },
+          { idempotent: true }
+        ),
       },
       wrapTool(ctx, "update_need", true, (args) => {
         const { needId, ...body } = args;
@@ -247,7 +278,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "get_next_candidate",
       {
         description: "Следующая карточка в колоде по потребности.",
-        inputSchema: { needId: z.string() },
+        ...readToolExtra(z),
+        inputSchema: mergeSchema(z, { needId: z.string() }),
       },
       wrapTool(ctx, "get_next_candidate", false, (args) =>
         services.getDeckNext(ctx.user.id, args.needId)
@@ -258,7 +290,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "decide_candidate",
       {
         description: "Решение по кандидату: reject, later или invite с вилкой ЗП.",
-        inputSchema: {
+        ...writeToolExtra(z, {
           needId: z.string(),
           candidateId: z.string(),
           decision: z.enum(["reject", "later", "invite"]),
@@ -266,7 +298,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
           salaryTo: z.number().int().optional(),
           offerText: z.string().optional(),
           contactChannel: z.string().optional(),
-        },
+        }),
       },
       wrapTool(ctx, "decide_candidate", true, (args) => {
         const { needId, ...payload } = args;
@@ -278,7 +310,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "list_shortlist",
       {
         description: "Список подходящих кандидатов по потребности.",
-        inputSchema: { needId: z.string() },
+        ...readToolExtra(z),
+        inputSchema: mergeSchema(z, { needId: z.string() }),
       },
       wrapTool(ctx, "list_shortlist", false, (args) =>
         services.listShortlist(ctx.user.id, args.needId)
@@ -287,7 +320,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
 
     server.registerTool(
       "list_invitations",
-      { description: "Исходящие приглашения.", inputSchema: {} },
+      {
+        description: "Исходящие приглашения.",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "list_invitations", false, () =>
         services.listEmployerInvitations(ctx.user.id)
       )
@@ -295,7 +331,10 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
 
     server.registerTool(
       "list_calls",
-      { description: "Звонки по принятым приглашениям.", inputSchema: {} },
+      {
+        description: "Звонки по принятым приглашениям.",
+        ...readToolExtra(z),
+      },
       wrapTool(ctx, "list_calls", false, () => services.listEmployerCalls(ctx.user.id))
     );
 
@@ -303,7 +342,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
       "get_call_analysis",
       {
         description: "Внутренний разбор завершённого звонка (только работодатель).",
-        inputSchema: { callId: z.string() },
+        ...readToolExtra(z),
+        inputSchema: mergeSchema(z, { callId: z.string() }),
       },
       wrapTool(ctx, "get_call_analysis", false, (args) =>
         services.getCallAnalysis(ctx.user.id, args.callId)
@@ -334,36 +374,33 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
     }
   );
 
-  server.registerResource(
-    "handcheck-need-template",
-    new ResourceTemplate("handcheck://needs/{id}", {}),
-    { description: "Потребность работодателя", mimeType: "application/json" },
-    async (uri, variables) => {
-      if (role !== "employer") {
-        return { contents: [{ uri: uri.href, text: "Доступно только работодателю" }] };
+  if (role === "employer") {
+    server.registerResource(
+      "handcheck-need-template",
+      new ResourceTemplate("handcheck://needs/{id}", {}),
+      { description: "Потребность работодателя", mimeType: "application/json" },
+      async (uri, variables) => {
+        const data = services.getNeedResource(ctx.user.id, role, variables.id);
+        return {
+          contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(data) }],
+        };
       }
-      const id = variables.id;
-      const data = services.getNeedResource(ctx.user.id, role, id);
-      return {
-        contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(data) }],
-      };
-    }
-  );
+    );
+  }
 
-  server.registerResource(
-    "handcheck-task-template",
-    new ResourceTemplate("handcheck://tasks/{id}", {}),
-    { description: "Задание теста (attemptId)", mimeType: "application/json" },
-    async (uri, variables) => {
-      if (role !== "candidate") {
-        return { contents: [{ uri: uri.href, text: "Доступно только кандидату" }] };
+  if (role === "candidate") {
+    server.registerResource(
+      "handcheck-task-template",
+      new ResourceTemplate("handcheck://tasks/{id}", {}),
+      { description: "Задание теста (attemptId)", mimeType: "application/json" },
+      async (uri, variables) => {
+        const data = services.getAssessmentTask(ctx.user.id, variables.id);
+        return {
+          contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(data) }],
+        };
       }
-      const data = services.getAssessmentTask(ctx.user.id, variables.id);
-      return {
-        contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(data) }],
-      };
-    }
-  );
+    );
+  }
 
   if (role === "candidate") {
   server.registerPrompt(
@@ -406,7 +443,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
             text:
               "Ты помогаешь работодателю в HandCheck. Уточни потребность (list_needs), " +
               "листай колоду get_next_candidate и фиксируй decide_candidate. " +
-              "После accept приглашения помоги со звонком; разбор — get_call_analysis.",
+              "После accept приглашения помоги со звонком; разбор — get_call_analysis. " +
+              "При вызове инструментов заполняй поле intent одной фразой — что попросил пользователь.",
           },
         },
       ],

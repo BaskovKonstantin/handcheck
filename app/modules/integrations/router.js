@@ -12,6 +12,7 @@ const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { httpError } = require("../../middleware/errors");
 const config = require("../../config");
 const { dbDateToIso } = require("../../lib/db-datetime");
+const { humanToolSummary } = require("../../lib/mcp-telemetry");
 
 const router = express.Router();
 
@@ -92,17 +93,37 @@ router.get("/audit", (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const rows = getDb()
     .prepare(
-      `SELECT tool_name, ok, result_summary AS text, created_at
-       FROM mcp_audit_log WHERE user_id = ? ORDER BY created_at DESC LIMIT ?`
+      `SELECT t.tool_name, t.ok, t.intent_text, t.created_at,
+              s.client_name, s.client_version, tok.client_where, tok.name AS token_name
+       FROM mcp_tool_calls t
+       LEFT JOIN mcp_client_sessions s ON s.id = t.session_id
+       LEFT JOIN api_tokens tok ON tok.id = t.api_token_id
+       WHERE t.user_id = ?
+       ORDER BY t.created_at DESC LIMIT ?`
     )
     .all(req.user.id, limit);
   res.json({
-    items: rows.map((r) => ({
-      tool: r.tool_name,
-      ok: Boolean(r.ok),
-      text: r.text,
-      at: dbDateToIso(r.created_at),
-    })),
+    items: rows.map((r) => {
+      const clientBits = [];
+      if (r.client_name && r.client_name !== "unknown" && r.client_name !== "http") {
+        clientBits.push(r.client_name + (r.client_version ? ` ${r.client_version}` : ""));
+      } else if (r.token_name) {
+        clientBits.push(r.token_name);
+      }
+      if (r.client_where) clientBits.push(r.client_where);
+      const clientLabel = clientBits.length ? clientBits.join(" · ") : "ИИ-клиент";
+      const summary = humanToolSummary(r.tool_name, Boolean(r.ok), {
+        intent: r.intent_text || undefined,
+      });
+      return {
+        tool: r.tool_name,
+        ok: Boolean(r.ok),
+        text: summary,
+        intent: r.intent_text || null,
+        client: clientLabel,
+        at: dbDateToIso(r.created_at),
+      };
+    }),
   });
 });
 

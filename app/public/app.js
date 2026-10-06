@@ -33,8 +33,17 @@ function sleep(ms) {
 function formatApiError(err) {
   const code = err?.data?.error || err?.message;
   const fields = err?.data?.details?.fields;
+  if (err?.data?.details?.message) return err.data.details.message;
   if (fields?.salaryRange) return fields.salaryRange;
+  if (fields?.offerText) return fields.offerText;
+  if (fields?.contactChannel) return fields.contactChannel;
   if (fields?.tokenName) return fields.tokenName;
+  if (code === "cooldown" && err?.data?.details?.retakeAt) {
+    const when = formatDateTimeMoscow(err.data.details.retakeAt);
+    return when
+      ? `${ERROR_MESSAGES.cooldown}. Повторная попытка с ${when}`
+      : ERROR_MESSAGES.cooldown;
+  }
   if (err?.status === 413 || code === "file_too_large") {
     return ERROR_MESSAGES.file_too_large;
   }
@@ -184,6 +193,8 @@ const NAV_ICONS = {
   deferred: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V4zm1 5v5l4 2-.8 1.4L11 14V9h2z" fill="currentColor"/></svg>',
   integrations:
     '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v3H7V7zm0 7h6v3H7v-3zm9 0h2v3h-2v-3zM5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="currentColor"/></svg>',
+  past:
+    '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V4zm1 5v5l4 2-.8 1.4L11 14V9h2z" fill="currentColor"/></svg>',
 };
 
 const LINK_ICON = {
@@ -192,6 +203,7 @@ const LINK_ICON = {
   "/candidate/tasks": "tasks",
   "/candidate/invitations": "invitations",
   "/candidate/calls": "calls",
+  "/candidate/past": "past",
   "/employer/need": "need",
   "/employer/deck": "deck",
   "/employer/list": "list",

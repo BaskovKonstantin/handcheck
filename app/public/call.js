@@ -5,12 +5,24 @@ let timerTick = null;
 let callSession = null;
 let roomInfo = null;
 let roomMe = null;
+let waitLivePoll = null;
+let roomPhase = "prejoin";
 
 const roomHost = document.getElementById("room-host");
+
+function callHeroTitle(role, counterpartName) {
+  const name = counterpartName || (role === "employer" ? "Кандидат" : "Работодатель");
+  return `Звонок: ${name}`;
+}
 
 function setCallLede(text) {
   const lede = document.querySelector(".call-room-hero .lede");
   if (lede) lede.textContent = text;
+}
+
+function setHeroTitle(role, counterpartName) {
+  const heroTitle = document.querySelector(".call-room-hero h1");
+  if (heroTitle) heroTitle.textContent = callHeroTitle(role, counterpartName);
 }
 
 function setBanner(text, live) {
@@ -26,6 +38,7 @@ function renderEndedView(info, me) {
     me.role === "employer"
       ? info.candidateName || "Кандидат"
       : info.companyName || "Работодатель";
+  setHeroTitle(me.role, who);
   const esc = HandCheck.escapeHtml;
   const endedWhen = info.endedAt ? HandCheck.formatDateTimeMoscow(info.endedAt) : "";
   const salary = HandCheck.formatSalaryRange(info.salaryFrom, info.salaryTo);
@@ -53,6 +66,10 @@ function renderEndedView(info, me) {
     if (me.role === "employer") return true;
     return side === "candidate";
   });
+  const recordingMissing =
+    visibleSides.length === 0
+      ? `<p class="invite-meta call-recording-missing">Запись не сохранилась — файл не был загружен или превысил лимит 80 МБ.</p>`
+      : "";
   const recordings = visibleSides.length
     ? `<section class="panel call-recording-panel"><h2 class="h2">Запись</h2><div class="call-recording-players">${visibleSides
         .map((side) => {
@@ -72,9 +89,10 @@ function renderEndedView(info, me) {
   roomHost.innerHTML = `<article class="panel call-result-card">
         <div class="call-result-head">
           <span class="status-pill ended">Завершён</span>
-          <h2 class="h2">${me.role === "employer" ? `Звонок с кандидатом: ${esc(who)}` : `Звонок с ${esc(who)}`}</h2>
+          <h2 class="h2">${esc(callHeroTitle(me.role, who))}</h2>
         </div>
         ${metaRows ? `<dl class="call-result-meta">${metaRows}</dl>` : ""}
+        ${recordingMissing}
         ${analysis}
         ${aiUsage}
         ${recordings}
@@ -132,7 +150,10 @@ function updateRecordingLabel(state) {
   const recLabel = document.getElementById("rec-label");
   const recDot = document.getElementById("rec-indicator");
   if (!recLabel) return;
-  if (state.recording) {
+  if (roomPhase === "waiting") {
+    recLabel.textContent = "Запись начнётся, когда звонок перейдёт в эфир";
+    recDot?.classList.remove("live");
+  } else if (state.recording) {
     recLabel.textContent = "Запись активна";
     recDot?.classList.add("live");
   } else if (state.recordingUnavailable) {
@@ -160,6 +181,9 @@ function updatePeerUi(state) {
     remote.hidden = false;
   } else if (state.connectionState === "connecting" || state.connectionState === "new") {
     peerState.textContent = "Подключение к собеседнику…";
+  } else if (roomPhase === "waiting") {
+    peerState.textContent =
+      "Ждём, пока собеседник подтвердит согласие и войдёт в комнату";
   } else {
     peerState.textContent = "Собеседник ещё не подключился";
   }
@@ -182,9 +206,100 @@ function setLivePanel(peerName, consentLocked) {
   }
 }
 
+function setWaitingPanel(peerName, consentLocked) {
+  const title = document.getElementById("panel-title");
+  const consent = document.getElementById("consent");
+  const consentWrap = document.getElementById("consent-wrap");
+  const peerLine = document.getElementById("peer-line");
+  if (title) title.textContent = "Ожидание";
+  if (peerLine && peerName) {
+    peerLine.hidden = false;
+    peerLine.textContent = `Собеседник: ${peerName}`;
+  }
+  if (consentLocked && consent) {
+    consent.checked = true;
+    consent.disabled = true;
+    if (consentWrap) consentWrap.style.opacity = "0.85";
+  }
+  updateRecordingLabel({ recording: false });
+  updatePeerUi({});
+}
+
+function startCallTimer() {
+  const timerEl = document.getElementById("timer");
+  if (!timerEl) return;
+  timerEl.hidden = false;
+  timerStartedAt = Date.now();
+  clearInterval(timerTick);
+  timerTick = setInterval(() => {
+    const sec = Math.floor((Date.now() - timerStartedAt) / 1000);
+    const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+    const ss = String(sec % 60).padStart(2, "0");
+    timerEl.textContent = `${mm}:${ss}`;
+  }, 1000);
+}
+
+function clearWaitLivePoll() {
+  if (waitLivePoll) {
+    clearInterval(waitLivePoll);
+    waitLivePoll = null;
+  }
+}
+
+async function activateLivePhase(peerName, me) {
+  roomPhase = "live";
+  setLivePanel(peerName, true);
+  setCallLede(
+    "Разговор в эфире. Запись идёт только пока активен индикатор записи — завершите звонок, когда закончите."
+  );
+  setBanner("Эфир — соединение с собеседником", true);
+  const endBtn = document.getElementById("end");
+  if (endBtn) {
+    endBtn.textContent = "Завершить";
+    endBtn.hidden = false;
+  }
+  startCallTimer();
+  if (callSession) await callSession.startLiveFeatures();
+}
+
+function startWaitForLive(peerName, me) {
+  roomPhase = "waiting";
+  setWaitingPanel(peerName, true);
+  setCallLede(
+    "Вы в комнате. Запись и расшифровка начнутся, когда собеседник подтвердит согласие и войдёт."
+  );
+  setBanner("Ожидаем второго участника", false);
+  const endBtn = document.getElementById("end");
+  if (endBtn) {
+    endBtn.textContent = "Выйти";
+    endBtn.hidden = false;
+  }
+  clearWaitLivePoll();
+  waitLivePoll = setInterval(async () => {
+    try {
+      const info = await HandCheck.api(`/api/calls/for-invitation/${invitationId}`);
+      if (info.status === "live") {
+        clearWaitLivePoll();
+        await activateLivePhase(peerName, me);
+        return;
+      }
+      if (info.consentCandidate && info.consentEmployer) {
+        const startRes = await HandCheck.api(`/api/calls/${callId}/start`, { method: "POST" });
+        if (startRes.status === "live") {
+          clearWaitLivePoll();
+          await activateLivePhase(peerName, me);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, 1500);
+}
+
 async function handleRemoteEnded() {
+  clearWaitLivePoll();
   if (callSession) {
-    await callSession.endLocalSide().catch(() => {});
+    await callSession.endLocalSide({ skipUpload: roomPhase !== "live" }).catch(() => {});
     callSession = null;
   }
   clearInterval(timerTick);
@@ -204,7 +319,6 @@ function bindRoomControls(info, me) {
   const remote = document.getElementById("remote");
   const roomErr = document.getElementById("room-err");
   const placeholder = document.getElementById("video-placeholder");
-  const timerEl = document.getElementById("timer");
 
   join.disabled = true;
 
@@ -234,7 +348,7 @@ function bindRoomControls(info, me) {
         join.disabled = !consent.checked;
         return;
       }
-      await HandCheck.api(`/api/calls/${callId}/start`, { method: "POST" });
+      const startRes = await HandCheck.api(`/api/calls/${callId}/start`, { method: "POST" });
 
       callSession = HandCheckCallRoom.createCallSession({
         callId,
@@ -243,8 +357,14 @@ function bindRoomControls(info, me) {
         onPeerEnded: () => {
           handleRemoteEnded();
         },
+        onUploadError: (message) => {
+          roomErr.hidden = false;
+          roomErr.textContent = message;
+        },
         onState: (state) => {
-          updateRecordingLabel(state);
+          if (roomPhase === "live" || state.speechNote || state.recordingUnavailable) {
+            updateRecordingLabel(state);
+          }
           updatePeerUi(state);
           const rs = callSession?.getRemoteStream();
           if (rs && remote && state.peerConnected) {
@@ -253,30 +373,19 @@ function bindRoomControls(info, me) {
         },
       });
       await callSession.attachLocalMedia(stream);
+      await callSession.connectSignaling();
       video.srcObject = stream;
       video.hidden = false;
       placeholder.hidden = true;
       video.classList.add("live");
 
-      setLivePanel(peerName, true);
-      setCallLede(
-        "Разговор в эфире. Запись идёт только пока активен индикатор записи — завершите звонок, когда закончите."
-      );
-      setBanner("Эфир — соединение с собеседником", true);
       join.hidden = true;
-      endBtn.hidden = false;
-      timerEl.hidden = false;
-      timerStartedAt = Date.now();
-      clearInterval(timerTick);
-      timerTick = setInterval(() => {
-        const sec = Math.floor((Date.now() - timerStartedAt) / 1000);
-        const mm = String(Math.floor(sec / 60)).padStart(2, "0");
-        const ss = String(sec % 60).padStart(2, "0");
-        timerEl.textContent = `${mm}:${ss}`;
-      }, 1000);
 
-      await callSession.enterLive(invitationId);
-      updateRecordingLabel({ recording: false, recordingUnavailable: false });
+      if (startRes.status === "live") {
+        await activateLivePhase(peerName, me);
+      } else {
+        startWaitForLive(peerName, me);
+      }
     } catch (e) {
       roomErr.hidden = false;
       roomErr.textContent = HandCheck.formatApiError(e);
@@ -287,7 +396,17 @@ function bindRoomControls(info, me) {
   endBtn.onclick = async () => {
     endBtn.disabled = true;
     roomErr.hidden = true;
+    clearWaitLivePoll();
     try {
+      if (roomPhase === "waiting") {
+        if (callSession) {
+          await callSession.endLocalSide({ skipUpload: true });
+          callSession = null;
+        }
+        clearInterval(timerTick);
+        location.href = me.role === "employer" ? "/employer/calls" : "/candidate/calls";
+        return;
+      }
       if (callSession) {
         await callSession.endLocalSide();
         callSession = null;
@@ -331,17 +450,12 @@ async function init() {
       return;
     }
     HandCheck.bootCabinetPage(me.role, () => {});
-    const heroTitle = document.querySelector(".call-room-hero h1");
-    if (heroTitle) {
-      const prefix = me.role === "employer" ? "Звонок с кандидатом: " : "Звонок с ";
-      const name =
-        me.role === "employer"
-          ? info.candidateName || "кандидатом"
-          : info.companyName || "компанией";
-      heroTitle.textContent = prefix + name;
-    }
-    const peerLabel =
-      me.role === "employer" ? info.candidateName || "Кандидат" : info.companyName || "Работодатель";
+    const counterpart =
+      me.role === "employer"
+        ? info.candidateName || "Кандидат"
+        : info.companyName || "Работодатель";
+    setHeroTitle(me.role, counterpart);
+    const peerLabel = counterpart;
     renderRoomShell(peerLabel);
     if (info.status === "live") {
       setCallLede(

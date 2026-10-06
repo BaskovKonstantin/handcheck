@@ -10,3 +10,9 @@
 - Audit log client label via `formatClientDescriptor` (em dash).
 - Candidate calls: auto-expand ended section when no active calls.
 - Mobile stat tiles: 3-up compact for today + employer invitations.
+
+## Round 28 fixes (branch cursor/round28-webrtc-fixes-5553)
+
+- Signaling: relay WS messages as UTF-8 text (fixes Blob JSON.parse in browsers); reject ended calls; replace duplicate tab per user.
+- Recording: WebM mimetype with codecs; capped MediaRecorder bitrate for 60 min / 80 MB; upload errors surfaced in RU.
+- Call room: waiting state until both consented + live; «Выйти» without 409; transcript `{ text, at }` + SR restart; hero «Звонок: …»; layout 1280/390; ended view missing-recording note.

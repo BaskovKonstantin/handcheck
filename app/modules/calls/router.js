@@ -72,9 +72,9 @@ function callDurationLabel(startedAt, endedAt) {
   const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
   if (!Number.isFinite(ms) || ms < 0) return null;
   const sec = Math.round(ms / 1000);
-  if (sec < 60) return `короткий звонок, меньше минуты`;
+  if (sec < 60) return `Короткий звонок, меньше минуты`;
   const min = Math.floor(sec / 60);
-  return `длительность около ${min} мин`;
+  return `Длительность около ${min} мин`;
 }
 
 function ensureCall(invitationId) {

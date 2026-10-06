@@ -68,4 +68,25 @@ describe("browser integrations smoke", () => {
       await browser.close();
     });
   }
+
+  it("shows created token with copy row (P0-1)", async () => {
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await page.goto(`${base}/auth`);
+    await page.fill("#email", "anna@demo.local");
+    await page.fill("#password", "demo-demo-demo");
+    await page.click("#primary-action");
+    await page.waitForURL(/\/candidate\//, { timeout: 15000 });
+    await page.goto(`${base}/candidate/integrations`);
+    await page.waitForSelector("#create-token", { timeout: 15000 });
+    await page.fill("#token-name", "Playwright token");
+    await page.click("#create-token");
+    await page.waitForFunction(() => {
+      const raw = document.getElementById("token-raw");
+      return raw && /^hc_/.test(raw.textContent || "");
+    });
+    const snippet = await page.locator("#cursor-snippet").textContent();
+    assert.match(snippet, /hc_/);
+    await browser.close();
+  });
 });

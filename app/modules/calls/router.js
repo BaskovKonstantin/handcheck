@@ -12,6 +12,7 @@ const config = require("../../config");
 const { queueAnalyzeCall } = require("./analyze-call");
 const { isUuid } = require("../../lib/uuid");
 const { rejectOversizedBody } = require("../../middleware/reject-oversized-body");
+const { dbDateToIso } = require("../../lib/db-datetime");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail);
@@ -66,6 +67,7 @@ router.get("/for-invitation/:invitationId", (req, res, next) => {
   res.json({
     callId: call.id,
     status: call.status,
+    endedAt: call.ended_at ? dbDateToIso(call.ended_at) : null,
     consentCandidate: Boolean(call.consent_at_candidate),
     consentEmployer: Boolean(call.consent_at_employer),
   });
@@ -111,8 +113,15 @@ router.post("/:id/end", (req, res, next) => {
   const call = db.prepare("SELECT * FROM calls WHERE id = ?").get(req.params.id);
   if (!call) return next(httpError(404, "not_found"));
   const inv = db.prepare("SELECT * FROM invitations WHERE id = ?").get(call.invitation_id);
+  if (!inv) return next(httpError(404, "not_found"));
   if (![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
     return next(httpError(403, "forbidden"));
+  }
+  if (call.status === "ended") {
+    return res.json({ ok: true, status: "ended" });
+  }
+  if (call.status !== "live" && call.status !== "ready") {
+    return next(httpError(409, "invalid_body"));
   }
   const now = new Date().toISOString();
   db.prepare("UPDATE calls SET status = 'ended', ended_at = ? WHERE id = ?").run(now, call.id);

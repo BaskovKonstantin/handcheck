@@ -33,6 +33,7 @@ router.get("/needs/:id/deck/next", (req, res, next) => {
     backgroundDomains: c.backgroundDomains,
     explanation: c.explanation.slice(0, 2),
     taskPhrases: c.taskPhrases,
+    integrationNote: c.integrationNote,
     phone: c.phone,
     contact_email: c.contact_email,
   }, null);

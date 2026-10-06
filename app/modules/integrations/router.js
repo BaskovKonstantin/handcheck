@@ -11,6 +11,7 @@ const {
 const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { httpError } = require("../../middleware/errors");
 const config = require("../../config");
+const { dbDateToIso } = require("../../lib/db-datetime");
 
 const router = express.Router();
 
@@ -33,8 +34,8 @@ router.get("/tokens", (req, res) => {
       name: r.name,
       prefix: r.token_prefix,
       scopes: JSON.parse(r.scopes_json || "[]"),
-      createdAt: r.created_at,
-      lastUsedAt: r.last_used_at,
+      createdAt: dbDateToIso(r.created_at),
+      lastUsedAt: dbDateToIso(r.last_used_at),
       revoked: Boolean(r.revoked_at),
     })),
   });
@@ -87,7 +88,7 @@ router.get("/audit", (req, res) => {
       tool: r.tool_name,
       ok: Boolean(r.ok),
       summary: r.result_summary,
-      at: r.created_at,
+      at: dbDateToIso(r.created_at),
     })),
   });
 });

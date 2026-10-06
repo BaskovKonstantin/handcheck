@@ -30,6 +30,8 @@ function applyPatches(db) {
     "action_source",
     "TEXT NOT NULL DEFAULT 'web' CHECK (action_source IN ('web', 'mcp'))"
   );
+  const { applyBatteryContentPatch } = require("./task-battery-content");
+  applyBatteryContentPatch(db);
 }
 
 module.exports = { applyPatches };

@@ -34,24 +34,26 @@
         const n = d.items[0] || {};
         const spec = n.specialization || "backend";
         const grade = n.grade || "middle";
+        const SPEC_LABEL = { backend: "Backend", frontend: "Frontend", qa: "QA" };
+        const GRADE_LABEL = { junior: "Junior", middle: "Middle", senior: "Senior" };
         statsEl.innerHTML = HandCheck.statTilesHtml([
           {
             variant: "forest",
             label: "Специализация",
-            value: spec,
+            value: SPEC_LABEL[spec] || spec,
             hint: "Из потребности в подборе",
           },
           {
             variant: "clay",
             label: "Грейд",
-            value: grade,
+            value: GRADE_LABEL[grade] || grade,
             hint: "Категория кандидатов",
           },
           {
             variant: "ink",
             label: "Домен",
             value: (n.domainText || "—").slice(0, 28) + ((n.domainText || "").length > 28 ? "…" : ""),
-            hint: "Текст для domain boost",
+            hint: "Учитывается в доменном бонусе",
           },
         ]);
         formEl.innerHTML = `

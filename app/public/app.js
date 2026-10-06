@@ -2,6 +2,8 @@ const ERROR_MESSAGES = {
   invalid_credentials: "Неверный email или пароль",
   unauthorized: "Войдите в аккаунт",
   forbidden: "Нет доступа",
+  email_not_confirmed: "Подтвердите email — проверьте почту после регистрации",
+  not_found: "Страница или объект не найдены",
   rate_limit: "Слишком много запросов — подождите минуту",
   file_too_large: "Файл слишком большой (максимум 80 МБ)",
   upload_failed: "Не удалось загрузить файл",
@@ -10,6 +12,15 @@ const ERROR_MESSAGES = {
   invalid_body: "Проверьте поля формы",
   network_error: "Не удалось связаться с сервером",
   timeout: "Сервер долго не отвечает",
+  cooldown: "Пересдача по этой специализации пока недоступна",
+  deadline_passed: "Время на рабочую задачу истекло",
+  candidate_paused: "Кандидат на паузе — новые приглашения не отправляются",
+  candidate_rejected: "Кандидат отклонён по этой потребности",
+  candidate_deferred: "Кандидат в отложенных — сначала верните его из списка отложенных",
+  consent_required: "Подтвердите согласие на запись перед входом в комнату",
+  invitation_duplicate: "Приглашение уже отправлено — дождитесь ответа кандидата",
+  invitation_final: "Ответ на приглашение уже зафиксирован",
+  battery_incomplete: "Батарея заданий для выбранной категории пока не готова",
 };
 
 const API_TIMEOUT_MS = 14000;
@@ -23,6 +34,7 @@ function formatApiError(err) {
   const code = err?.data?.error || err?.message;
   const fields = err?.data?.details?.fields;
   if (fields?.salaryRange) return fields.salaryRange;
+  if (fields?.tokenName) return fields.tokenName;
   if (err?.status === 413 || code === "file_too_large") {
     return ERROR_MESSAGES.file_too_large;
   }
@@ -281,9 +293,13 @@ function mountCabinetChromeSync(links, role) {
   ensureCabinetChrome(links, role, placeholder);
 }
 
-async function refreshCabinetMeEmail() {
+async function refreshCabinetMeEmail(expectedRole) {
   try {
     const me = await api("/api/me");
+    if (expectedRole && me.role !== expectedRole) {
+      window.location.replace(me.role === "employer" ? "/employer/deck" : "/candidate/today");
+      return;
+    }
     cabinetMeEmail = me.email || "";
     setCachedMeEmail(cabinetMeEmail);
     updateCabinetEmails(cabinetMeEmail);
@@ -294,7 +310,7 @@ async function refreshCabinetMeEmail() {
 
 async function mountCabinetShell(links, role) {
   mountCabinetChromeSync(links, role);
-  await refreshCabinetMeEmail();
+  await refreshCabinetMeEmail(role);
 }
 
 /**
@@ -303,7 +319,7 @@ async function mountCabinetShell(links, role) {
 function bootCabinetPage(role, loadFn) {
   const links = role === "employer" ? EMPLOYER_LINKS : CANDIDATE_LINKS;
   mountCabinetChromeSync(links, role);
-  void refreshCabinetMeEmail();
+  void refreshCabinetMeEmail(role);
   try {
     const result = loadFn();
     if (result && typeof result.then === "function") {
@@ -430,6 +446,26 @@ function callStatusClass(status) {
   return "ready";
 }
 
+function formatDateTimeMoscow(iso) {
+  if (!iso) return "";
+  let normalized = iso;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:/.test(iso)) {
+    normalized = `${iso.replace(" ", "T")}Z`;
+  } else if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]$/.test(iso) && !/[+-]\d{2}:\d{2}$/.test(iso)) {
+    normalized = `${iso}Z`;
+  }
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function formatSalaryRange(from, to) {
   const f = Number(from);
   const t = Number(to);
@@ -554,5 +590,6 @@ window.HandCheck = {
   callStatusLabel: (s) => CALL_STATUS_LABEL[s] || s,
   callStatusClass,
   formatSalaryRange,
+  formatDateTimeMoscow,
   LOGO_MARK,
 };

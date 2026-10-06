@@ -46,7 +46,7 @@
         }
         const workState = currentIndex >= 4 ? (currentIndex === 4 ? "current" : "done") : "";
         steps.push(`<li class="battery-step battery-step-work ${workState}">
-          <span class="battery-step-num">W</span>
+          <span class="battery-step-num">5</span>
           <span class="battery-step-label">Рабочая</span>
         </li>`);
         return `<ol class="battery-steps" aria-label="Шаги батареи">${steps.join("")}</ol>`;
@@ -76,17 +76,22 @@
       }
 
       async function renderStartForm(category) {
+        const onCooldown = category?.cooldownActive && category?.retakeAt;
+        const retakeLine = onCooldown
+          ? `<p class="field-error">Пересдача возможна после ${new Date(category.retakeAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}.</p>`
+          : "";
         const catBlock = category?.label
           ? `<div class="battery-last-result">
               <span class="invite-meta">Текущая категория</span>
               <span class="category-pill">${category.label}</span>
-              <p class="invite-meta">Новая попытка может улучшить категорию после cooldown по специализации.</p>
+              <p class="invite-meta">Новая попытка может улучшить категорию после паузы для пересдачи по специализации.</p>
+              ${retakeLine}
             </div>`
-          : `<p class="invite-meta">Категория появится после первой завершённой батареи.</p>`;
+          : `<p class="invite-meta">${onCooldown ? "Категория не подтверждена." : "Категория появится после первой завершённой батареи."}</p>${retakeLine}`;
         panel.innerHTML = `
           ${batteryStepIndicator(0, 5)}
           ${catBlock}
-          <p class="invite-meta">Выберите специализацию и грейд для новой попытки.</p>
+          <p class="invite-meta">Выберите специализацию и грейд. Сейчас доступна только категория Backend × Middle — остальные батареи готовятся.</p>
           <div class="form-field">
             <span class="form-label">Специализация</span>
             ${choiceChips("spec", SPECS, "backend")}
@@ -95,25 +100,29 @@
             <span class="form-label">Грейд</span>
             ${choiceChips("grade", GRADES, "middle")}
           </div>
-          <button class="btn-primary" id="start">Начать батарею</button>
+          <button class="btn-primary" id="start" ${onCooldown ? "disabled" : ""}>Начать батарею</button>
           <p class="field-error" id="err" hidden></p>`;
         bindChoiceChips(panel);
         document.getElementById("start").onclick = async () => {
+          if (onCooldown) return;
           const err = document.getElementById("err");
           err.hidden = true;
+          const spec = document.getElementById("spec").value;
+          const grade = document.getElementById("grade").value;
+          if (spec !== "backend" || grade !== "middle") {
+            err.hidden = false;
+            err.textContent = "Батарея заданий для выбранной категории пока не готова.";
+            return;
+          }
           try {
             await HandCheck.api("/api/assessment/battery/start", {
               method: "POST",
-              body: JSON.stringify({
-                specialization: document.getElementById("spec").value,
-                grade: document.getElementById("grade").value,
-              }),
+              body: JSON.stringify({ specialization: spec, grade }),
             });
             await init();
           } catch (e) {
             err.hidden = false;
-            err.textContent =
-              e.status === 409 ? "Пересдача этой специализации пока недоступна." : HandCheck.formatApiError(e);
+            err.textContent = HandCheck.formatApiError(e);
           }
         };
       }

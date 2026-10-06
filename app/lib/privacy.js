@@ -9,6 +9,7 @@ function employerCandidateView(viewerEmployerId, candidate, invitation) {
     backgroundDomains: candidate.backgroundDomains,
     explanation: candidate.explanation,
     taskPhrases: candidate.taskPhrases,
+    integrationNote: candidate.integrationNote || null,
   };
   if (
     invitation &&

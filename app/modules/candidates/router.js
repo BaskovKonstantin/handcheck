@@ -15,6 +15,8 @@ const {
 const { shouldMarkUserAsTest } = require("../../lib/is-test-user");
 const { normalizeStackInput } = require("../../lib/need-validation");
 const { dbDateToIso } = require("../../lib/db-datetime");
+const { sanitizeStoredDisplayName } = require("../../lib/public-candidate-name");
+const { formatSpecGradeLabel } = require("../../lib/category-labels");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("candidate"));
@@ -24,8 +26,9 @@ router.get("/profile", (req, res) => {
   const p = db
     .prepare("SELECT * FROM candidate_profiles WHERE user_id = ?")
     .get(req.user.id);
+  const user = db.prepare("SELECT email FROM users WHERE id = ?").get(req.user.id);
   res.json({
-    displayName: p.display_name,
+    displayName: sanitizeStoredDisplayName(p.display_name, user?.email),
     stack: JSON.parse(p.stack_json || "[]"),
     phone: p.phone,
     contactEmail: p.contact_email,
@@ -206,7 +209,7 @@ router.get("/invitations", (req, res) => {
         status: r.status,
         companyName: r.company_name,
         needTitle: r.need_title,
-        needCategory: `${r.specialization} × ${r.grade}`,
+        needCategory: formatSpecGradeLabel(r.specialization, r.grade),
         callStatus: r.call_status || null,
         createdAt: dbDateToIso(r.created_at),
       };

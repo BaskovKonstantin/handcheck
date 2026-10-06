@@ -447,6 +447,19 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await context.close();
   });
 
+  it("profile empty episode shows field errors (round 24 P1-6)", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "boris@demo.local");
+    await page.goto(`${BASE}/candidate/profile`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector("#add-ep", { timeout: 15000 });
+    await page.click("#add-ep", { force: true });
+    await page.waitForSelector("#ep-err:not([hidden])", { timeout: 10000 });
+    const err = (await page.locator("#ep-err").textContent()) || "";
+    assert.match(err, /роль|домен/i);
+    await context.close();
+  });
+
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

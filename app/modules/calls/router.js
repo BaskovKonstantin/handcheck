@@ -14,6 +14,7 @@ const { isUuid } = require("../../lib/uuid");
 const { rejectOversizedBody } = require("../../middleware/reject-oversized-body");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
+const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail);
@@ -94,7 +95,10 @@ router.get("/for-invitation/:invitationId", (req, res, next) => {
     .prepare("SELECT company_name FROM employer_profiles WHERE user_id = ?")
     .get(inv.employer_user_id);
   const candidate = db
-    .prepare("SELECT display_name FROM candidate_profiles WHERE user_id = ?")
+    .prepare(
+      `SELECT cp.display_name, u.email FROM candidate_profiles cp
+       JOIN users u ON u.id = cp.user_id WHERE cp.user_id = ?`
+    )
     .get(inv.candidate_user_id);
   const payload = {
     callId: call.id,
@@ -105,7 +109,7 @@ router.get("/for-invitation/:invitationId", (req, res, next) => {
     consentEmployer: Boolean(call.consent_at_employer),
     needTitle: need?.title || "",
     companyName: employer?.company_name || "",
-    candidateName: candidate?.display_name || "",
+    candidateName: publicCandidateDisplayName(candidate?.display_name, candidate?.email),
     salaryFrom: inv.salary_from,
     salaryTo: inv.salary_to,
   };
@@ -125,7 +129,13 @@ router.get("/for-invitation/:invitationId", (req, res, next) => {
 });
 
 router.post("/:id/consent", (req, res, next) => {
-  if (req.body?.accepted !== true) return next(httpError(400, "invalid_body"));
+  if (req.body?.accepted !== true) {
+    return next(
+      httpError(400, "invalid_body", {
+        fields: { accepted: "Подтвердите согласие на запись" },
+      })
+    );
+  }
   const db = getDb();
   const call = db.prepare("SELECT * FROM calls WHERE id = ?").get(req.params.id);
   if (!call) return next(httpError(404, "not_found"));
@@ -149,8 +159,20 @@ router.post("/:id/start", (req, res, next) => {
   const isCandidate = req.user.id === inv.candidate_user_id;
   const isEmployer = req.user.id === inv.employer_user_id;
   if (!isCandidate && !isEmployer) return next(httpError(403, "forbidden"));
-  if (isCandidate && !call.consent_at_candidate) return next(httpError(400, "consent_required"));
-  if (isEmployer && !call.consent_at_employer) return next(httpError(400, "consent_required"));
+  if (isCandidate && !call.consent_at_candidate) {
+    return next(
+      httpError(400, "consent_required", {
+        message: "Подтвердите согласие на запись перед входом в комнату",
+      })
+    );
+  }
+  if (isEmployer && !call.consent_at_employer) {
+    return next(
+      httpError(400, "consent_required", {
+        message: "Подтвердите согласие на запись перед входом в комнату",
+      })
+    );
+  }
   const updated = db.prepare("SELECT * FROM calls WHERE id = ?").get(call.id);
   if (call.status === "ended") {
     return next(httpError(409, "call_ended"));
@@ -243,7 +265,19 @@ router.post(
 );
 
 router.post("/:id/transcript-chunk", (req, res, next) => {
-  const text = String(req.body?.text || "").trim();
+  const text = String(req.body?.text ?? "").trim();
+  if (!text) {
+    return next(httpError(400, "invalid_body", { fields: { text: "Напишите реплику" } }));
+  }
+  const CHUNK_MAX = 4000;
+  const TRANSCRIPT_MAX = 20_000;
+  if (text.length > CHUNK_MAX) {
+    return next(
+      httpError(400, "invalid_body", {
+        fields: { text: `Реплика слишком длинная (максимум ${CHUNK_MAX} символов)` },
+      })
+    );
+  }
   const db = getDb();
   const call = db.prepare("SELECT * FROM calls WHERE id = ?").get(req.params.id);
   if (!call) return next(httpError(404, "not_found"));
@@ -258,7 +292,15 @@ router.post("/:id/transcript-chunk", (req, res, next) => {
     req.user.id === inv.candidate_user_id ? "Кандидат" : "Работодатель";
   const chunk = new RegExp(`^${roleLabel}\\s*:`, "i").test(text) ? text : `${roleLabel}: ${text}`;
   const merged = (call.transcript_text ? `${call.transcript_text} ` : "") + chunk;
-  db.prepare("UPDATE calls SET transcript_text = ? WHERE id = ?").run(merged.trim(), call.id);
+  const trimmed = merged.trim();
+  if (trimmed.length > TRANSCRIPT_MAX) {
+    return next(
+      httpError(400, "invalid_body", {
+        fields: { text: `Транскрипт слишком длинный (максимум ${TRANSCRIPT_MAX} символов)` },
+      })
+    );
+  }
+  db.prepare("UPDATE calls SET transcript_text = ? WHERE id = ?").run(trimmed, call.id);
   res.json({ ok: true });
 });
 

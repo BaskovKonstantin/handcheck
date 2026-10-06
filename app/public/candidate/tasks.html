@@ -171,18 +171,27 @@
         const draftKey = `handcheck:draft:v1:${attemptId}`;
         const saved = localStorage.getItem(draftKey);
         let restored = "";
+        let localAt = 0;
         if (saved) {
           try {
             const p = JSON.parse(saved);
             restored = p.text || "";
+            localAt = Number(p.at) || 0;
           } catch {
             restored = "";
           }
         }
+        const serverDraft = t.draftText || "";
+        if (!restored && serverDraft) restored = serverDraft;
+        else if (restored && serverDraft && serverDraft.length > restored.length) restored = serverDraft;
         const stepIndex = submitted;
+        const metaLine = HandCheck.formatSpecGradeLabel(
+          cur.battery.specialization,
+          cur.battery.claimedGrade
+        );
         panel.innerHTML = `
           ${batteryStepIndicator(stepIndex, 5)}
-          <p class="invite-meta">${cur.battery.specialization} · ${cur.battery.claimedGrade} · форма ${cur.battery.formKey}</p>
+          <p class="invite-meta">${HandCheck.escapeHtml(metaLine)}</p>
           <p>${HandCheck.escapeHtml(t.prompt)}</p>
           <textarea id="answer" rows="8">${HandCheck.escapeHtml(restored)}</textarea>
           <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
@@ -191,7 +200,7 @@
         if (restored) document.getElementById("draft-note").hidden = false;
         const ta = document.getElementById("answer");
         let submitting = false;
-        ta.addEventListener("blur", async () => {
+        const persistDraft = async () => {
           if (submitting) return;
           const text = ta.value;
           localStorage.setItem(draftKey, JSON.stringify({ text, at: Date.now() }));
@@ -203,16 +212,26 @@
           } catch {
             /* ignore draft race after submit */
           }
+        };
+        ta.addEventListener("blur", () => {
+          persistDraft();
         });
+        let draftTimer = null;
+        if (t.type === "work") {
+          draftTimer = setInterval(() => {
+            persistDraft();
+          }, 10000);
+        }
         document.getElementById("submit").onclick = async () => {
           const err = document.getElementById("err");
           err.hidden = true;
           const attemptsLeft = attempts.filter((a) => !a.submitted).length;
           if (attemptsLeft === 1) {
-            const ok = window.confirm("Это последний ответ в тесте. Отправить и завершить батарею?");
+            const ok = window.confirm("Это последний ответ в тесте. Отправить и завершить тест?");
             if (!ok) return;
           }
           submitting = true;
+          if (draftTimer) clearInterval(draftTimer);
           try {
             await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
               method: "POST",

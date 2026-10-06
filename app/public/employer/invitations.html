@@ -71,8 +71,13 @@
                 : "";
             const call =
               i.status === "accepted"
-                ? `<a class="btn-primary" href="/call/${esc(i.id)}">Комната звонка</a>`
+                ? i.callStatus === "ended"
+                  ? `<a class="btn-primary" href="/call/${esc(i.id)}">Итог звонка</a>`
+                  : `<a class="btn-primary" href="/call/${esc(i.id)}">Комната звонка</a>`
                 : "";
+            const priorDecline = i.hadPriorDecline
+              ? `<p class="invite-meta">Ранее отклонил приглашение по этой потребности</p>`
+              : "";
             const aiBadge = i.viaAiClient
               ? `<span class="status-pill status-pill-asis sent">через ИИ-клиент</span>`
               : "";
@@ -95,6 +100,7 @@
               <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
               ${offer}
               ${channel}
+              ${priorDecline}
               ${contacts}
               <div class="invite-actions">${call}</div>
             </article>`;

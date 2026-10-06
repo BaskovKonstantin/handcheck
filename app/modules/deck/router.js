@@ -89,9 +89,10 @@ router.get("/needs/:id/deferred", (req, res, next) => {
   if (!need) return next(httpError(404, "not_found"));
   const rows = getDb()
     .prepare(
-      `SELECT nr.candidate_user_id, cp.display_name, c.label
+      `SELECT nr.candidate_user_id, cp.display_name, u.email, c.label
        FROM need_reviews nr
        JOIN candidate_profiles cp ON cp.user_id = nr.candidate_user_id
+       JOIN users u ON u.id = nr.candidate_user_id
        JOIN candidate_categories cc ON cc.candidate_user_id = nr.candidate_user_id
        JOIN categories c ON c.id = cc.category_id
        WHERE nr.need_id = ? AND nr.employer_user_id = ? AND nr.decision = 'later'`
@@ -100,7 +101,7 @@ router.get("/needs/:id/deferred", (req, res, next) => {
   res.json({
     items: rows.map((r) => ({
       candidateId: r.candidate_user_id,
-      displayName: publicCandidateDisplayName(r.display_name),
+      displayName: publicCandidateDisplayName(r.display_name, r.email),
       categoryLabel: r.label,
     })),
   });

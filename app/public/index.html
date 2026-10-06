@@ -114,7 +114,7 @@
             demo ? `${v || 2} <span class="stat-label">в демо</span>` : String(v);
           document.getElementById("stats").innerHTML = `
             <div class="stat stat-forest"><div class="stat-value">${fmt(s.categories, s.categoriesDemo)}</div><div class="stat-label">категорий подтверждено</div></div>
-            <div class="stat stat-clay"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты</div></div>
+            <div class="stat stat-clay"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты к приглашениям</div></div>
             <div class="stat stat-ink"><div class="stat-value">${fmt(s.invitations, s.invitationsDemo)}</div><div class="stat-label">приглашений</div></div>`;
         });
     </script>

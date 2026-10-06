@@ -44,8 +44,14 @@ function validateOptionalEmail(value, fieldKey = "contactEmail") {
 function validateOptionalPhone(value) {
   const fields = {};
   const phone = String(value ?? "").trim();
-  if (phone && phone.length > 32) {
+  if (!phone) return { phone: "", fields };
+  if (phone.length > 32) {
     fields.phone = "Телефон слишком длинный";
+  } else {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10 || !/^[\d\s+().-]+$/.test(phone)) {
+      fields.phone = "Укажите корректный телефон";
+    }
   }
   return { phone, fields };
 }
@@ -54,16 +60,22 @@ function validateBackgroundEpisode(body) {
   const fields = {};
   const roleTitle = String(body?.roleTitle ?? "").trim();
   const domain = String(body?.domain ?? "").trim();
+  const industry = String(body?.industry ?? "").trim();
+  const note = String(body?.note ?? "").trim();
   if (!roleTitle) fields.roleTitle = "Укажите роль";
+  else if (roleTitle.length > 120) fields.roleTitle = "Роль — не длиннее 120 символов";
   if (!domain) fields.domain = "Укажите домен";
+  else if (domain.length > 200) fields.domain = "Домен — не длиннее 200 символов";
+  if (industry.length > 120) fields.industry = "Отрасль — не длиннее 120 символов";
+  if (note.length > 500) fields.note = "Заметка — не длиннее 500 символов";
   if (Object.keys(fields).length) {
     throw httpError(400, "invalid_body", { fields });
   }
   return {
     roleTitle,
     domain,
-    industry: String(body?.industry ?? "").trim(),
-    note: String(body?.note ?? "").trim(),
+    industry,
+    note,
   };
 }
 

@@ -74,6 +74,17 @@ function applyPatches(db) {
     const dn = prof.get(u.id)?.display_name;
     if (shouldMarkUserAsTest(u.email, dn)) mark.run(u.id);
   }
+
+  db.exec(`
+    UPDATE candidate_profiles
+    SET display_name = ''
+    WHERE display_name != ''
+      AND EXISTS (
+        SELECT 1 FROM users u
+        WHERE u.id = candidate_profiles.user_id
+          AND lower(trim(candidate_profiles.display_name)) = lower(trim(substr(u.email, 1, instr(u.email, '@') - 1)))
+      );
+  `);
 }
 
 module.exports = { applyPatches };

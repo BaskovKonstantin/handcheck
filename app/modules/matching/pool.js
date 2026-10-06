@@ -16,7 +16,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
   );
   const rows = db
     .prepare(
-      `SELECT u.id AS user_id, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
+      `SELECT u.id AS user_id, u.email, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
               cc.test_score, cc.motivation, cc.assigned_at, c.label AS category_label,
               priv.trust_ok
        FROM candidate_categories cc
@@ -97,7 +97,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
     out.push({
       id: r.user_id,
       reviewDecision: decision || null,
-      displayName: publicCandidateDisplayName(r.display_name),
+      displayName: publicCandidateDisplayName(r.display_name, r.email),
       categoryLabel: r.category_label,
       stack: JSON.parse(r.stack_json || "[]"),
       phone: r.phone,

@@ -30,4 +30,9 @@ function formatRuDateTime(iso, timeZone = "Europe/Moscow") {
   });
 }
 
-module.exports = { dbDateToIso, formatRuDateTime };
+/** SQLite-safe bounds for comparing TEXT timestamps (ISO or `YYYY-MM-DD HH:MM:SS`). */
+function sqlDatetimeExpr(column) {
+  return `datetime(replace(replace(${column}, 'T', ' '), 'Z', ''))`;
+}
+
+module.exports = { dbDateToIso, formatRuDateTime, sqlDatetimeExpr };

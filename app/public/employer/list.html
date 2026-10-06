@@ -131,7 +131,7 @@
                 .join("");
               const actions =
                 r.reviewStatus === "invited"
-                  ? `<a class="btn-ghost btn-sm" href="/employer/invitations">К приглашениям</a>`
+                  ? `<div class="list-row-actions"><a class="btn-ghost btn-sm" href="/employer/invitations">К приглашениям</a></div>`
                   : `<div class="list-row-actions">
                   <button type="button" class="btn-ghost btn-sm" data-decision="later" data-id="${r.id}">Отложить</button>
                   <button type="button" class="btn-ghost btn-sm" data-decision="rejected" data-id="${r.id}">Отказать</button>

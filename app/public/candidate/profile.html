@@ -63,6 +63,7 @@
             <label>Домен <input id="ep-domain" /></label>
             <label>Отрасль <input id="ep-industry" /></label>
             <button type="button" class="btn-ghost" id="add-ep">Добавить эпизод</button>
+            <p class="field-error" id="ep-err" hidden></p>
           </section>`;
         const saveBtn = document.getElementById("save-profile");
         const checkDirty = () => {
@@ -90,15 +91,22 @@
           }
         };
         document.getElementById("add-ep").onclick = async () => {
-          await HandCheck.api("/api/candidate/background", {
-            method: "POST",
-            body: JSON.stringify({
-              roleTitle: document.getElementById("ep-role").value,
-              domain: document.getElementById("ep-domain").value,
-              industry: document.getElementById("ep-industry").value,
-            }),
-          });
-          await load();
+          const epErr = document.getElementById("ep-err");
+          epErr.hidden = true;
+          try {
+            await HandCheck.api("/api/candidate/background", {
+              method: "POST",
+              body: JSON.stringify({
+                roleTitle: document.getElementById("ep-role").value,
+                domain: document.getElementById("ep-domain").value,
+                industry: document.getElementById("ep-industry").value,
+              }),
+            });
+            await load();
+          } catch (e) {
+            epErr.hidden = false;
+            epErr.textContent = HandCheck.formatApiError(e);
+          }
         };
         main.querySelectorAll(".del-ep").forEach((btn) => {
           btn.onclick = async () => {

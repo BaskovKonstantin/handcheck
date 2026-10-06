@@ -36,6 +36,15 @@ function parseSalaryRange(salaryFrom, salaryTo) {
   if (Number.isInteger(to) && to > SALARY_MAX) {
     fields.salaryRange = fields.salaryRange || "Слишком большая сумма в поле «До»";
   }
+  const SALARY_MIN = 10_000;
+  if (Number.isInteger(from) && from > 0 && from < SALARY_MIN) {
+    fields.salaryRange = `Минимальная сумма в поле «От» — ${SALARY_MIN.toLocaleString("ru-RU")} ₽`;
+  }
+  if (Number.isInteger(to) && to > 0 && to < SALARY_MIN) {
+    fields.salaryRange =
+      fields.salaryRange ||
+      `Минимальная сумма в поле «До» — ${SALARY_MIN.toLocaleString("ru-RU")} ₽`;
+  }
   return { fields, from, to };
 }
 

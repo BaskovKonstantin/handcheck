@@ -34,7 +34,6 @@ function normalizeScopes(scopes) {
     const v = String(s).trim().toLowerCase();
     if (allowed.has(v) && !out.includes(v)) out.push(v);
   }
-  if (!out.length) out.push("read");
   return out;
 }
 

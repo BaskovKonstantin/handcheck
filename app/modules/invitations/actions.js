@@ -48,7 +48,11 @@ function createInvitation(employerUserId, body, actionSource = "web") {
       fields: { companyName: "Заполните профиль компании" },
     });
   }
-  assertCandidateInNeedPool(employerUserId, need, candidateId);
+  if (!need.active) {
+    throw httpError(409, "need_inactive", {
+      message: "Потребность неактивна — новые приглашения отправить нельзя",
+    });
+  }
   const avail = db
     .prepare("SELECT availability FROM candidate_profiles WHERE user_id = ?")
     .get(candidateId);
@@ -60,6 +64,7 @@ function createInvitation(employerUserId, body, actionSource = "web") {
     .get(employerUserId, needId, candidateId);
   if (review?.decision === "rejected") throw httpError(409, "candidate_rejected");
   if (review?.decision === "later") throw httpError(409, "candidate_deferred");
+  assertCandidateInNeedPool(employerUserId, need, candidateId);
   const existing = findActiveInvitation(db, needId, candidateId);
   if (existing) throw httpError(409, "invitation_duplicate");
   const id = newId();

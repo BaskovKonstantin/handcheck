@@ -88,7 +88,8 @@
         const { active, ended } = splitCalls(items);
         const ready = active.filter((r) => r.callStatus !== "live").length;
         const live = active.filter((r) => r.callStatus === "live").length;
-        statsEl.innerHTML = HandCheck.statTilesHtml([
+        statsEl.innerHTML = HandCheck.statTilesHtml(
+          [
           {
             variant: "clay",
             icon: ICON_READY,
@@ -110,7 +111,9 @@
             value: ended.length,
             hint: "Архив без разбора",
           },
-        ]);
+        ],
+          { gridClass: "stat-tile-grid-compact" }
+        );
         if (!items.length) {
           list.innerHTML = HandCheck.emptyState(
             "Звонков пока нет",
@@ -126,7 +129,7 @@
         const endedSection =
           ended.length > 0
             ? `<details class="calls-archive">
-                <summary class="calls-archive-summary">Завершённые звонки (${ended.length})</summary>
+                <summary class="calls-archive-summary">Завершённые звонки</summary>
                 <div class="invite-card-grid">${ended.map((row) => callCard(row, false)).join("")}</div>
               </details>`
             : "";

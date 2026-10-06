@@ -16,7 +16,7 @@ const ERROR_MESSAGES = {
   deadline_passed: "Время на рабочую задачу истекло",
   candidate_paused: "Кандидат на паузе — новые приглашения не отправляются",
   candidate_rejected: "Кандидат отклонён по этой потребности",
-  candidate_deferred: "Кандидат в отложенных — сначала верните его из списка отложенных",
+  candidate_deferred: "Кандидат в отложенных — верните его в подбор",
   consent_required: "Подтвердите согласие на запись перед входом в комнату",
   invitation_duplicate: "Приглашение уже отправлено — дождитесь ответа кандидата",
   invitation_final: "Ответ на приглашение уже зафиксирован",
@@ -28,7 +28,20 @@ const ERROR_MESSAGES = {
   invalid_recording: "Некорректный файл записи",
   invalid_availability: "Выберите доступность",
   candidate_not_in_pool: "Кандидат не подходит под эту потребность",
+  need_inactive: "Потребность неактивна — новые приглашения отправить нельзя",
 };
+
+const SPEC_LABELS = { backend: "Backend", frontend: "Frontend", qa: "QA" };
+const GRADE_LABELS = { junior: "Junior", middle: "Middle", senior: "Senior" };
+
+function formatSpecGradeLabel(specialization, grade) {
+  const spec = SPEC_LABELS[specialization] || specialization || "";
+  const gr = GRADE_LABELS[grade] || grade || "";
+  if (!spec && !gr) return "";
+  if (!gr) return spec;
+  if (!spec) return gr;
+  return `${spec} × ${gr}`;
+}
 
 const API_TIMEOUT_MS = 14000;
 const API_RETRIES = 2;
@@ -214,7 +227,7 @@ function setCachedMeEmail(email) {
 }
 
 function escapeHtml(text) {
-  return String(text || "")
+  return String(text ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -231,10 +244,7 @@ function resolveEmployerNeedId(needs, searchParams) {
   if (fromQuery && byId.has(fromQuery)) return fromQuery;
   try {
     const stored = localStorage.getItem(EMPLOYER_NEED_STORAGE_KEY);
-    if (stored && byId.has(stored)) {
-      const item = byId.get(stored);
-      if (item.active) return stored;
-    }
+    if (stored && byId.has(stored)) return stored;
   } catch {
     /* ignore */
   }
@@ -253,10 +263,10 @@ function persistEmployerNeedId(needId) {
 
 function needSwitcherOptionLabel(n) {
   const esc = escapeHtml;
-  const spec = n.specialization ? ` · ${n.specialization}` : "";
-  const grade = n.grade ? ` ${n.grade}` : "";
+  const specGrade = formatSpecGradeLabel(n.specialization, n.grade);
+  const suffix = specGrade ? ` · ${specGrade}` : "";
   const inactive = n.active ? "" : " (неактивна)";
-  return `${esc(n.title || "Без названия")}${esc(spec)}${esc(grade)}${inactive}`;
+  return `${esc(n.title || "Без названия")}${esc(suffix)}${inactive}`;
 }
 
 function employerNeedSwitcherHtml(needs, selectedId) {
@@ -276,7 +286,7 @@ function employerNeedSwitcherHtml(needs, selectedId) {
     .join("");
   const banner =
     selected && !selected.active
-      ? `<p class="need-inactive-banner invite-meta">Потребность неактивна — кандидаты не увидят её в подборе, но вы можете просматривать списки.</p>`
+      ? `<p class="need-inactive-banner invite-meta">Потребность неактивна — просмотр списков и колоды доступен, новые приглашения отправить нельзя.</p>`
       : "";
   return `${banner}<div class="need-switcher-bar"><label class="form-label need-switcher">Потребность
     <select id="employer-need-switch">${options}</select></label></div>`;
@@ -552,9 +562,10 @@ function timelineSection(title, items) {
   return `<section class="timeline-section"><h2 class="timeline-heading">${esc(title)}</h2><ol class="timeline-list">${rows}</ol></section>`;
 }
 
-function statTilesHtml(tiles) {
+function statTilesHtml(tiles, options = {}) {
   const esc = escapeHtml;
-  return `<div class="stat-tile-grid">${tiles
+  const gridClass = options.gridClass ? ` ${options.gridClass}` : "";
+  return `<div class="stat-tile-grid${gridClass}">${tiles
     .map(
       (t) => `<article class="stat-tile stat-tile-${esc(t.variant || "forest")}">
       <div class="stat-tile-label">${t.icon || ""}${esc(t.label)}</div>
@@ -791,6 +802,7 @@ window.HandCheck = {
   formatSalaryRange,
   formatDateTimeMoscow,
   formatRetakeDateMoscow,
+  formatSpecGradeLabel,
   escapeHtml,
   resolveEmployerNeedId,
   persistEmployerNeedId,

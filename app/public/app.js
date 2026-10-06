@@ -101,7 +101,7 @@ const CALL_STATUS_LABEL = {
   ended: "Завершён",
 };
 
-const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="currentColor" opacity="0.12"/><path d="M8 18V10h3.2c2.2 0 3.6 1.1 3.6 2.9 0 1.2-.6 2.1-1.6 2.5L16 18h-2.4l-1.9-2.2H11v2.2H8zm3-4.5c.9 0 1.4-.4 1.4-1.1s-.5-1.1-1.4-1.1H11v2.2h0zM17.5 18V10H20v8h-2.5z" fill="currentColor"/></svg></span>`;
+const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="32" height="32" rx="9" fill="currentColor"/><path d="M8.5 10h2.2v4.1h3.1V10H16v11h-2.2v-4.4h-3.1V21H8.5V10zm9.2 0H20c2.4 0 3.8 1.3 3.8 3.4 0 1.5-.7 2.5-1.9 3l2.1 4.6h-2.5l-1.8-4h-1.5v4h-2.2V10zm2.2 2v2.4h1.1c.8 0 1.2-.4 1.2-1.1s-.4-1.1-1.2-1.1h-1.1z" fill="#fff"/><path d="M23.5 9.2l1.4 1.4-5.2 5.2-2.1-2.1 1.4-1.4 0.7 0.7 3.8-3.8z" fill="#E5F0EA" opacity="0.9"/></svg></span>`;
 
 const NAV_ICONS = {
   today: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4V6zm2 2v10h12V8H6zm2 9h2v-2H8v2zm0-4h2v-2H8v2zm4 4h2v-2h-2v2zm0-4h2v-2h-2v2zm4 4h2v-2h-2v2z" fill="currentColor"/></svg>',
@@ -241,6 +241,41 @@ function emptyState(title, help, ctaHref, ctaLabel) {
   return `<div class="empty-state">${EMPTY_ILLUSTRATION}<h2 class="empty-title">${title}</h2><p class="empty-help">${help}</p>${cta}</div>`;
 }
 
+/** Keep in sync with app/lib/deck-empty-state.js */
+function getDeckEmptyState({ invitedInMatches }) {
+  if (invitedInMatches > 0) {
+    return {
+      title: "Колода пуста",
+      help:
+        "Все подходящие кандидаты уже получили приглашение по этой потребности. Откройте приглашения или посмотрите полный список.",
+      actions: [
+        { href: "/employer/invitations", label: "Приглашения", primary: true },
+        { href: "/employer/list", label: "Список", primary: false },
+        { href: "/employer/need", label: "Изменить потребность", primary: false },
+      ],
+    };
+  }
+  return {
+    title: "Колода пуста",
+    help:
+      "Нет кандидатов для свайпа по текущим фильтрам. Проверьте потребность, снимите фильтры в списке или загляните в отложенные.",
+    actions: [
+      { href: "/employer/list", label: "Список", primary: true },
+      { href: "/employer/deferred", label: "Отложенные", primary: false },
+      { href: "/employer/need", label: "Изменить потребность", primary: false },
+    ],
+  };
+}
+
+function emptyStateActions(title, help, actions) {
+  const ctas = (actions || [])
+    .map((a) =>
+      `<a class="${a.primary ? "btn-primary" : "btn-ghost"}" href="${a.href}">${a.label}</a>`
+    )
+    .join("");
+  return `<div class="empty-state">${EMPTY_ILLUSTRATION}<h2 class="empty-title">${title}</h2><p class="empty-help">${help}</p><div class="empty-actions">${ctas}</div></div>`;
+}
+
 function loadErrorState(title, help, retryFn) {
   const id = `retry-${Math.random().toString(36).slice(2, 9)}`;
   setTimeout(() => {
@@ -296,6 +331,8 @@ window.HandCheck = {
   employerNav,
   setLoading,
   emptyState,
+  emptyStateActions,
+  getDeckEmptyState,
   loadErrorState,
   loadPanel,
   toast,

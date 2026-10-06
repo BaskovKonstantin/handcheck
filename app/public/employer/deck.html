@@ -13,15 +13,16 @@
         <h1>Колода</h1>
         <p class="lede">Один жест — одно решение. Без фото и без числовых оценок.</p>
       </header>
-      <div class="deck-wrap">
-        <div id="deck-card" class="deck-card enter"></div>
+      <div class="deck-wrap" id="deck-wrap">
+        <div id="deck-card" class="deck-card enter" hidden></div>
         <div class="deck-actions" id="deck-actions" hidden>
           <button class="btn-ghost" type="button" data-decision="rejected">Отказать</button>
           <button class="btn-ghost" type="button" data-decision="later">Отложить</button>
           <button class="btn-primary" type="button" id="invite-open">Пригласить</button>
         </div>
       </div>
-      <p class="empty" id="empty" hidden>Кандидатов в колоде нет</p>
+      <p class="empty" id="empty" hidden></p>
+      <div id="deck-empty" hidden></div>
     </main>
     <div class="invite-sheet hidden" id="sheet">
       <div class="invite-panel">

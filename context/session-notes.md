@@ -1,6 +1,5 @@
-# HandCheck session notes
+# HandCheck session
 
-- Round 4 branch: `cursor/round4-test-improve-ed4d`
-- Prod tested via API smoke; Playwright in-page fetch to prod hangs in cloud VM (curl/API client OK)
-- Fix: matches API keeps `invited` candidates for employer list; deck still excludes them
-- Screenshots: `handcheck-ui/round4/after/`
+- Round 5 branch: cursor/round5-visual-redesign-77f5
+- Visual: forest hero block, landing mockup, HC logo, stat accents, deck empty state + demo top-up seed
+- Prod: https://handcheck.baski.pro

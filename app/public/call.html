@@ -9,23 +9,17 @@
   </head>
   <body class="call-room-page">
     <main class="call-room column">
-      <header class="call-room-hero">
-        <h1>Комната звонка</h1>
-        <p class="lede">Согласие на запись обязательно. Состояние комнаты обновляется после входа.</p>
+      <header class="call-room-hero call-room-hero-expressive">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="call-room-hero-inner">
+          <p class="hero-eyebrow call-room-eyebrow">Видеозвонок HandCheck</p>
+          <h1>Комната звонка</h1>
+          <p class="lede">Согласие на запись обязательно. Комната откроется после принятого приглашения.</p>
+        </div>
       </header>
-      <p class="call-state-banner" id="state-banner">Подготовка комнаты…</p>
-      <label class="panel" style="display:block;margin-bottom:1rem">
-        <input type="checkbox" id="consent" />
-        Разговор сохранится и будет использован, чтобы оценить соответствие задаче.
-      </label>
-      <p><span class="rec-dot" id="rec-indicator"></span><span id="rec-label">Запись выключена</span></p>
-      <video id="local" class="call-video" autoplay muted playsinline></video>
-      <p id="timer" class="dashboard-value" style="font-size:1.25rem">00:00</p>
-      <div class="form-actions">
-        <button class="btn-primary" id="join" disabled>Войти в комнату</button>
-        <button class="btn-ghost" id="end" hidden>Завершить</button>
+      <div id="room-host">
+        <p class="call-state-banner" id="state-banner">Подготовка комнаты…</p>
       </div>
-      <p class="field-error" id="room-err" hidden></p>
     </main>
     <script src="/app.js"></script>
     <script src="/call.js"></script>

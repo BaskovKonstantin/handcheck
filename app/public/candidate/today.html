@@ -30,6 +30,42 @@
       const ICON_CALL =
         '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg></span>';
 
+      function formatInviteDate(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+      }
+
+      function groupAcceptedInvites(items) {
+        const groups = new Map();
+        (items || [])
+          .filter((i) => i.status === "accepted")
+          .forEach((i) => {
+            const key = `${i.companyName}|${i.salaryFrom}|${i.salaryTo}`;
+            const list = groups.get(key) || [];
+            list.push(i);
+            groups.set(key, list);
+          });
+        return [...groups.values()]
+          .map((list) => {
+            const sorted = list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const primary = sorted[0];
+            const extra = sorted.length > 1 ? ` · ещё ${sorted.length - 1}` : "";
+            const dateStr = formatInviteDate(primary.createdAt);
+            const salary = HandCheck.formatSalaryRange(primary.salaryFrom, primary.salaryTo);
+            const metaParts = [dateStr, salary].filter(Boolean);
+            return {
+              primary,
+              meta: `${metaParts.join(" · ")}${extra}`,
+              roomHref: sorted.length > 1 ? "/candidate/calls" : `/call/${primary.id}`,
+              roomLabel: sorted.length > 1 ? "Все звонки" : "Комната",
+            };
+          })
+          .sort((a, b) => new Date(b.primary.createdAt) - new Date(a.primary.createdAt))
+          .slice(0, 4);
+      }
+
       function buildUpcomingSteps(invItems, cat) {
         const steps = [];
         if (!cat.label) {
@@ -44,24 +80,23 @@
           .filter((i) => i.status === "sent" || i.status === "viewed")
           .slice(0, 4)
           .forEach((i) => {
+            const dateStr = formatInviteDate(i.createdAt);
+            const salary = HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo);
             steps.push({
               tone: "clay",
               title: `Ответить: ${i.companyName}`,
-              meta: HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo),
+              meta: [dateStr, salary].filter(Boolean).join(" · "),
               cta: '<a class="btn-ghost btn-sm" href="/candidate/invitations">Приглашения</a>',
             });
           });
-        (invItems || [])
-          .filter((i) => i.status === "accepted")
-          .slice(0, 3)
-          .forEach((i) => {
-            steps.push({
-              tone: "forest",
-              title: `Звонок с ${i.companyName}`,
-              meta: "Приглашение принято — можно войти в комнату",
-              cta: `<a class="btn-primary btn-sm" href="/call/${i.id}">Комната</a>`,
-            });
+        groupAcceptedInvites(invItems).forEach(({ primary, meta, roomHref, roomLabel }) => {
+          steps.push({
+            tone: "forest",
+            title: `Звонок с ${primary.companyName}`,
+            meta: meta || "Приглашение принято — можно войти в комнату",
+            cta: `<a class="btn-primary btn-sm" href="${roomHref}">${roomLabel}</a>`,
           });
+        });
         if (!steps.length) {
           steps.push({
             tone: "muted",
@@ -95,12 +130,15 @@
         const retake = cat.retakeAt
           ? `<p class="invite-meta">Пересдача возможна после ${new Date(cat.retakeAt).toLocaleDateString("ru")}</p>`
           : "";
+        const categoryHint = `<p class="invite-meta">Задания подтверждают навык — при успешной пересдаче категория обновится.</p>
+              <a class="btn-primary btn-sm" href="/candidate/tasks">Улучшить категорию</a>`;
         const timeline = HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat));
         dash.innerHTML = `
           <div class="stat-tile-grid">
             <article class="stat-tile stat-tile-forest">
               <div class="stat-tile-label">${ICON_CAT} Категория</div>
               <div class="stat-tile-value"><span class="category-pill">${cat.label}</span></div>
+              ${categoryHint}
               ${retake}
             </article>
             <article class="stat-tile stat-tile-clay">

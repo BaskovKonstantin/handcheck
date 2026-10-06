@@ -7,43 +7,97 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body class="auth-page">
-    <main class="column auth-column auth-shell">
-      <div class="auth-hero-band">
-        <a class="logo" href="/" id="auth-logo">HandCheck</a>
-        <h1 class="display-title" style="font-size:clamp(1.75rem,5vw,2.25rem);max-width:none">Кабинет HandCheck</h1>
-      </div>
-      <p class="auth-demo-hint" id="demo-hint">
-        Демо-аккаунты: <strong>anna@demo.local</strong>, <strong>cafe@demo.local</strong> и другие с паролем
-        <strong>demo-demo-demo</strong>. После регистрации код подтверждения в демо: <strong>000000</strong>.
-      </p>
-      <div class="auth-tabs" role="tablist">
-        <button type="button" class="auth-tab active" id="tab-login" role="tab" aria-selected="true">Вход</button>
-        <button type="button" class="auth-tab" id="tab-register" role="tab" aria-selected="false">Регистрация</button>
-      </div>
-      <div class="panel auth-panel">
-        <label>Email <input type="email" id="email" autocomplete="username" /></label>
-        <label>Пароль <input type="password" id="password" autocomplete="current-password" /></label>
-        <label id="role-wrap">Роль
-          <select id="role">
-            <option value="candidate">Кандидат</option>
-            <option value="employer">Работодатель</option>
-          </select>
-        </label>
-        <p class="field-error" id="err" hidden></p>
-        <div class="form-actions">
-          <button class="btn-primary" type="button" id="primary-action">Войти</button>
+  <body class="auth-page auth-page-split">
+    <div class="auth-split">
+      <section class="auth-split-hero landing-hero" aria-hidden="false">
+        <div class="landing-hero-pattern" aria-hidden="true"></div>
+        <div class="auth-split-hero-inner">
+          <a class="logo logo-on-dark" href="/" id="auth-logo-hero">HandCheck</a>
+          <p class="hero-eyebrow">Найм без рейтингов и фото</p>
+          <h1 class="display-title display-title-on-dark auth-split-title">
+            Категория по навыку.<br />Приглашение с вилкой.
+          </h1>
+          <ul class="auth-value-list">
+            <li>
+              <span class="auth-value-dot" aria-hidden="true"></span>
+              <span>Тест задаёт специализацию и грейд — без баллов в интерфейсе.</span>
+            </li>
+            <li>
+              <span class="auth-value-dot" aria-hidden="true"></span>
+              <span>Работодатель приглашает с вилкой зарплаты; контакты — после согласия.</span>
+            </li>
+            <li>
+              <span class="auth-value-dot" aria-hidden="true"></span>
+              <span>Видеозвонок с записью и внутренним разбором для найма.</span>
+            </li>
+          </ul>
+          <div class="landing-mockup auth-split-mockup" aria-hidden="true">
+            <div class="landing-mockup-label">Колода работодателя</div>
+            <div class="landing-mockup-card">
+              <div class="landing-mockup-stack"></div>
+              <div class="landing-mockup-face">
+                <div class="deck-card-head">
+                  <div class="avatar-monogram">А</div>
+                  <div>
+                    <h2 class="deck-name">Анна</h2>
+                    <span class="category-pill">Backend × Middle</span>
+                  </div>
+                </div>
+                <div class="chip-row">
+                  <span class="chip chip-domain">backend-разработчик · HoReCa</span>
+                </div>
+                <div class="chip-row chip-row-skills">
+                  <span class="chip chip-skill">node</span>
+                  <span class="chip chip-skill">typescript</span>
+                </div>
+              </div>
+            </div>
+            <div class="landing-mockup-actions">
+              <span class="mock-pill mock-pill-ghost">Отложить</span>
+              <span class="mock-pill mock-pill-clay">Пригласить</span>
+            </div>
+          </div>
         </div>
-        <div class="auth-confirm-block" id="confirm-block" hidden>
-          <p class="invite-meta">Мы отправили код на email. В демо введите <strong>000000</strong>.</p>
-          <label>Код подтверждения <input id="code" autocomplete="one-time-code" inputmode="numeric" /></label>
-          <button class="btn-ghost" type="button" id="confirm">Подтвердить email</button>
+      </section>
+      <section class="auth-split-form" aria-labelledby="auth-form-title">
+        <div class="auth-form-shell">
+          <a class="logo auth-form-logo" href="/" id="auth-logo">HandCheck</a>
+          <h2 class="auth-form-title" id="auth-form-title">Кабинет HandCheck</h2>
+          <p class="auth-demo-hint" id="demo-hint">
+            Демо: <strong>anna@demo.local</strong>, <strong>cafe@demo.local</strong> — пароль
+            <strong>demo-demo-demo</strong>. Код подтверждения: <strong>000000</strong>.
+          </p>
+          <div class="auth-tabs" role="tablist">
+            <button type="button" class="auth-tab active" id="tab-login" role="tab" aria-selected="true">Вход</button>
+            <button type="button" class="auth-tab" id="tab-register" role="tab" aria-selected="false">Регистрация</button>
+          </div>
+          <div class="panel auth-panel">
+            <label>Email <input type="email" id="email" autocomplete="username" /></label>
+            <label>Пароль <input type="password" id="password" autocomplete="current-password" /></label>
+            <label id="role-wrap">Роль
+              <select id="role">
+                <option value="candidate">Кандидат</option>
+                <option value="employer">Работодатель</option>
+              </select>
+            </label>
+            <p class="field-error" id="err" hidden></p>
+            <div class="form-actions">
+              <button class="btn-primary btn-lg auth-submit" type="button" id="primary-action">Войти</button>
+            </div>
+            <div class="auth-confirm-block" id="confirm-block" hidden>
+              <p class="invite-meta">Мы отправили код на email. В демо введите <strong>000000</strong>.</p>
+              <label>Код подтверждения <input id="code" autocomplete="one-time-code" inputmode="numeric" /></label>
+              <button class="btn-ghost" type="button" id="confirm">Подтвердить email</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </main>
+      </section>
+    </div>
     <script src="/app.js"></script>
     <script>
-      document.getElementById("auth-logo").innerHTML = `${HandCheck.LOGO_MARK}<span>HandCheck</span>`;
+      const logoHtml = `${HandCheck.LOGO_MARK}<span>HandCheck</span>`;
+      document.getElementById("auth-logo").innerHTML = logoHtml;
+      document.getElementById("auth-logo-hero").innerHTML = logoHtml;
       const q = new URLSearchParams(location.search);
       if (q.get("role")) document.getElementById("role").value = q.get("role");
 
@@ -79,28 +133,39 @@
       tabRegister.onclick = () => setMode("register");
       setMode(q.get("mode") === "register" ? "register" : "login");
 
+      function cacheEmail(email) {
+        try {
+          if (email) sessionStorage.setItem("hc_me_email", email);
+        } catch {
+          /* ignore */
+        }
+      }
+
       primaryBtn.onclick = async () => {
         err.hidden = true;
+        const email = document.getElementById("email").value.trim();
         try {
           if (mode === "login") {
             const j = await HandCheck.api("/api/auth/login", {
               method: "POST",
               body: JSON.stringify({
-                email: document.getElementById("email").value,
+                email,
                 password: document.getElementById("password").value,
               }),
             });
+            cacheEmail(j.user?.email || email);
             location.href = j.user.role === "employer" ? "/employer/deck" : "/candidate/today";
             return;
           }
           await HandCheck.api("/api/auth/register", {
             method: "POST",
             body: JSON.stringify({
-              email: document.getElementById("email").value,
+              email,
               password: document.getElementById("password").value,
               role: document.getElementById("role").value,
             }),
           });
+          cacheEmail(email);
           confirmBlock.hidden = false;
           showErr("Аккаунт создан — введите код подтверждения ниже.", true);
         } catch (e) {

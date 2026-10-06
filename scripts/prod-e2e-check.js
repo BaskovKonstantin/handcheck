@@ -25,10 +25,10 @@ function warn(msg) {
 }
 
 async function login(page, email) {
-  await goto(`${BASE}/auth`);
+  await page.goto(`${BASE}/auth`, { waitUntil: "domcontentloaded" });
   await page.fill("#email", email);
   await page.fill("#password", PASS);
-  await page.click("#login");
+  await page.click("#primary-action");
   await page.waitForURL(/\/(candidate|employer)\//, { timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(600);
 }

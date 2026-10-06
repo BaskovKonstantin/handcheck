@@ -106,7 +106,7 @@ router.get("/category", (req, res) => {
 router.get("/invitations", (req, res) => {
   const rows = getDb()
     .prepare(
-      `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.contact_channel, i.status,
+      `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.contact_channel, i.status, i.created_at,
               e.company_name, e.contact_email AS employer_contact_email
        FROM invitations i
        JOIN employer_profiles e ON e.user_id = i.employer_user_id
@@ -123,6 +123,7 @@ router.get("/invitations", (req, res) => {
         contactChannel: r.contact_channel,
         status: r.status,
         companyName: r.company_name,
+        createdAt: r.created_at,
       };
       if (r.status === "accepted") {
         item.employerContactEmail = r.employer_contact_email;

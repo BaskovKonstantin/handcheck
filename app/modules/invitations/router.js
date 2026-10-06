@@ -98,6 +98,7 @@ router.get("/invitations", (req, res) => {
         status: r.status,
         offerText: r.offer_text,
         contactChannel: r.contact_channel,
+        createdAt: r.created_at,
       };
       if (r.status === "accepted") {
         item.candidatePhone = r.phone;

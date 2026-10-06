@@ -4,24 +4,46 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Приглашения — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <header class="page-header">
-        <h1>Исходящие приглашения</h1>
-        <p class="lede">После принятия здесь появятся телефон и email кандидата.</p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Исходящие приглашения</h1>
+          <p class="lede">После принятия здесь появятся телефон и email кандидата.</p>
+        </div>
       </header>
-      <div id="list"><p class="loading">Загрузка…</p></div>
+      <div id="stats"></div>
+      <div id="list"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
     </main>
     <script src="/app.js"></script>
     <script>
       HandCheck.employerNav();
       const list = document.getElementById("list");
+      const statsEl = document.getElementById("stats");
+
+      function cardStatusClass(status) {
+        if (status === "accepted") return "invite-card-status-accepted";
+        if (status === "declined") return "invite-card-status-declined";
+        return "invite-card-status-sent";
+      }
+
       HandCheck.api("/api/employer/invitations")
         .then((d) => {
-          if (!d.items.length) {
+          const items = d.items || [];
+          const sent = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
+          const accepted = items.filter((i) => i.status === "accepted").length;
+          const declined = items.filter((i) => i.status === "declined").length;
+          statsEl.innerHTML = HandCheck.statTilesHtml([
+            { variant: "clay", label: "Ожидают", value: sent, hint: "Ответ кандидата" },
+            { variant: "forest", label: "Принято", value: accepted, hint: "Контакты открыты" },
+            { variant: "ink", label: "Отклонено", value: declined, hint: "Без контактов" },
+          ]);
+          if (!items.length) {
             list.innerHTML = HandCheck.emptyState(
               "Приглашений пока нет",
               "Откройте колоду и пригласите кандидата с вилкой зарплаты.",
@@ -30,7 +52,7 @@
             );
             return;
           }
-          list.innerHTML = d.items
+          list.innerHTML = `<div class="invite-card-grid">${items
             .map((i) => {
               const contacts =
                 i.status === "accepted"
@@ -38,16 +60,20 @@
                   : "";
               const call =
                 i.status === "accepted"
-                  ? `<a class="btn-ghost" href="/call/${i.id}">Комната звонка</a>`
+                  ? `<a class="btn-primary" href="/call/${i.id}">Комната звонка</a>`
                   : "";
-              return `<article class="invite-card">
-              <h3>${i.candidateName}</h3>
-              <p class="invite-meta">₽${i.salaryFrom.toLocaleString("ru")} – ₽${i.salaryTo.toLocaleString("ru")} · <span class="status-pill ${i.status}">${HandCheck.invitationStatusLabel(i.status)}</span></p>
+              const stCls = HandCheck.invitationStatusClass(i.status);
+              return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
+              <div class="invite-card-top">
+                <h3>${i.candidateName}</h3>
+                <span class="status-pill ${stCls}">${HandCheck.invitationStatusLabel(i.status)}</span>
+              </div>
+              <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
               ${contacts}
               <div class="invite-actions">${call}</div>
             </article>`;
             })
-            .join("");
+            .join("")}</div>`;
         })
         .catch(() => {
           list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);

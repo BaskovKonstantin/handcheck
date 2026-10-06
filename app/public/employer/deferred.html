@@ -4,29 +4,70 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Отложенные — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Отложенные</h1>
-      <div id="list"></div>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Отложенные</h1>
+          <p class="lede">Кандидаты, которых вы отложили в колоде. Верните в подбор или пригласите из списка.</p>
+        </div>
+      </header>
+      <div id="stats"></div>
+      <div id="list"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
     </main>
     <script src="/app.js"></script>
     <script>
       HandCheck.employerNav();
+      const list = document.getElementById("list");
+      const statsEl = document.getElementById("stats");
+
       HandCheck.api("/api/employer/needs").then(async (needs) => {
         const id = needs.items[0]?.id;
         const d = await HandCheck.api(`/api/employer/needs/${id}/deferred`);
-        document.getElementById("list").innerHTML =
-          d.items
-            .map(
-              (x) =>
-                `<div class="panel">${x.displayName} — ${x.categoryLabel}
-                <button class="btn-ghost" data-c="${x.candidateId}">Вернуть в колоду</button></div>`
-            )
-            .join("") || '<p class="empty">Нет отложенных</p>';
-        document.querySelectorAll("button[data-c]").forEach((b) => {
+        const count = (d.items || []).length;
+        statsEl.innerHTML = HandCheck.statTilesHtml([
+          {
+            variant: "forest",
+            label: "В отложенных",
+            value: count,
+            hint: count ? "Можно вернуть в колоду" : "Свайп «позже» в колоде",
+            link: count ? { href: "/employer/deck", label: "Колода" } : null,
+          },
+          {
+            variant: "clay",
+            label: "Список",
+            value: "→",
+            hint: "Все кандидаты по потребности",
+            link: { href: "/employer/list", label: "Открыть" },
+          },
+        ]);
+        if (!count) {
+          list.innerHTML = HandCheck.emptyState(
+            "Нет отложенных",
+            "В колоде нажмите «Позже», если кандидат интересен, но не сейчас.",
+            "/employer/deck",
+            "В колоду"
+          );
+          return;
+        }
+        list.innerHTML = d.items
+          .map(
+            (x) =>
+              `<article class="invite-card invite-card-expressive invite-card-status-sent">
+                <div class="invite-card-top">
+                  <h3>${x.displayName}</h3>
+                  <span class="category-pill">${x.categoryLabel}</span>
+                </div>
+                <button class="btn-ghost btn-sm" data-c="${x.candidateId}">Вернуть в колоду</button>
+              </article>`
+          )
+          .join("");
+        list.querySelectorAll("button[data-c]").forEach((b) => {
           b.onclick = async () => {
             await HandCheck.api(`/api/employer/needs/${id}/reviews/${b.dataset.c}`, {
               method: "DELETE",

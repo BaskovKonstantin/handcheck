@@ -1,5 +1,6 @@
 # HandCheck session
 
-- Round 5 branch: cursor/round5-visual-redesign-77f5
-- Visual: forest hero block, landing mockup, HC logo, stat accents, deck empty state + demo top-up seed
+- Round 7 branch: cursor/round7-ui-polish-5339
+- Fixes: hide empty desktop cabinet top bar; instant shell paint; Today timeline; heroes/stat tiles on profile/tasks/need/deferred/invitations/auth/call; auth tabs; employer invitation cards
 - Prod: https://handcheck.baski.pro
+- Demo password: demo-demo-demo

@@ -1,6 +1,6 @@
 # HandCheck session
 
-- Round 7 branch: cursor/round7-ui-polish-5339
-- Fixes: hide empty desktop cabinet top bar; instant shell paint; Today timeline; heroes/stat tiles on profile/tasks/need/deferred/invitations/auth/call; auth tabs; employer invitation cards
+- Round 8 branch: cursor/ui-round8-polish-0970
+- Fixes: global [hidden]; auth split-screen hero; sessionStorage email cache + sidebar card; Today timeline dedupe + category CTA; call room polish; candidate calls hero + no await nav
 - Prod: https://handcheck.baski.pro
 - Demo password: demo-demo-demo

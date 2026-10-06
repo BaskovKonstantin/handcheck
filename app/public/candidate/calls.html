@@ -4,23 +4,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Звонки — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <header class="page-header">
-        <h1>Звонки</h1>
-        <p class="lede">Только принятые приглашения. Разбор звонка кандидату не показывается.</p>
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Звонки</h1>
+          <p class="lede">Только принятые приглашения. Разбор звонка кандидату не показывается.</p>
+        </div>
       </header>
-      <div id="list"><p class="loading"><span class="loading-dot"></span>Загрузка…</p></div>
+      <div id="list"></div>
     </main>
     <script src="/app.js"></script>
     <script>
       const list = document.getElementById("list");
 
       async function load() {
-        await HandCheck.candidateNav();
+        list.innerHTML = HandCheck.skeletonBlocks(3);
         const d = await HandCheck.api("/api/candidate/calls");
         if (!d.items.length) {
           list.innerHTML = HandCheck.emptyState(
@@ -34,11 +38,12 @@
         list.innerHTML = d.items
           .map(
             (c) =>
-              `<a class="row-link invite-card" href="${c.roomUrl}"><strong>${c.companyName}</strong> — ${c.needTitle}<br><span class="invite-meta">Статус: <span class="status-pill ${c.callStatus === "live" ? "accepted" : ""}">${c.callStatus}</span></span></a>`
+              `<a class="row-link invite-card" href="${c.roomUrl}"><strong>${c.companyName}</strong> — ${c.needTitle}<br><span class="invite-meta">Статус: <span class="status-pill ${HandCheck.callStatusClass(c.callStatus)}">${HandCheck.callStatusLabel(c.callStatus)}</span></span></a>`
           )
           .join("");
       }
 
+      HandCheck.candidateNav();
       HandCheck.loadPanel(list, load);
     </script>
   </body>

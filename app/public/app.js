@@ -106,6 +106,32 @@ const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="32" he
 let cabinetNavMounted = false;
 let cabinetMeEmail = "";
 
+const ME_EMAIL_KEY = "hc_me_email";
+
+function getCachedMeEmail() {
+  try {
+    return sessionStorage.getItem(ME_EMAIL_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setCachedMeEmail(email) {
+  try {
+    if (email) sessionStorage.setItem(ME_EMAIL_KEY, email);
+    else sessionStorage.removeItem(ME_EMAIL_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function formatCabinetEmailMarkup(email) {
+  if (email) {
+    return `<span class="cabinet-email" title="${email}">${email}</span>`;
+  }
+  return `<span class="cabinet-email cabinet-email-skeleton" aria-busy="true" title="Загрузка профиля"></span>`;
+}
+
 const NAV_ICONS = {
   today: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v14H4V6zm2 2v10h12V8H6zm2 9h2v-2H8v2zm0-4h2v-2H8v2zm4 4h2v-2h-2v2zm0-4h2v-2h-2v2zm4 4h2v-2h-2v2z" fill="currentColor"/></svg>',
   profile: '<svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" fill="currentColor"/></svg>',
@@ -147,6 +173,7 @@ function navLinkHtml(l, compact) {
 
 function bindLogout(btn) {
   btn?.addEventListener("click", async () => {
+    setCachedMeEmail("");
     await api("/api/auth/logout", { method: "POST" });
     window.location.href = "/auth";
   });
@@ -154,6 +181,8 @@ function bindLogout(btn) {
 
 function updateCabinetEmails(email) {
   document.querySelectorAll(".cabinet-email").forEach((el) => {
+    el.classList.remove("cabinet-email-skeleton");
+    el.removeAttribute("aria-busy");
     el.textContent = email;
     el.title = email;
   });
@@ -165,7 +194,7 @@ function paintCabinetHeader(el, meEmail) {
       <div class="cabinet-header-inner">
         <a class="logo cabinet-header-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
         <div class="cabinet-user cabinet-user-inline">
-          <span class="cabinet-email" title="${meEmail}">${meEmail}</span>
+          ${formatCabinetEmailMarkup(meEmail)}
           <button type="button" class="btn-ghost btn-sm" id="logout-btn-header">Выход</button>
         </div>
       </div>
@@ -192,7 +221,7 @@ function ensureCabinetChrome(links, role, meEmail) {
     </div>
     <div class="cabinet-aside-inner">${navLinks}</div>
     <div class="cabinet-user-card">
-      <span class="cabinet-email" title="${meEmail}">${meEmail}</span>
+      ${formatCabinetEmailMarkup(meEmail)}
       <button type="button" class="btn-ghost btn-sm" id="logout-btn-aside">Выход</button>
     </div>`;
   bindLogout(document.getElementById("logout-btn-aside"));
@@ -215,13 +244,14 @@ function ensureCabinetChrome(links, role, meEmail) {
 async function mountCabinetShell(links, role) {
   const el = document.getElementById("site-header");
   if (!el) return;
-  const placeholder = cabinetMeEmail || "…";
+  const placeholder = cabinetMeEmail || getCachedMeEmail();
   paintCabinetHeader(el, placeholder);
   ensureCabinetChrome(links, role, placeholder);
   cabinetNavMounted = true;
   try {
     const me = await api("/api/me");
     cabinetMeEmail = me.email || "";
+    setCachedMeEmail(cabinetMeEmail);
     updateCabinetEmails(cabinetMeEmail);
   } catch {
     window.location.href = "/auth";

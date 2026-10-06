@@ -61,12 +61,14 @@ function createApp() {
     ["/candidate/tasks", "candidate/tasks.html"],
     ["/candidate/invitations", "candidate/invitations.html"],
     ["/candidate/calls", "candidate/calls.html"],
+    ["/candidate/profile", "candidate/profile.html"],
     ["/employer/need", "employer/need.html"],
     ["/employer/deck", "employer/deck.html"],
     ["/employer/list", "employer/list.html"],
     ["/employer/deferred", "employer/deferred.html"],
     ["/employer/invitations", "employer/invitations.html"],
     ["/employer/calls", "employer/calls.html"],
+    ["/employer/profile", "employer/profile.html"],
   ];
   for (const [url, file] of routes) {
     app.get(url, (_req, res) => res.sendFile(path.join(publicDir, file)));

@@ -8,18 +8,49 @@
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Исходящие приглашения</h1>
-      <div id="list"></div>
+      <header class="page-header">
+        <h1>Исходящие приглашения</h1>
+        <p class="lede">После принятия здесь появятся телефон и email кандидата.</p>
+      </header>
+      <div id="list"><p class="loading">Загрузка…</p></div>
     </main>
     <script src="/app.js"></script>
     <script>
       HandCheck.employerNav();
-      HandCheck.api("/api/employer/invitations").then((d) => {
-        document.getElementById("list").innerHTML =
-          d.items
-            .map((i) => `<div class="panel">${i.candidateName} — ${i.status} (₽${i.salaryFrom}–${i.salaryTo})</div>`)
-            .join("") || '<p class="empty">Пока нет</p>';
-      });
+      const list = document.getElementById("list");
+      HandCheck.api("/api/employer/invitations")
+        .then((d) => {
+          if (!d.items.length) {
+            list.innerHTML = HandCheck.emptyState(
+              "Приглашений пока нет",
+              "Откройте колоду и пригласите кандидата с вилкой зарплаты.",
+              "/employer/deck",
+              "В колоду"
+            );
+            return;
+          }
+          list.innerHTML = d.items
+            .map((i) => {
+              const contacts =
+                i.status === "accepted"
+                  ? `<div class="contacts-block"><strong>Контакты кандидата</strong><br>Телефон: ${i.candidatePhone || "—"}<br>Email: ${i.candidateContactEmail || "—"}</div>`
+                  : "";
+              const call =
+                i.status === "accepted"
+                  ? `<a class="btn-ghost" href="/call/${i.id}">Комната звонка</a>`
+                  : "";
+              return `<article class="invite-card">
+              <h3>${i.candidateName}</h3>
+              <p class="invite-meta">₽${i.salaryFrom.toLocaleString("ru")} – ₽${i.salaryTo.toLocaleString("ru")} · <span class="status-pill ${i.status}">${i.status}</span></p>
+              ${contacts}
+              <div class="invite-actions">${call}</div>
+            </article>`;
+            })
+            .join("");
+        })
+        .catch(() => {
+          list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
+        });
     </script>
   </body>
 </html>

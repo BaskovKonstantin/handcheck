@@ -8,10 +8,50 @@
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Звонки</h1>
-      <p class="hero-lede">После завершения — три фразы внутреннего разбора (только для работодателя).</p>
+      <header class="page-header">
+        <h1>Звонки</h1>
+        <p class="lede">После завершения — три фразы внутреннего разбора только для вас.</p>
+      </header>
+      <div id="list"><p class="loading">Загрузка…</p></div>
     </main>
     <script src="/app.js"></script>
-    <script>HandCheck.employerNav();</script>
+    <script>
+      HandCheck.employerNav();
+      const list = document.getElementById("list");
+      HandCheck.api("/api/employer/calls")
+        .then(async (d) => {
+          if (!d.items.length) {
+            list.innerHTML = HandCheck.emptyState(
+              "Звонков пока нет",
+              "Примите приглашение кандидатом, чтобы открыть комнату.",
+              "/employer/invitations",
+              "К приглашениям"
+            );
+            return;
+          }
+          const parts = [];
+          for (const c of d.items) {
+            let analysis = "";
+            if (c.callStatus === "ended" && c.callId) {
+              try {
+                const a = await HandCheck.api(`/api/calls/${c.callId}/analysis`);
+                analysis = `<p class="contacts-block">${a.summary_text}</p>`;
+              } catch {
+                analysis = '<p class="invite-meta">Разбор готовится…</p>';
+              }
+            }
+            parts.push(`<article class="invite-card">
+              <h3>${c.candidateName}</h3>
+              <p class="invite-meta">${c.needTitle} · ${c.callStatus}</p>
+              <a class="btn-primary" href="${c.roomUrl}">Комната</a>
+              ${analysis}
+            </article>`);
+          }
+          list.innerHTML = parts.join("");
+        })
+        .catch(() => {
+          list.innerHTML = HandCheck.emptyState("Ошибка загрузки", "Попробуйте обновить страницу.", null);
+        });
+    </script>
   </body>
 </html>

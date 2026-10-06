@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Профиль — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <header class="page-header">
+        <h1>Профиль</h1>
+        <p class="lede">Имя, контакты и эпизоды опыта влияют на подбор. Оценки и рейтинги нигде не показываются.</p>
+      </header>
+      <div id="main">Загрузка…</div>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      const main = document.getElementById("main");
+      let snapshot = "";
+
+      async function load() {
+        HandCheck.candidateNav();
+        const [profile, bg] = await Promise.all([
+          HandCheck.api("/api/candidate/profile"),
+          HandCheck.api("/api/candidate/background"),
+        ]);
+        snapshot = JSON.stringify({ profile, bg });
+        main.innerHTML = `
+          <section class="panel">
+            <h2 class="h2">Основное</h2>
+            <label>Имя <input id="displayName" value="${profile.displayName || ""}" /></label>
+            <label>Телефон <input id="phone" autocomplete="tel" value="${profile.phone || ""}" /></label>
+            <label>Email для контактов <input id="contactEmail" autocomplete="email" value="${profile.contactEmail || ""}" /></label>
+            <label>Стек (через запятую) <input id="stack" value="${(profile.stack || []).join(", ")}" /></label>
+            <label>Доступность
+              <select id="availability">
+                <option value="open" ${profile.availability === "open" ? "selected" : ""}>Открыт к приглашениям</option>
+                <option value="paused" ${profile.availability === "paused" ? "selected" : ""}>Пауза (новые инвайты не приходят)</option>
+              </select>
+            </label>
+            <p class="field-error" id="prof-err" hidden></p>
+            <div class="form-actions">
+              <button class="btn-primary" id="save-profile" disabled>Сохранить профиль</button>
+            </div>
+          </section>
+          <section class="panel" style="margin-top:1.25rem">
+            <h2 class="h2">Эпизоды опыта</h2>
+            <div class="episode-list" id="episodes">${(bg.items || [])
+              .map(
+                (e) =>
+                  `<div class="episode-item" data-id="${e.id}"><strong>${e.role_title}</strong> · ${e.industry}<br><span class="invite-meta">${e.domain}</span>
+                  <button type="button" class="btn-ghost btn-sm del-ep" data-id="${e.id}">Удалить</button></div>`
+              )
+              .join("") || '<p class="invite-meta">Пока нет эпизодов — добавьте хотя бы один для доменного совпадения.</p>'}</div>
+            <label>Роль <input id="ep-role" /></label>
+            <label>Домен <input id="ep-domain" /></label>
+            <label>Отрасль <input id="ep-industry" /></label>
+            <button type="button" class="btn-ghost" id="add-ep">Добавить эпизод</button>
+          </section>`;
+        const saveBtn = document.getElementById("save-profile");
+        const checkDirty = () => {
+          const cur = collectProfile();
+          saveBtn.disabled = JSON.stringify(cur) === snapshot;
+        };
+        main.querySelectorAll("input,select").forEach((el) => el.addEventListener("input", checkDirty));
+        saveBtn.onclick = async () => {
+          const err = document.getElementById("prof-err");
+          err.hidden = true;
+          try {
+            const p = collectProfile().profile;
+            await HandCheck.api("/api/candidate/profile", {
+              method: "PUT",
+              body: JSON.stringify(p),
+            });
+            await HandCheck.api("/api/candidate/availability", {
+              method: "PUT",
+              body: JSON.stringify({ availability: p.availability }),
+            });
+            await load();
+          } catch (e) {
+            err.hidden = false;
+            err.textContent = HandCheck.formatApiError(e);
+          }
+        };
+        document.getElementById("add-ep").onclick = async () => {
+          await HandCheck.api("/api/candidate/background", {
+            method: "POST",
+            body: JSON.stringify({
+              roleTitle: document.getElementById("ep-role").value,
+              domain: document.getElementById("ep-domain").value,
+              industry: document.getElementById("ep-industry").value,
+            }),
+          });
+          await load();
+        };
+        main.querySelectorAll(".del-ep").forEach((btn) => {
+          btn.onclick = async () => {
+            if (!confirm("Эпизод исчезнет из подбора")) return;
+            await HandCheck.api(`/api/candidate/background/${btn.dataset.id}`, { method: "DELETE" });
+            await load();
+          };
+        });
+      }
+
+      function collectProfile() {
+        return {
+          profile: {
+            displayName: document.getElementById("displayName").value,
+            phone: document.getElementById("phone").value,
+            contactEmail: document.getElementById("contactEmail").value,
+            stack: document
+              .getElementById("stack")
+              .value.split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+            availability: document.getElementById("availability").value,
+          },
+        };
+      }
+
+      load().catch(() => {
+        main.innerHTML = HandCheck.emptyState(
+          "Не удалось загрузить профиль",
+          "Проверьте соединение и войдите снова.",
+          "/auth",
+          "Войти"
+        );
+      });
+    </script>
+  </body>
+</html>

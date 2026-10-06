@@ -6,10 +6,14 @@
     <title>Вход — HandCheck</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
-    <main class="column" style="max-width: 480px">
-      <h1>Вход и регистрация</h1>
-      <div class="panel">
+  <body class="auth-page">
+    <main class="column auth-column">
+      <a class="logo" href="/">HandCheck</a>
+      <header class="page-header">
+        <h1>Вход и регистрация</h1>
+        <p class="lede">Демо: anna@demo.local или cafe@demo.local, пароль из .env.example. Код подтверждения 000000.</p>
+      </header>
+      <div class="panel auth-panel">
         <label>Email <input type="email" id="email" autocomplete="username" /></label>
         <label>Пароль <input type="password" id="password" autocomplete="current-password" /></label>
         <label>Роль
@@ -19,9 +23,12 @@
           </select>
         </label>
         <p class="field-error" id="err" hidden></p>
-        <button class="btn-primary" type="button" id="login">Войти</button>
-        <button class="btn-ghost" type="button" id="register">Зарегистрироваться</button>
-        <label>Подтверждение кода <input id="code" autocomplete="one-time-code" /></label>
+        <div class="form-actions">
+          <button class="btn-primary" type="button" id="login">Войти</button>
+          <button class="btn-ghost" type="button" id="register">Зарегистрироваться</button>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:1.5rem 0" />
+        <label>Подтверждение кода <input id="code" autocomplete="one-time-code" placeholder="000000" /></label>
         <button class="btn-ghost" type="button" id="confirm">Подтвердить email</button>
       </div>
     </main>
@@ -46,29 +53,39 @@
           });
           location.href = j.user.role === "employer" ? "/employer/deck" : "/candidate/today";
         } catch (e) {
-          showErr("Не удалось войти");
+          showErr(HandCheck.formatApiError(e));
         }
       };
       document.getElementById("register").onclick = async () => {
-        await HandCheck.api("/api/auth/register", {
-          method: "POST",
-          body: JSON.stringify({
-            email: document.getElementById("email").value,
-            password: document.getElementById("password").value,
-            role: document.getElementById("role").value,
-          }),
-        });
-        showErr("Код отправлен (в демо: 000000)");
+        err.hidden = true;
+        try {
+          await HandCheck.api("/api/auth/register", {
+            method: "POST",
+            body: JSON.stringify({
+              email: document.getElementById("email").value,
+              password: document.getElementById("password").value,
+              role: document.getElementById("role").value,
+            }),
+          });
+          showErr("Аккаунт создан. Введите код 000000 в демо и нажмите «Подтвердить email».");
+        } catch (e) {
+          showErr(HandCheck.formatApiError(e));
+        }
       };
       document.getElementById("confirm").onclick = async () => {
-        await HandCheck.api("/api/auth/confirm", {
-          method: "POST",
-          body: JSON.stringify({
-            email: document.getElementById("email").value,
-            code: document.getElementById("code").value,
-          }),
-        });
-        showErr("Email подтверждён — войдите");
+        err.hidden = true;
+        try {
+          await HandCheck.api("/api/auth/confirm", {
+            method: "POST",
+            body: JSON.stringify({
+              email: document.getElementById("email").value,
+              code: document.getElementById("code").value,
+            }),
+          });
+          showErr("Email подтверждён — нажмите «Войти».");
+        } catch (e) {
+          showErr(HandCheck.formatApiError(e));
+        }
       };
     </script>
   </body>

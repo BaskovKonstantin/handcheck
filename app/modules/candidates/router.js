@@ -107,21 +107,52 @@ router.get("/invitations", (req, res) => {
   const rows = getDb()
     .prepare(
       `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.contact_channel, i.status,
-              e.company_name
+              e.company_name, e.contact_email AS employer_contact_email
        FROM invitations i
        JOIN employer_profiles e ON e.user_id = i.employer_user_id
        WHERE i.candidate_user_id = ? ORDER BY i.created_at DESC`
     )
     .all(req.user.id);
   res.json({
+    items: rows.map((r) => {
+      const item = {
+        id: r.id,
+        salaryFrom: r.salary_from,
+        salaryTo: r.salary_to,
+        offerText: r.offer_text,
+        contactChannel: r.contact_channel,
+        status: r.status,
+        companyName: r.company_name,
+      };
+      if (r.status === "accepted") {
+        item.employerContactEmail = r.employer_contact_email;
+      }
+      return item;
+    }),
+  });
+});
+
+router.get("/calls", (req, res) => {
+  const rows = getDb()
+    .prepare(
+      `SELECT i.id AS invitation_id, c.id AS call_id, c.status AS call_status,
+              e.company_name, n.title AS need_title
+       FROM invitations i
+       JOIN employer_profiles e ON e.user_id = i.employer_user_id
+       JOIN employer_needs n ON n.id = i.need_id
+       LEFT JOIN calls c ON c.invitation_id = i.id
+       WHERE i.candidate_user_id = ? AND i.status = 'accepted'
+       ORDER BY i.created_at DESC`
+    )
+    .all(req.user.id);
+  res.json({
     items: rows.map((r) => ({
-      id: r.id,
-      salaryFrom: r.salary_from,
-      salaryTo: r.salary_to,
-      offerText: r.offer_text,
-      contactChannel: r.contact_channel,
-      status: r.status,
+      invitationId: r.invitation_id,
+      callId: r.call_id,
+      callStatus: r.call_status || "ready",
       companyName: r.company_name,
+      needTitle: r.need_title,
+      roomUrl: `/call/${r.invitation_id}`,
     })),
   });
 });

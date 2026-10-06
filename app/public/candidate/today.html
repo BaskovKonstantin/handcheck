@@ -8,16 +8,32 @@
   <body>
     <div id="site-header"></div>
     <main class="column cabinet-content">
-      <h1>Сегодня</h1>
-      <div class="panel" id="cat">Загрузка…</div>
+      <header class="page-header">
+        <h1>Сегодня</h1>
+        <p class="lede">Ваша категория по тесту — без числовых оценок.</p>
+      </header>
+      <div id="cat" class="panel"><p class="loading">Загрузка…</p></div>
+      <div class="form-actions" style="margin-top:1rem">
+        <a class="btn-ghost" href="/candidate/profile">Профиль</a>
+        <a class="btn-primary" href="/candidate/invitations">Приглашения</a>
+      </div>
     </main>
     <script src="/app.js"></script>
     <script>
       HandCheck.candidateNav();
       HandCheck.api("/api/candidate/category").then((c) => {
-        document.getElementById("cat").textContent = c.label
-          ? `Категория: ${c.label}`
-          : "Категория появится после теста";
+        const el = document.getElementById("cat");
+        if (!c.label) {
+          el.innerHTML = HandCheck.emptyState(
+            "Категория ещё не подтверждена",
+            "Пройдите батарею заданий — специализация и грейд появятся здесь.",
+            "/candidate/tasks",
+            "Начать тест"
+          );
+          return;
+        }
+        el.innerHTML = `<span class="category-pill">${c.label}</span>
+          ${c.retakeAt ? `<p class="invite-meta" style="margin-top:1rem">Пересдача этой специализации возможна после ${new Date(c.retakeAt).toLocaleDateString("ru")}</p>` : ""}`;
       });
     </script>
   </body>

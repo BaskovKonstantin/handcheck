@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Профиль компании — HandCheck</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="site-header"></div>
+    <main class="column cabinet-content">
+      <header class="page-header">
+        <h1>Профиль компании</h1>
+        <p class="lede">Эти данные видны кандидату после принятия приглашения.</p>
+      </header>
+      <div id="main">Загрузка…</div>
+    </main>
+    <script src="/app.js"></script>
+    <script>
+      let snapshot = "";
+      async function load() {
+        HandCheck.employerNav();
+        const p = await HandCheck.api("/api/employer/profile");
+        snapshot = JSON.stringify(p);
+        const main = document.getElementById("main");
+        main.innerHTML = `
+          <section class="panel">
+            <label>Название компании <input id="companyName" value="${p.companyName || ""}" /></label>
+            <label>Отрасль <input id="industry" value="${p.industry || ""}" /></label>
+            <label>Контактный email <input id="contactEmail" autocomplete="email" value="${p.contactEmail || ""}" /></label>
+            <label>Описание <textarea id="description" rows="4">${p.description || ""}</textarea></label>
+            <p class="field-error" id="err" hidden></p>
+            <div class="form-actions">
+              <button class="btn-primary" id="save" disabled>Сохранить</button>
+            </div>
+          </section>`;
+        const save = document.getElementById("save");
+        const fields = main.querySelectorAll("input,textarea");
+        const read = () => ({
+          companyName: document.getElementById("companyName").value,
+          industry: document.getElementById("industry").value,
+          contactEmail: document.getElementById("contactEmail").value,
+          description: document.getElementById("description").value,
+        });
+        fields.forEach((el) =>
+          el.addEventListener("input", () => {
+            save.disabled = JSON.stringify(read()) === snapshot;
+          })
+        );
+        save.onclick = async () => {
+          const err = document.getElementById("err");
+          err.hidden = true;
+          try {
+            await HandCheck.api("/api/employer/profile", { method: "PUT", body: JSON.stringify(read()) });
+            await load();
+          } catch (e) {
+            err.hidden = false;
+            err.textContent = HandCheck.formatApiError(e);
+          }
+        };
+      }
+      load();
+    </script>
+  </body>
+</html>

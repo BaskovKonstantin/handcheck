@@ -53,6 +53,9 @@ function wrapTool(ctx, name, needWrite, fn, meta = {}) {
       logToolCall(ctx, name, args, { ...result, durationMs: Date.now() - started });
       return result;
     } catch (e) {
+      if (!e.isMcp) {
+        console.error(`[mcp] tool ${name} failed:`, e);
+      }
       const msg = e.isMcp ? e.message : "Не удалось выполнить действие";
       const err = toolError(msg);
       logToolCall(ctx, name, args, { ...err, durationMs: Date.now() - started });
@@ -244,6 +247,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
           stack: z.array(z.string()).optional(),
           domainText: z.string().optional(),
           notes: z.string().optional(),
+          active: z.boolean().optional(),
         }),
       },
       wrapTool(ctx, "create_need", true, (args) => services.createEmployerNeed(ctx.user.id, args))

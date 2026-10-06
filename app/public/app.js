@@ -284,10 +284,7 @@ function employerNeedSwitcherHtml(needs, selectedId) {
         `<option value="${esc(n.id)}"${n.id === selectedId ? " selected" : ""}>${needSwitcherOptionLabel(n)}</option>`
     )
     .join("");
-  const banner =
-    selected && !selected.active
-      ? `<p class="need-inactive-banner invite-meta">Потребность неактивна — просмотр списков и колоды доступен, новые приглашения отправить нельзя.</p>`
-      : "";
+  const banner = selected && !selected.active ? needInactiveBannerHtml() : "";
   return `${banner}<div class="need-switcher-bar"><label class="form-label need-switcher">Потребность
     <select id="employer-need-switch">${options}</select></label></div>`;
 }
@@ -308,6 +305,27 @@ function bindEmployerNeedSwitcher(onChange) {
 
 function joinMetaParts(parts) {
   return parts.filter((p) => p != null && String(p).trim()).join(" · ");
+}
+
+function needInactiveBannerHtml() {
+  return `<p class="need-inactive-banner invite-meta">Потребность неактивна — просмотр списков и колоды доступен, новые приглашения отправить нельзя.</p>`;
+}
+
+function formatTimeMoscow(iso) {
+  if (!iso) return "";
+  let normalized = iso;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:/.test(iso)) {
+    normalized = `${iso.replace(" ", "T")}Z`;
+  } else if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]$/.test(iso) && !/[+-]\d{2}:\d{2}$/.test(iso)) {
+    normalized = `${iso}Z`;
+  }
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function renderAiUsageSection(aiUsage, { compact = false } = {}) {
@@ -566,18 +584,21 @@ function statTilesHtml(tiles, options = {}) {
   const esc = escapeHtml;
   const gridClass = options.gridClass ? ` ${options.gridClass}` : "";
   return `<div class="stat-tile-grid${gridClass}">${tiles
-    .map(
-      (t) => `<article class="stat-tile stat-tile-${esc(t.variant || "forest")}">
+    .map((t) => {
+      const clamp = Boolean(t.clamp);
+      const valueClass = clamp ? "stat-tile-value stat-tile-value-clamp" : "stat-tile-value";
+      const titleAttr = clamp && t.value ? ` title="${esc(t.value)}"` : "";
+      return `<article class="stat-tile stat-tile-${esc(t.variant || "forest")}">
       <div class="stat-tile-label">${t.icon || ""}${esc(t.label)}</div>
-      <div class="stat-tile-value">${esc(t.value)}</div>
+      <div class="${valueClass}"${titleAttr}>${esc(t.value)}</div>
       ${t.hint ? `<p class="invite-meta">${esc(t.hint)}</p>` : ""}
       ${
         t.link
           ? `<a class="btn-ghost btn-sm" href="${esc(t.link.href)}">${esc(t.link.label)}</a>`
           : ""
       }
-    </article>`
-    )
+    </article>`;
+    })
     .join("")}</div>`;
 }
 
@@ -801,7 +822,9 @@ window.HandCheck = {
   callStatusClass,
   formatSalaryRange,
   formatDateTimeMoscow,
+  formatTimeMoscow,
   formatRetakeDateMoscow,
+  needInactiveBannerHtml,
   formatSpecGradeLabel,
   escapeHtml,
   resolveEmployerNeedId,

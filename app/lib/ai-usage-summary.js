@@ -72,10 +72,70 @@ function formatClientLabel(row) {
   if (name && !["http", "unknown"].includes(name.toLowerCase())) {
     const ver = row.client_version ? ` ${row.client_version}` : "";
     const base = `${name}${ver}`;
-    return where ? `${base} · где подключён: ${where}` : base;
+    return where ? `ИИ-клиент: ${base} (${where})` : `ИИ-клиент: ${base}`;
   }
-  if (where) return where;
+  if (where) return `ИИ-клиент: ${where}`;
   return null;
+}
+
+function employerInvitationIdsForCandidate(db, employerUserId, candidateUserId) {
+  return db
+    .prepare(
+      `SELECT id FROM invitations WHERE employer_user_id = ? AND candidate_user_id = ?`
+    )
+    .all(employerUserId, candidateUserId)
+    .map((r) => r.id);
+}
+
+function sessionRelatesToEmployerInvitations(db, sessionId, candidateUserId, invitationIds) {
+  if (!invitationIds.length) return false;
+  const idSet = new Set(invitationIds);
+  const rows = db
+    .prepare(
+      `SELECT tool_name, args_masked_json FROM mcp_tool_calls
+       WHERE session_id = ? AND user_id = ? AND ok = 1`
+    )
+    .all(sessionId, candidateUserId);
+  for (const row of rows) {
+    if (row.tool_name === "respond_invitation") {
+      try {
+        const args = JSON.parse(row.args_masked_json || "{}");
+        if (args.invitationId && idSet.has(args.invitationId)) return true;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return false;
+}
+
+function postTestClientLabelsForEmployer(db, employerUserId, candidateUserId, window, inWindowLabels) {
+  if (!employerHasInvitation(employerUserId, candidateUserId)) {
+    return [];
+  }
+  const invitationIds = employerInvitationIdsForCandidate(db, employerUserId, candidateUserId);
+  const windowEnd = sqliteComparableTimestamp(window.to);
+  const sessions = db
+    .prepare(
+      `SELECT s.id, s.client_name, s.client_version, s.last_seen_at, t.client_where
+       FROM mcp_client_sessions s
+       LEFT JOIN api_tokens t ON t.id = s.api_token_id
+       WHERE s.user_id = ?
+       ORDER BY s.last_seen_at DESC LIMIT 20`
+    )
+    .all(candidateUserId);
+  const labels = [];
+  const seen = new Set(inWindowLabels);
+  for (const s of sessions) {
+    const seenAt = sqliteComparableTimestamp(s.last_seen_at);
+    if (!seenAt || seenAt <= windowEnd) continue;
+    const label = formatClientLabel(s);
+    if (!label || seen.has(label)) continue;
+    if (!sessionRelatesToEmployerInvitations(db, s.id, candidateUserId, invitationIds)) continue;
+    seen.add(label);
+    labels.push(label);
+  }
+  return labels;
 }
 
 function latestBatteryWindow(db, candidateUserId) {
@@ -169,13 +229,13 @@ function buildActivityLines(calls, stats) {
     lines.push("Сдал рабочую задачу через ИИ-клиент");
   }
 
+  const intentLines = [];
   for (const q of intentQuotes) {
-    if (lines.length >= 6) break;
-    if (lines.some((l) => l.includes(`«${q}»`))) continue;
-    lines.push(`«${q.slice(0, 160)}»`);
+    if (intentLines.length >= 3) break;
+    intentLines.push(`Просил ИИ-клиент: «${q.slice(0, 160)}»`);
   }
 
-  return lines.slice(0, 6);
+  return { activityLines: lines.slice(0, 6), intentLines };
 }
 
 function sqliteComparableTimestamp(value) {
@@ -240,50 +300,34 @@ function summarizeAiUsageForEmployer(employerUserId, candidateUserId) {
     ? clientsFromAssessmentCalls(db, candidateUserId, window)
     : [];
 
-  let sessions = db
-    .prepare(
-      `SELECT s.client_name, s.client_version, s.last_seen_at, t.client_where
-       FROM mcp_client_sessions s
-       LEFT JOIN api_tokens t ON t.id = s.api_token_id
-       WHERE s.user_id = ?
-       ORDER BY s.last_seen_at DESC LIMIT 20`
-    )
-    .all(candidateUserId);
+  const postClientLabels =
+    window
+      ? postTestClientLabelsForEmployer(db, employerUserId, candidateUserId, window, clients)
+      : [];
 
-  let postClients = [];
-  if (window) {
-    const windowEnd = sqliteComparableTimestamp(window.to);
-    postClients = [
-      ...new Set(
-        sessions
-          .filter((s) => {
-            const seen = sqliteComparableTimestamp(s.last_seen_at);
-            return seen && seen > windowEnd;
-          })
-          .map(formatClientLabel)
-          .filter(Boolean)
-          .filter((label) => !clients.includes(label))
-      ),
-    ];
-  }
-
-  const activityLines = buildActivityLines(calls, stats);
+  const { activityLines, intentLines } = buildActivityLines(calls, stats);
   const activityHeadline = activityHeadlineFromBattery(stats);
 
-  if (!clients.length && !postClients.length && !activityLines.length && !activityHeadline) {
+  if (
+    !clients.length &&
+    !postClientLabels.length &&
+    !activityLines.length &&
+    !intentLines.length &&
+    !activityHeadline
+  ) {
     return null;
   }
 
-  const clientPart = clients.length ? `Подключались клиенты: ${clients.join("; ")}.` : "";
-  const postPart = postClients.length
-    ? `Подключал ИИ-клиент после теста: ${postClients.join("; ")}.`
+  const clientPart = clients.length ? `${clients.join("; ")}.` : "";
+  const postPart = postClientLabels.length
+    ? `После теста через ИИ-клиент по вашим приглашениям: ${postClientLabels.join("; ")}.`
     : "";
   const headline = [clientPart, activityHeadline, postPart].filter(Boolean).join(" ");
 
   return {
     headline,
     clients,
-    activityLines,
+    activityLines: [...activityLines, ...intentLines],
     empty: false,
   };
 }

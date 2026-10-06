@@ -49,7 +49,16 @@ router.post("/battery/start", (req, res, next) => {
     }
     const formKey = Math.random() < 0.5 ? "A" : "B";
     const { quick, work } = getPublishedBatteryTasks(specialization, grade, formKey);
-    assertBatteryComplete(quick, work);
+    try {
+      assertBatteryComplete(quick, work);
+    } catch (e) {
+      if (e.code === "battery_incomplete") {
+        throw httpError(409, "battery_incomplete", {
+          message: "Батарея заданий для выбранной категории пока не готова",
+        });
+      }
+      throw e;
+    }
     const batteryId = newId();
     const now = new Date().toISOString();
     db.prepare(

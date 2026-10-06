@@ -6,7 +6,7 @@ const { newId } = require("../../lib/ids");
 const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
-const { validateNeedBody } = require("../../lib/need-validation");
+const { validateNeedBody, employerNeedTitleTaken } = require("../../lib/need-validation");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -32,10 +32,18 @@ router.get("/needs", (req, res) => {
 router.post("/needs", (req, res, next) => {
   const parsed = validateNeedBody(req.body || {}, { requireTitle: true });
   if (!parsed.ok) return next(httpError(400, "invalid_body", { fields: parsed.fields }));
-  const id = newId();
   const v = parsed.value;
+  const db = getDb();
+  if (employerNeedTitleTaken(db, req.user.id, v.title)) {
+    return next(
+      httpError(409, "need_duplicate_title", {
+        message: "Потребность с таким названием уже есть",
+      })
+    );
+  }
+  const id = newId();
   const activeFlag = v.active === undefined ? 1 : v.active ? 1 : 0;
-  getDb()
+  db
     .prepare(
       `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`

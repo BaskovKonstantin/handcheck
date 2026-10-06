@@ -59,9 +59,12 @@
                   <button type="button" class="btn-ghost btn-sm del-ep" data-id="${e.id}">Удалить</button></div>`
               )
               .join("") || '<p class="invite-meta">Пока нет эпизодов — добавьте хотя бы один, чтобы работодатели видели ваш опыт в отрасли.</p>'}</div>
-            <label>Роль <input id="ep-role" /></label>
-            <label>Домен <input id="ep-domain" /></label>
-            <label>Отрасль <input id="ep-industry" /></label>
+            <label>Роль <input id="ep-role" aria-describedby="ep-role-err" />
+              <span class="field-error" id="ep-role-err" hidden></span></label>
+            <label>Домен <input id="ep-domain" aria-describedby="ep-domain-err" />
+              <span class="field-error" id="ep-domain-err" hidden></span></label>
+            <label>Отрасль <input id="ep-industry" aria-describedby="ep-industry-err" />
+              <span class="field-error" id="ep-industry-err" hidden></span></label>
             <button type="button" class="btn-ghost" id="add-ep">Добавить эпизод</button>
             <p class="field-error" id="ep-err" hidden></p>
           </section>`;
@@ -92,7 +95,16 @@
         };
         document.getElementById("add-ep").onclick = async () => {
           const epErr = document.getElementById("ep-err");
+          const fieldIds = {
+            roleTitle: "ep-role-err",
+            domain: "ep-domain-err",
+            industry: "ep-industry-err",
+          };
           epErr.hidden = true;
+          for (const id of Object.values(fieldIds)) {
+            const el = document.getElementById(id);
+            if (el) el.hidden = true;
+          }
           try {
             await HandCheck.api("/api/candidate/background", {
               method: "POST",
@@ -104,8 +116,24 @@
             });
             await load();
           } catch (e) {
-            epErr.hidden = false;
-            epErr.textContent = HandCheck.formatApiError(e);
+            const fields = e?.data?.details?.fields;
+            let shown = false;
+            if (fields) {
+              for (const [key, elId] of Object.entries(fieldIds)) {
+                if (fields[key]) {
+                  const el = document.getElementById(elId);
+                  if (el) {
+                    el.hidden = false;
+                    el.textContent = fields[key];
+                    shown = true;
+                  }
+                }
+              }
+            }
+            if (!shown) {
+              epErr.hidden = false;
+              epErr.textContent = HandCheck.formatApiError(e);
+            }
           }
         };
         main.querySelectorAll(".del-ep").forEach((btn) => {

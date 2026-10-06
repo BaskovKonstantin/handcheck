@@ -173,7 +173,7 @@
         const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
         const retakeDate = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
         const improveBtn = onCooldown
-          ? `<button class="btn-improve-locked btn-sm" type="button" disabled title="Пересдача с ${retakeDate}"><span class="btn-lock" aria-hidden="true">🔒</span> Улучшить до ${retakeDate}</button>`
+          ? `<button class="btn-improve-locked btn-sm" type="button" disabled title="Пересдача с ${retakeDate}"><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача с ${retakeDate}</button>`
           : `<a class="btn-primary btn-sm" href="/candidate/tasks">Улучшить категорию</a>`;
         const categoryHint = `<p class="invite-meta">Задания подтверждают навык — при успешной пересдаче категория обновится.</p>
               ${improveBtn}`;

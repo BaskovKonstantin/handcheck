@@ -25,6 +25,14 @@ function createInvitation(employerUserId, body, actionSource = "web") {
     offerText,
     contactChannel,
   } = body || {};
+  if (!needId || !candidateId) {
+    throw httpError(400, "invalid_body");
+  }
+  const db = getDb();
+  const need = db
+    .prepare("SELECT * FROM employer_needs WHERE id = ? AND employer_user_id = ?")
+    .get(needId, employerUserId);
+  if (!need) throw httpError(404, "not_found");
   const { fields, from, to } = parseSalaryRange(salaryFrom, salaryTo);
   const offer = String(offerText || "").trim();
   const channel = String(contactChannel || "").trim();
@@ -32,14 +40,9 @@ function createInvitation(employerUserId, body, actionSource = "web") {
   else if (offer.length > 2000) fields.offerText = "Текст приглашения слишком длинный (максимум 2000 символов)";
   if (!channel) fields.contactChannel = "Укажите канал связи";
   else if (channel.length > 64) fields.contactChannel = "Канал связи слишком длинный";
-  if (!needId || !candidateId || Object.keys(fields).length) {
-    throw httpError(400, "invalid_body", Object.keys(fields).length ? { fields } : undefined);
+  if (Object.keys(fields).length) {
+    throw httpError(400, "invalid_body", { fields });
   }
-  const db = getDb();
-  const need = db
-    .prepare("SELECT * FROM employer_needs WHERE id = ? AND employer_user_id = ?")
-    .get(needId, employerUserId);
-  if (!need) throw httpError(404, "not_found");
   const company = db
     .prepare("SELECT company_name FROM employer_profiles WHERE user_id = ?")
     .get(employerUserId);

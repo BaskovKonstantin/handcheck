@@ -51,6 +51,8 @@ function validateOptionalPhone(value) {
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10 || !/^[\d\s+().-]+$/.test(phone)) {
       fields.phone = "Укажите корректный телефон";
+    } else if (/^0+$/.test(digits) || /^(\d)\1{9,}$/.test(digits)) {
+      fields.phone = "Укажите корректный телефон";
     }
   }
   return { phone, fields };

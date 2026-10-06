@@ -22,7 +22,7 @@ const {
   validateOptionalEmail,
   validateOptionalPhone,
 } = require("../../lib/validation");
-const { validateNeedBody } = require("../../lib/need-validation");
+const { validateNeedBody, employerNeedTitleTaken } = require("../../lib/need-validation");
 const { validateAnswerText } = require("../../lib/assessment-answer");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { publicCandidateDisplayName, sanitizeStoredDisplayName } = require("../../lib/public-candidate-name");
@@ -160,12 +160,16 @@ function listAssessmentTasks(userId) {
 function getAssessmentTask(userId, attemptId) {
   const row = getDb()
     .prepare(
-      `SELECT a.id, a.battery_id, t.prompt, t.type FROM attempts a JOIN tasks t ON t.id = a.task_id
+      `SELECT a.id, a.battery_id, a.answer_text, a.submitted_at, t.prompt, t.type FROM attempts a JOIN tasks t ON t.id = a.task_id
        WHERE a.id = ? AND a.candidate_user_id = ?`
     )
     .get(attemptId, userId);
   if (!row) throw mcpError("Задание не найдено", "not_found");
-  return { id: row.id, prompt: row.prompt, type: row.type, batteryId: row.battery_id };
+  const out = { id: row.id, prompt: row.prompt, type: row.type, batteryId: row.battery_id };
+  if (!row.submitted_at) {
+    out.draftText = String(row.answer_text || "");
+  }
+  return out;
 }
 
 function startAssessment(userId, specialization, grade, actionSource = "web") {
@@ -248,10 +252,15 @@ function submitAttemptAnswer(userId, attemptId, answerText, actionSource = "web"
 }
 
 function listCandidateInvitations(userId) {
+  const { formatSpecGradeLabel } = require("../../lib/category-labels");
   const rows = getDb()
     .prepare(
-      `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.status, i.created_at, e.company_name
-       FROM invitations i JOIN employer_profiles e ON e.user_id = i.employer_user_id
+      `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.contact_channel, i.status, i.created_at,
+              e.company_name, n.title AS need_title, n.specialization, n.grade, c.status AS call_status
+       FROM invitations i
+       JOIN employer_profiles e ON e.user_id = i.employer_user_id
+       JOIN employer_needs n ON n.id = i.need_id
+       LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.candidate_user_id = ? ORDER BY i.created_at DESC`
     )
     .all(userId);
@@ -260,8 +269,12 @@ function listCandidateInvitations(userId) {
     salaryFrom: r.salary_from,
     salaryTo: r.salary_to,
     offerText: r.offer_text,
+    contactChannel: r.contact_channel,
     status: r.status,
     companyName: r.company_name,
+    needTitle: r.need_title,
+    needCategory: formatSpecGradeLabel(r.specialization, r.grade),
+    callStatus: r.call_status || null,
     createdAt: dbDateToIso(r.created_at),
   }));
 }
@@ -324,10 +337,14 @@ function createEmployerNeed(userId, body) {
     const msg = Object.values(parsed.fields)[0] || "Некорректные данные потребности";
     throw mcpError(msg, "invalid_body");
   }
-  const id = newId();
+  const db = getDb();
   const v = parsed.value;
+  if (employerNeedTitleTaken(db, userId, v.title)) {
+    throw mcpError("Потребность с таким названием уже есть", "need_duplicate_title");
+  }
+  const id = newId();
   const activeFlag = v.active === undefined ? 1 : v.active ? 1 : 0;
-  getDb()
+  db
     .prepare(
       `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -497,6 +514,7 @@ function listEmployerCalls(userId) {
               c.id AS call_id, c.status AS call_status, c.ended_at, n.title AS need_title
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       JOIN users u ON u.id = i.candidate_user_id
        JOIN employer_needs n ON n.id = i.need_id
        LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.employer_user_id = ? AND i.status = 'accepted'
@@ -515,9 +533,10 @@ function listEmployerCalls(userId) {
 function getCallAnalysis(userId, callId) {
   const db = getDb();
   const call = db.prepare("SELECT * FROM calls WHERE id = ?").get(callId);
-  if (!call || call.status !== "ended") throw mcpError("Разбор звонка ещё не готов", "not_ready");
+  if (!call) throw mcpError("Звонок не найден", "not_found");
   const inv = db.prepare("SELECT * FROM invitations WHERE id = ?").get(call.invitation_id);
-  if (inv.employer_user_id !== userId) throw mcpError("Нет доступа", "forbidden");
+  if (!inv || inv.employer_user_id !== userId) throw mcpError("Звонок не найден", "not_found");
+  if (call.status !== "ended") throw mcpError("Разбор звонка ещё не готов", "not_ready");
   const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
   if (!a) throw mcpError("Разбор звонка ещё не готов", "not_ready");
   const aiUsage = summarizeAiUsageForEmployer(userId, inv.candidate_user_id);

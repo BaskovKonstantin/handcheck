@@ -76,7 +76,9 @@ async function checkForbiddenNumbers(page, label) {
 
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    args: ["--disable-http2", "--disable-remote-fonts"],
+  });
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultNavigationTimeout(60000);

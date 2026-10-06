@@ -21,7 +21,7 @@ function getNeed(req, needId) {
 router.get("/needs/:id/deck/next", (req, res, next) => {
   const need = getNeed(req, req.params.id);
   if (!need) return next(httpError(404, "not_found"));
-  let items = loadCandidatesForNeed(need, req.user.id);
+  let items = loadCandidatesForNeed(need, req.user.id, { forDeck: true });
   items = applyFilters(items, req.query);
   if (!items.length) return res.json({ card: null });
   const c = items[0];

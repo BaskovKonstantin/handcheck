@@ -2,6 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Список — HandCheck</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -18,32 +19,50 @@
     </main>
     <script src="/app.js"></script>
     <script>
-      HandCheck.employerNav();
+      const rowsEl = document.getElementById("rows");
       const params = new URLSearchParams(location.search);
       document.getElementById("stack").value = params.get("stack") || "";
       document.getElementById("fsp").value = params.get("fsp") || "";
       async function load() {
+        await HandCheck.employerNav();
         const needs = await HandCheck.api("/api/employer/needs");
         const needId = needs.items[0]?.id;
+        if (!needId) {
+          rowsEl.innerHTML = HandCheck.emptyState("Нет потребности", "Сначала опишите потребность.", "/employer/need", "К потребности");
+          return;
+        }
         const qs = location.search || "";
         const data = await HandCheck.api(`/api/employer/needs/${needId}/matches${qs}`);
-        document.getElementById("rows").innerHTML = data.items
-          .map(
-            (r) =>
-              `<a class="row-link" href="#">${r.categoryLabel}<br><small>${r.explanation.join(
-                " · "
-              )}</small></a>`
-          )
+        if (!data.items.length) {
+          rowsEl.innerHTML = HandCheck.emptyState(
+            "Подходящих кандидатов нет",
+            "Проверьте фильтры или откройте колоду — возможно, все уже в приглашениях.",
+            "/employer/invitations",
+            "К приглашениям"
+          );
+          return;
+        }
+        rowsEl.innerHTML = data.items
+          .map((r) => {
+            const invited =
+              r.reviewStatus === "invited"
+                ? '<span class="status-pill accepted">Приглашён</span> · '
+                : "";
+            return `<div class="row-link row-link-static"><strong>${r.categoryLabel}</strong> ${invited}<br><small>${r.explanation.join(
+              " · "
+            )}</small></div>`;
+          })
           .join("");
       }
       document.getElementById("apply").onclick = () => {
         const p = new URLSearchParams();
         if (document.getElementById("stack").value) p.set("stack", document.getElementById("stack").value);
         if (document.getElementById("fsp").value) p.set("fsp", document.getElementById("fsp").value);
-        history.replaceState({}, "", `/employer/list?${p}`);
+        const q = p.toString();
+        history.replaceState({}, "", q ? `/employer/list?${q}` : "/employer/list");
         load();
       };
-      load();
+      HandCheck.loadPanel(rowsEl, load);
     </script>
   </body>
 </html>

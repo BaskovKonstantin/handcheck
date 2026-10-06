@@ -81,6 +81,19 @@ async function loadCard() {
     cardEl.innerHTML = "";
     actions.hidden = true;
     empty.hidden = false;
+    try {
+      const qs = window.location.search;
+      const matches = await HandCheck.api(`/api/employer/needs/${needId}/matches${qs}`);
+      const invited = matches.items?.filter((i) => i.reviewStatus === "invited").length || 0;
+      if (invited > 0) {
+        empty.textContent =
+          "В колоде никого нет — оставшиеся кандидаты уже приглашены. Смотрите раздел «Приглашения».";
+      } else {
+        empty.textContent = "Кандидатов в колоде нет. Попробуйте снять фильтры или проверить потребность.";
+      }
+    } catch {
+      empty.textContent = "Кандидатов в колоде нет";
+    }
     candidateId = null;
     return;
   }

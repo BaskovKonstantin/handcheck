@@ -486,6 +486,10 @@ textarea:focus {
   transition: background var(--dur-fast) var(--ease-out);
 }
 
+.row-link-static {
+  cursor: default;
+}
+
 .row-link:hover {
   background: var(--card);
 }
@@ -1034,19 +1038,7 @@ body.has-cabinet-chrome main {
   border-radius: 50%;
   background: var(--clay);
   margin-right: 0.5rem;
-  animation: load-pulse 1s ease-in-out infinite;
-}
-
-@keyframes load-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
+  opacity: 0.85;
 }
 
 .toast-root {

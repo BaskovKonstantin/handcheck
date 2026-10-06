@@ -88,6 +88,19 @@ function isActive(href) {
   return path === href || path.startsWith(href + "/");
 }
 
+const INVITATION_STATUS_LABEL = {
+  sent: "Отправлено",
+  viewed: "Просмотрено",
+  accepted: "Принято",
+  declined: "Отклонено",
+};
+
+const CALL_STATUS_LABEL = {
+  ready: "Готов к звонку",
+  live: "В эфире",
+  ended: "Завершён",
+};
+
 const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="currentColor" opacity="0.12"/><path d="M8 18V10h3.2c2.2 0 3.6 1.1 3.6 2.9 0 1.2-.6 2.1-1.6 2.5L16 18h-2.4l-1.9-2.2H11v2.2H8zm3-4.5c.9 0 1.4-.4 1.4-1.1s-.5-1.1-1.4-1.1H11v2.2h0zM17.5 18V10H20v8h-2.5z" fill="currentColor"/></svg></span>`;
 
 const NAV_ICONS = {
@@ -287,5 +300,7 @@ window.HandCheck = {
   loadPanel,
   toast,
   initials,
+  invitationStatusLabel: (s) => INVITATION_STATUS_LABEL[s] || s,
+  callStatusLabel: (s) => CALL_STATUS_LABEL[s] || s,
   LOGO_MARK,
 };

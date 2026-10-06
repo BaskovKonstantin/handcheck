@@ -2,6 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Приглашения — HandCheck</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -46,7 +47,7 @@
                     : "";
               return `<article class="invite-card">
               <h3>${i.companyName}</h3>
-              <p class="invite-meta"><span class="salary-band">₽${i.salaryFrom.toLocaleString("ru")} – ₽${i.salaryTo.toLocaleString("ru")}</span> · <span class="status-pill ${i.status}">${i.status}</span></p>
+              <p class="invite-meta"><span class="salary-band">₽${i.salaryFrom.toLocaleString("ru")} – ₽${i.salaryTo.toLocaleString("ru")}</span> · <span class="status-pill ${i.status}">${HandCheck.invitationStatusLabel(i.status)}</span></p>
               <p>${i.offerText}</p>${contacts}${actions}</article>`;
             })
             .join("");

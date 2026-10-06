@@ -5,7 +5,8 @@ const { rankCandidates } = require("../../lib/ranking");
 const { buildTaskPhrases } = require("../../lib/task-phrases");
 const { buildExplanation } = require("./explain");
 
-function loadCandidatesForNeed(need, employerUserId) {
+function loadCandidatesForNeed(need, employerUserId, options = {}) {
+  const forDeck = options.forDeck === true;
   const db = getDb();
   const rows = db
     .prepare(
@@ -29,9 +30,10 @@ function loadCandidatesForNeed(need, employerUserId) {
         `SELECT decision FROM need_reviews WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?`
       )
       .get(employerUserId, need.id, r.user_id);
-    if (rejected?.decision === "rejected") continue;
-    if (rejected?.decision === "later") continue;
-    if (rejected?.decision === "invited") continue;
+    const decision = rejected?.decision;
+    if (decision === "rejected") continue;
+    if (decision === "later") continue;
+    if (forDeck && decision === "invited") continue;
 
     const episodes = db
       .prepare(
@@ -75,6 +77,7 @@ function loadCandidatesForNeed(need, employerUserId) {
 
     out.push({
       id: r.user_id,
+      reviewDecision: decision || null,
       displayName: r.display_name,
       categoryLabel: r.category_label,
       stack: JSON.parse(r.stack_json || "[]"),
@@ -104,6 +107,7 @@ function loadCandidatesForNeed(need, employerUserId) {
       domain_boost: c.domain_boost,
       fsp_boost: c.fsp_boost,
       displayName: c.displayName,
+      reviewDecision: c.reviewDecision,
       phone: c.phone,
       contact_email: c.contact_email,
     };
@@ -122,13 +126,15 @@ function applyFilters(items, query) {
 }
 
 function publicMatchShape(c) {
-  return {
+  const row = {
     id: c.id,
     categoryLabel: c.categoryLabel,
     stack: c.stack,
     backgroundDomains: c.backgroundDomains,
     explanation: c.explanation,
   };
+  if (c.reviewDecision === "invited") row.reviewStatus = "invited";
+  return row;
 }
 
 module.exports = { loadCandidatesForNeed, applyFilters, publicMatchShape };

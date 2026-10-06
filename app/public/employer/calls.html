@@ -2,6 +2,7 @@
 <html lang="ru">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Звонки — HandCheck</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -42,7 +43,7 @@
             }
             parts.push(`<article class="invite-card">
               <h3>${c.candidateName}</h3>
-              <p class="invite-meta">${c.needTitle} · ${c.callStatus}</p>
+              <p class="invite-meta">${c.needTitle} · ${HandCheck.callStatusLabel(c.callStatus)}</p>
               <a class="btn-primary" href="${c.roomUrl}">Комната</a>
               ${analysis}
             </article>`);

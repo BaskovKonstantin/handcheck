@@ -1,5 +1,7 @@
 const invitationId = location.pathname.split("/").pop();
 let callId = null;
+let timerStartedAt = null;
+let timerTick = null;
 
 const consent = document.getElementById("consent");
 const join = document.getElementById("join");
@@ -65,6 +67,15 @@ join.onclick = async () => {
   recLabel.textContent = "Запись активна";
   join.hidden = true;
   endBtn.hidden = false;
+  const timerEl = document.getElementById("timer");
+  timerStartedAt = Date.now();
+  clearInterval(timerTick);
+  timerTick = setInterval(() => {
+    const sec = Math.floor((Date.now() - timerStartedAt) / 1000);
+    const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+    const ss = String(sec % 60).padStart(2, "0");
+    timerEl.textContent = `${mm}:${ss}`;
+  }, 1000);
 };
 
 endBtn.onclick = async () => {

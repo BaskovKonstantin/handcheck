@@ -1,5 +1,6 @@
-# HandCheck rev.5 implementation session
+# HandCheck session notes
 
-- Branch: cursor/handcheck-rev5-a6e9
-- Canonical spec: docs/IMPLEMENTATION-PLAN-rev5.md (from upload)
-- Prod health check left to operator
+- Round 4 branch: `cursor/round4-test-improve-ed4d`
+- Prod tested via API smoke; Playwright in-page fetch to prod hangs in cloud VM (curl/API client OK)
+- Fix: matches API keeps `invited` candidates for employer list; deck still excludes them
+- Screenshots: `handcheck-ui/round4/after/`

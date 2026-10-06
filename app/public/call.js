@@ -70,6 +70,7 @@ function bindRoomControls() {
         body: JSON.stringify({ accepted: true }),
       });
       await HandCheck.api(`/api/calls/${callId}/start`, { method: "POST" });
+      setCallLede("Разговор в эфире. Запись ведётся — завершите звонок, когда закончите.");
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       video.srcObject = stream;
       video.hidden = false;

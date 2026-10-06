@@ -119,23 +119,35 @@
       HandCheck.api("/api/integrations/tokens"),
       HandCheck.api("/api/integrations/audit?limit=30"),
     ]);
-    const tokenRows = (tokens.items || [])
-      .map((t) => {
-        const revoked = t.revoked ? " · отозван" : "";
-        const used = t.lastUsedAt
-          ? ` · последнее использование ${HandCheck.formatDateTimeMoscow(t.lastUsedAt)}`
-          : "";
-        return `<li class="token-row">
+    const allTokens = tokens.items || [];
+    const activeTokens = allTokens.filter((t) => !t.revoked);
+    const revokedTokens = allTokens.filter((t) => t.revoked);
+
+    function tokenRow(t, muted) {
+      const used = t.lastUsedAt
+        ? ` · последнее использование ${HandCheck.formatDateTimeMoscow(t.lastUsedAt)}`
+        : "";
+      const cls = muted ? "token-row token-row-revoked" : "token-row";
+      return `<li class="${cls}">
           <strong>${escapeHtml(t.name)}</strong>
-          <span class="invite-meta">${escapeHtml(t.prefix)} · ${scopeLabelList(t.scopes)}${used}${revoked}</span>
+          <span class="invite-meta">${escapeHtml(t.prefix)} · ${scopeLabelList(t.scopes)}${used}</span>
           ${
             t.revoked
               ? ""
               : `<button type="button" class="btn-ghost btn-sm revoke-token" data-id="${t.id}" data-name="${escapeHtml(t.name)}">Отозвать</button>`
           }
         </li>`;
-      })
-      .join("");
+    }
+
+    const activeRows = activeTokens.map((t) => tokenRow(t, false)).join("");
+    const revokedRows = revokedTokens.map((t) => tokenRow(t, true)).join("");
+    const revokedBlock = revokedTokens.length
+      ? `<details class="token-revoked-archive">
+          <summary class="invite-meta">Отозванные (${revokedTokens.length})</summary>
+          <ul class="token-list token-list-revoked">${revokedRows}</ul>
+        </details>`
+      : "";
+    const tokenListBlock = `<ul class="token-list">${activeRows || '<li class="invite-meta">Пока нет активных токенов.</li>'}</ul>${revokedBlock}`;
     const auditRows = (audit.items || [])
       .map((a) => {
         const status = a.ok ? "Успешно" : "Ошибка";
@@ -181,7 +193,7 @@
           ${renderTokenOnce(justCreatedToken, cfg)}
           <button type="button" class="btn-primary" id="create-token">Создать токен</button>
           <h3 class="h3" style="margin-top:1.25rem">Ваши токены</h3>
-          <ul class="token-list">${tokenRows || '<li class="invite-meta">Пока нет токенов.</li>'}</ul>
+          ${tokenListBlock}
         </section>
         <section class="panel">
           <span class="integrations-step-badge">Шаг 2</span>

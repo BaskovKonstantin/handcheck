@@ -100,6 +100,7 @@ describe("round 16 findings", () => {
     assert.ok(row, "expected call_analyses row");
     assert.equal(row.consistency_note, "domain_match");
     assert.match(row.summary_text, /доменом потребности/);
+    assert.ok(!/Формулировки совпали/.test(row.summary_text));
   });
 
   it("stores intent for read tools and exposes MCP annotations", async () => {

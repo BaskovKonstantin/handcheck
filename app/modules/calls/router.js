@@ -224,8 +224,11 @@ router.post("/:id/transcript-chunk", (req, res, next) => {
   if (call.status !== "live") {
     return next(httpError(409, "call_not_live"));
   }
-  const merged = (call.transcript_text + " " + text).trim();
-  db.prepare("UPDATE calls SET transcript_text = ? WHERE id = ?").run(merged, call.id);
+  const roleLabel =
+    req.user.id === inv.candidate_user_id ? "Кандидат" : "Работодатель";
+  const chunk = new RegExp(`^${roleLabel}\\s*:`, "i").test(text) ? text : `${roleLabel}: ${text}`;
+  const merged = (call.transcript_text ? `${call.transcript_text} ` : "") + chunk;
+  db.prepare("UPDATE calls SET transcript_text = ? WHERE id = ?").run(merged.trim(), call.id);
   res.json({ ok: true });
 });
 

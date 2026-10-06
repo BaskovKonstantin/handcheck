@@ -54,7 +54,7 @@
             <div class="episode-list" id="episodes">${(bg.items || [])
               .map(
                 (e) =>
-                  `<div class="episode-item" data-id="${e.id}"><strong>${e.role_title}</strong> · ${e.industry}<br><span class="invite-meta">${e.domain}</span>
+                  `<div class="episode-item" data-id="${e.id}"><strong>${e.roleTitle}</strong> · ${e.industry}<br><span class="invite-meta">${e.domain}</span>
                   <button type="button" class="btn-ghost btn-sm del-ep" data-id="${e.id}">Удалить</button></div>`
               )
               .join("") || '<p class="invite-meta">Пока нет эпизодов — добавьте хотя бы один для доменного совпадения.</p>'}</div>

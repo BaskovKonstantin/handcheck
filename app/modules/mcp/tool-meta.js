@@ -2,11 +2,10 @@
 
 function intentField(z) {
   return {
-    intent: z
-      .string()
-      .max(200)
-      .optional()
-      .describe("Кратко: что попросил пользователь у ассистента"),
+    intent: z.preprocess(
+      (val) => (typeof val === "string" ? val.slice(0, 200) : val),
+      z.string().optional()
+    ).describe("Кратко: что попросил пользователь у ассистента"),
   };
 }
 

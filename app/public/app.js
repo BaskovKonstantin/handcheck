@@ -30,20 +30,38 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function formatRetakeDateMoscow(iso) {
+  if (!iso) return "";
+  let normalized = iso;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:/.test(iso)) {
+    normalized = `${iso.replace(" ", "T")}Z`;
+  } else if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]$/.test(iso) && !/[+-]\d{2}:\d{2}$/.test(iso)) {
+    normalized = `${iso}Z`;
+  }
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function formatApiError(err) {
   const code = err?.data?.error || err?.message;
   const fields = err?.data?.details?.fields;
+  if (code === "cooldown" && err?.data?.details?.retakeAt) {
+    const when = formatRetakeDateMoscow(err.data.details.retakeAt);
+    return when
+      ? `${ERROR_MESSAGES.cooldown}. Повторная попытка с ${when}`
+      : ERROR_MESSAGES.cooldown;
+  }
   if (err?.data?.details?.message) return err.data.details.message;
   if (fields?.salaryRange) return fields.salaryRange;
   if (fields?.offerText) return fields.offerText;
   if (fields?.contactChannel) return fields.contactChannel;
   if (fields?.tokenName) return fields.tokenName;
-  if (code === "cooldown" && err?.data?.details?.retakeAt) {
-    const when = formatDateTimeMoscow(err.data.details.retakeAt);
-    return when
-      ? `${ERROR_MESSAGES.cooldown}. Повторная попытка с ${when}`
-      : ERROR_MESSAGES.cooldown;
-  }
   if (err?.status === 413 || code === "file_too_large") {
     return ERROR_MESSAGES.file_too_large;
   }
@@ -640,6 +658,7 @@ window.HandCheck = {
   callStatusClass,
   formatSalaryRange,
   formatDateTimeMoscow,
+  formatRetakeDateMoscow,
   escapeHtml,
   LOGO_MARK,
 };

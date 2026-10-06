@@ -18,4 +18,28 @@ function assertWebmUpload(file) {
   return generic.has(base);
 }
 
-module.exports = { isWebmBuffer, assertWebmUpload, normalizeWebmMime };
+/** MediaRecorder continuation blobs may start with a cluster, not EBML. */
+function isWebmClusterBuffer(buf) {
+  if (!buf || buf.length < 4) return false;
+  return buf[0] === 0x1f && buf[1] === 0x43 && buf[2] === 0xb6 && buf[3] === 0x75;
+}
+
+function assertRecordingChunkUpload(file, hasExistingChunks) {
+  if (!file?.buffer?.length) return false;
+  if (assertWebmUpload(file)) return true;
+  if (hasExistingChunks && isWebmClusterBuffer(file.buffer)) {
+    const base = normalizeWebmMime(file.mimetype);
+    if (base === "video/webm" || base === "audio/webm") return true;
+    const generic = new Set(["application/octet-stream", "text/plain", "binary/octet-stream"]);
+    return generic.has(base);
+  }
+  return false;
+}
+
+module.exports = {
+  isWebmBuffer,
+  isWebmClusterBuffer,
+  assertWebmUpload,
+  assertRecordingChunkUpload,
+  normalizeWebmMime,
+};

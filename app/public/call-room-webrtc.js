@@ -11,6 +11,8 @@
   const RECORDER_AUDIO_BPS = 15_000;
   const RECORDER_TOTAL_BPS = RECORDER_VIDEO_BPS + RECORDER_AUDIO_BPS;
   const CHUNK_UPLOAD_MS = 12_000;
+  /** Chromium keepalive fetch body limit (~64 KB). */
+  const KEEPALIVE_BODY_LIMIT = 60 * 1024;
 
   function wsUrl(callId) {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -75,6 +77,7 @@
     let recorder = null;
     let recorderChunks = [];
     let uploadedChunkCount = 0;
+    let chunkUploadFailed = false;
     let chunkUploadTimer = null;
     let speech = null;
     let speechNoteShown = false;
@@ -163,12 +166,23 @@
       }
       const conn = await ensurePeerConnection();
       if (msg.t === WS_SIGNAL.OFFER && role === "candidate") {
-        await conn.setRemoteDescription(msg.sdp);
-        const answer = await conn.createAnswer();
-        await conn.setLocalDescription(answer);
-        sendSignal({ t: WS_SIGNAL.ANSWER, sdp: conn.localDescription });
+        if (conn.signalingState === "stable" && conn.remoteDescription) return;
+        if (conn.signalingState === "have-local-offer") return;
+        try {
+          await conn.setRemoteDescription(msg.sdp);
+          const answer = await conn.createAnswer();
+          await conn.setLocalDescription(answer);
+          sendSignal({ t: WS_SIGNAL.ANSWER, sdp: conn.localDescription });
+        } catch {
+          /* glare or stale offer */
+        }
       } else if (msg.t === WS_SIGNAL.ANSWER && role === "employer") {
-        await conn.setRemoteDescription(msg.sdp);
+        if (conn.signalingState !== "have-local-offer") return;
+        try {
+          await conn.setRemoteDescription(msg.sdp);
+        } catch {
+          /* duplicate or stale answer */
+        }
       } else if (msg.t === WS_SIGNAL.ICE && msg.candidate) {
         try {
           await conn.addIceCandidate(msg.candidate);
@@ -176,6 +190,7 @@
           /* ignore stale ice */
         }
       } else if (msg.t === WS_SIGNAL.ENDED) {
+        if (ended) return;
         ended = true;
         if (typeof onPeerEnded === "function") onPeerEnded();
       }
@@ -311,18 +326,25 @@
       emit({ recording: true });
     }
 
+    async function postMultipart(url, form, blobSize) {
+      const useKeepalive = blobSize > 0 && blobSize <= KEEPALIVE_BODY_LIMIT;
+      const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+        keepalive: useKeepalive,
+      });
+      return res;
+    }
+
     async function uploadRecordingChunk(blob) {
       if (!blob?.size) return;
       const form = new FormData();
       form.append("file", blob, `chunk-${uploadedChunkCount}.webm`);
-      const res = await fetch(`/api/calls/${callId}/recording-chunk`, {
-        method: "POST",
-        credentials: "include",
-        body: form,
-        keepalive: true,
-      });
+      const res = await postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size);
       if (!res.ok) throw new Error("chunk_upload_failed");
       uploadedChunkCount += 1;
+      chunkUploadFailed = false;
       return true;
     }
 
@@ -339,6 +361,8 @@
       clearInterval(chunkUploadTimer);
       chunkUploadTimer = setInterval(() => {
         flushRecordingChunks().catch(() => {
+          chunkUploadFailed = true;
+          emit({ recordingUploadDegraded: true });
           if (typeof onUploadError === "function") {
             onUploadError("Не удалось сохранить фрагмент записи — повторим при завершении звонка");
           }
@@ -351,12 +375,7 @@
         recorderChunks = [];
         const form = new FormData();
         form.append("file", blob, "chunk-emergency.webm");
-        fetch(`/api/calls/${callId}/recording-chunk`, {
-          method: "POST",
-          credentials: "include",
-          body: form,
-          keepalive: true,
-        }).catch(() => {});
+        void postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size).catch(() => {});
       };
       global.addEventListener("pagehide", onPageHide);
     }
@@ -368,22 +387,23 @@
           recorder.stop();
         });
       }
-      await flushRecordingChunks();
+      try {
+        await flushRecordingChunks();
+      } catch {
+        chunkUploadFailed = true;
+      }
       const mime = pickRecorderMime() || "video/webm";
-      const tail = recorderChunks.length ? new Blob(recorderChunks, { type: mime }) : new Blob([], { type: mime });
+      const tail = recorderChunks.length ? new Blob(recorderChunks, { type: mime }) : null;
       recorderChunks = [];
       const durationMs =
         liveStartedAt != null ? Math.max(0, Date.now() - liveStartedAt) : 0;
       const form = new FormData();
-      const minimalWebm = new Blob([new Uint8Array([0x1a, 0x45, 0xdf, 0xa3])], { type: mime });
-      form.append("file", tail.size ? tail : minimalWebm, "recording.webm");
+      if (tail?.size) {
+        form.append("file", tail, "recording.webm");
+      }
       form.append("durationMs", String(durationMs));
-      const res = await fetch(`/api/calls/${callId}/recording`, {
-        method: "POST",
-        credentials: "include",
-        body: form,
-        keepalive: true,
-      });
+      const bodySize = tail?.size || 0;
+      const res = await postMultipart(`/api/calls/${callId}/recording`, form, bodySize);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         const code = err?.error || `recording_upload_${res.status}`;
@@ -487,6 +507,7 @@
     RECORDER_TOTAL_BPS,
     RECORDING_LIMIT_BYTES,
     RECORDING_TARGET_SECONDS,
+    KEEPALIVE_BODY_LIMIT,
     _WS_SIGNAL: WS_SIGNAL,
   };
 })(window);

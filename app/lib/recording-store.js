@@ -4,6 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../config");
 const { fixWebmDuration } = require("fix-webm-duration");
+const { isWebmBuffer } = require("./webm");
+const { MIN_PLAYABLE_RECORDING_BYTES, isPlayableRecordingFile } = require("./call-recording");
 
 function callsRoot() {
   return path.resolve(config.CALLS_DIR);
@@ -42,8 +44,26 @@ function appendChunk(callId, side, buffer) {
   return filePath;
 }
 
+function normalizeChunkPart(buf, isFirst) {
+  if (!buf?.length) return buf;
+  if (isFirst) return buf;
+  if (isWebmBuffer(buf)) {
+    const cluster = Buffer.from([0x1f, 0x43, 0xb6, 0x75]);
+    const at = buf.indexOf(cluster, 4);
+    if (at > 0) return buf.subarray(at);
+    return buf.subarray(4);
+  }
+  return buf;
+}
+
 function mergeBuffers(buffers) {
-  return Buffer.concat(buffers.filter((b) => b && b.length));
+  const parts = buffers.filter((b) => b && b.length);
+  if (!parts.length) return Buffer.alloc(0);
+  return Buffer.concat(parts.map((b, i) => normalizeChunkPart(b, i === 0)));
+}
+
+function totalChunkBytes(callId, side) {
+  return listChunkFiles(callId, side).reduce((sum, p) => sum + fs.statSync(p).size, 0);
 }
 
 function mergeChunksToFinal(callId, side, tailBuffer, durationMs) {
@@ -60,6 +80,7 @@ function mergeChunksToFinal(callId, side, tailBuffer, durationMs) {
   }
   const finalPath = path.join(callDir(callId), `${side}.webm`);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+  if (merged.length < MIN_PLAYABLE_RECORDING_BYTES) return null;
   fs.writeFileSync(finalPath, merged);
   return finalPath;
 }
@@ -78,6 +99,16 @@ function writeFinalRecording(callId, side, buffer, durationMs) {
   }
   const finalPath = path.join(callDir(callId), `${side}.webm`);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
+  if (merged.length < MIN_PLAYABLE_RECORDING_BYTES) {
+    if (fs.existsSync(finalPath) && !isPlayableRecordingFile(finalPath)) {
+      try {
+        fs.unlinkSync(finalPath);
+      } catch {
+        /* ignore */
+      }
+    }
+    return null;
+  }
   fs.writeFileSync(finalPath, merged);
   return finalPath;
 }
@@ -88,4 +119,6 @@ module.exports = {
   mergeChunksToFinal,
   writeFinalRecording,
   listChunkFiles,
+  totalChunkBytes,
+  mergeBuffers,
 };

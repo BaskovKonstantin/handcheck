@@ -7,6 +7,7 @@ let roomInfo = null;
 let roomMe = null;
 let waitLivePoll = null;
 let roomPhase = "prejoin";
+let localEndInProgress = false;
 
 const roomHost = document.getElementById("room-host");
 
@@ -154,7 +155,9 @@ function updateRecordingLabel(state) {
     recLabel.textContent = "Запись начнётся, когда звонок перейдёт в эфир";
     recDot?.classList.remove("live");
   } else if (state.recording) {
-    recLabel.textContent = "Запись активна";
+    recLabel.textContent = state.recordingUploadDegraded
+      ? "Запись активна — есть сбои загрузки фрагментов"
+      : "Запись активна";
     recDot?.classList.add("live");
   } else if (state.recordingUnavailable) {
     recLabel.textContent = "Запись недоступна в этом браузере";
@@ -306,9 +309,12 @@ function startWaitForLive(peerName, me) {
 }
 
 async function handleRemoteEnded() {
+  if (localEndInProgress) return;
   clearWaitLivePoll();
   if (callSession) {
-    await callSession.endLocalSide({ skipUpload: roomPhase !== "live" }).catch(() => {});
+    await callSession
+      .endLocalSide({ skipUpload: roomPhase !== "live", waitForUpload: roomPhase === "live" })
+      .catch(() => {});
     callSession = null;
   }
   clearInterval(timerTick);
@@ -429,11 +435,12 @@ function bindRoomControls(info, me) {
           return;
         }
       }
-      await HandCheck.api(`/api/calls/${callId}/end`, { method: "POST" });
+      localEndInProgress = true;
       if (callSession) {
-        callSession.endLocalSide().catch(() => {});
+        await callSession.endLocalSide({ waitForUpload: true }).catch(() => {});
         callSession = null;
       }
+      await HandCheck.api(`/api/calls/${callId}/end`, { method: "POST" });
       clearInterval(timerTick);
       location.href = `/call/${invitationId}`;
     } catch (e) {

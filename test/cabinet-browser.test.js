@@ -31,11 +31,12 @@ async function waitForHealth(timeoutMs = 20000) {
 }
 
 async function login(page, email) {
-  await page.goto(`${BASE}/auth`, { waitUntil: "commit", timeout: 30000 });
+  await page.goto(`${BASE}/auth`, { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.waitForSelector("#email", { timeout: 15000 });
   await page.fill("#email", email);
   await page.fill("#password", PASS);
   await page.click("#primary-action", { force: true });
-  await page.waitForURL(/\/(candidate|employer)\//, { timeout: 20000 });
+  await page.waitForURL(/\/(candidate|employer)\//, { timeout: 45000 });
 }
 
 async function assertCabinetPage(page, urlPath, contentSelector, emailHint) {
@@ -601,14 +602,14 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
         },
         { timeout: 45000 }
       );
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 3000));
       await empPage.click("#end", { force: true });
       await empPage.waitForURL((url) => url.pathname === `/call/${invId}`, { timeout: 45000 });
       await empPage.waitForSelector(".call-result-card", { timeout: 30000 });
       await candPage.waitForSelector(".call-result-card", { timeout: 45000 });
 
       let info = null;
-      for (let attempt = 0; attempt < 20; attempt += 1) {
+      for (let attempt = 0; attempt < 40; attempt += 1) {
         info = await empPage.evaluate(async (id) => {
           const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
           return r.json();
@@ -838,6 +839,95 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       const hasMr = await page.evaluate(() => typeof window.MediaRecorder === "undefined");
       assert.equal(hasMr, true);
       await empCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
+  });
+
+  it("round33: anonymous /privacy renders policy without auth redirect", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/privacy`, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForFunction(
+      () => location.pathname === "/privacy" && document.querySelector(".privacy-doc h2"),
+      { timeout: 15000 }
+    );
+    const heading = await page.locator(".privacy-doc h2").first().textContent();
+    assert.match(heading || "", /Цели обработки/i);
+    await context.close();
+  });
+
+  it("round33: live call uploads playable recordings for both sides", async () => {
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+      const Database = require("better-sqlite3");
+      const db = new Database(dbPath);
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round33 recording', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await emp.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await cand.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await emp.check("#consent", { force: true });
+      await emp.click("#join", { force: true });
+      await cand.check("#consent", { force: true });
+      await cand.click("#join", { force: true });
+      await emp.waitForFunction(
+        () => (document.getElementById("panel-title")?.textContent || "").includes("В эфире"),
+        { timeout: 60000 }
+      );
+      await new Promise((r) => setTimeout(r, 26000));
+      await emp.click("#end", { force: true });
+      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      await cand.waitForURL(new RegExp(`/call/${invId}`), { timeout: 90000 });
+      await emp.waitForSelector(".call-result-card", { timeout: 30000 });
+      await cand.waitForSelector(".call-result-card", { timeout: 45000 });
+      let info = null;
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        info = await emp.evaluate(async (id) => {
+          const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+          return r.json();
+        }, invId);
+        const sides = info.recordingSides || [];
+        if (info.status === "ended" && sides.includes("employer") && sides.includes("candidate")) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      const sides = info.recordingSides || [];
+      assert.ok(sides.includes("employer"), `employer recording missing: ${sides.join(",")}`);
+      assert.ok(sides.includes("candidate"), `candidate recording missing: ${sides.join(",")}`);
+      const sizes = await emp.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        const info = await r.json();
+        const out = {};
+        for (const side of info.recordingSides || []) {
+          const res = await fetch(`/api/calls/${info.callId}/recording?side=${side}`, {
+            credentials: "include",
+          });
+          const buf = await res.arrayBuffer();
+          out[side] = buf.byteLength;
+        }
+        return out;
+      }, invId);
+      assert.ok(sizes.employer > 100 * 1024, `employer bytes ${sizes.employer}`);
+      assert.ok(sizes.candidate > 100 * 1024, `candidate bytes ${sizes.candidate}`);
+      await empCtx.close();
+      await candCtx.close();
     } finally {
       await mediaBrowser.close();
     }

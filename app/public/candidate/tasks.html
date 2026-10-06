@@ -17,51 +17,131 @@
           <p class="lede">4 коротких ответа и одна рабочая задача. Результат — категория, не балл.</p>
         </div>
       </header>
-      <div id="panel" class="panel"><p class="loading">Загрузка…</p></div>
+      <div id="panel" class="panel"></div>
     </main>
     <script src="/app.js"></script>
     <script>
-      HandCheck.candidateNav();
       const panel = document.getElementById("panel");
       let attemptId = null;
 
+      const SPECS = [
+        { value: "backend", label: "Backend" },
+        { value: "frontend", label: "Frontend" },
+        { value: "qa", label: "QA" },
+      ];
+      const GRADES = [
+        { value: "junior", label: "Junior" },
+        { value: "middle", label: "Middle" },
+        { value: "senior", label: "Senior" },
+      ];
+
+      function batteryStepIndicator(currentIndex, total) {
+        const steps = [];
+        for (let i = 0; i < 4; i += 1) {
+          const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "";
+          steps.push(`<li class="battery-step ${state}" aria-current="${i === currentIndex ? "step" : "false"}">
+            <span class="battery-step-num">${i + 1}</span>
+            <span class="battery-step-label">Короткий ${i + 1}</span>
+          </li>`);
+        }
+        const workState = currentIndex >= 4 ? (currentIndex === 4 ? "current" : "done") : "";
+        steps.push(`<li class="battery-step battery-step-work ${workState}">
+          <span class="battery-step-num">W</span>
+          <span class="battery-step-label">Рабочая</span>
+        </li>`);
+        return `<ol class="battery-steps" aria-label="Шаги батареи">${steps.join("")}</ol>`;
+      }
+
+      function choiceChips(name, options, selected) {
+        return `<div class="choice-chip-row" role="radiogroup" aria-label="${name}">
+          ${options
+            .map(
+              (o) =>
+                `<button type="button" class="choice-chip${o.value === selected ? " active" : ""}" data-choice="${o.value}" data-field="${name}">${o.label}</button>`
+            )
+            .join("")}
+          <input type="hidden" id="${name}" value="${selected}" />
+        </div>`;
+      }
+
+      function bindChoiceChips(root) {
+        root.querySelectorAll(".choice-chip").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const field = btn.dataset.field;
+            root.querySelectorAll(`.choice-chip[data-field="${field}"]`).forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            document.getElementById(field).value = btn.dataset.choice;
+          });
+        });
+      }
+
+      async function renderStartForm(category) {
+        const catBlock = category?.label
+          ? `<div class="battery-last-result">
+              <span class="invite-meta">Текущая категория</span>
+              <span class="category-pill">${category.label}</span>
+              <p class="invite-meta">Новая попытка может улучшить категорию после cooldown по специализации.</p>
+            </div>`
+          : `<p class="invite-meta">Категория появится после первой завершённой батареи.</p>`;
+        panel.innerHTML = `
+          ${batteryStepIndicator(0, 5)}
+          ${catBlock}
+          <p class="invite-meta">Выберите специализацию и грейд для новой попытки.</p>
+          <div class="form-field">
+            <span class="form-label">Специализация</span>
+            ${choiceChips("spec", SPECS, "backend")}
+          </div>
+          <div class="form-field">
+            <span class="form-label">Грейд</span>
+            ${choiceChips("grade", GRADES, "middle")}
+          </div>
+          <button class="btn-primary" id="start">Начать батарею</button>
+          <p class="field-error" id="err" hidden></p>`;
+        bindChoiceChips(panel);
+        document.getElementById("start").onclick = async () => {
+          const err = document.getElementById("err");
+          err.hidden = true;
+          try {
+            await HandCheck.api("/api/assessment/battery/start", {
+              method: "POST",
+              body: JSON.stringify({
+                specialization: document.getElementById("spec").value,
+                grade: document.getElementById("grade").value,
+              }),
+            });
+            await init();
+          } catch (e) {
+            err.hidden = false;
+            err.textContent =
+              e.status === 409 ? "Пересдача этой специализации пока недоступна (cooldown)." : HandCheck.formatApiError(e);
+          }
+        };
+      }
+
       async function init() {
-        const cur = await HandCheck.api("/api/assessment/battery/current");
+        panel.innerHTML = HandCheck.skeletonBlocks(2);
+        const [cur, category] = await Promise.all([
+          HandCheck.api("/api/assessment/battery/current"),
+          HandCheck.api("/api/candidate/category").catch(() => ({ label: null })),
+        ]);
         if (!cur.battery) {
-          panel.innerHTML = `
-            <p class="invite-meta">Выберите специализацию и грейд для новой попытки.</p>
-            <label>Специализация <select id="spec"><option value="backend">backend</option><option value="frontend">frontend</option><option value="qa">qa</option></select></label>
-            <label>Грейд <select id="grade"><option value="middle">middle</option><option value="junior">junior</option><option value="senior">senior</option></select></label>
-            <button class="btn-primary" id="start">Начать батарею</button>
-            <p class="field-error" id="err" hidden></p>`;
-          document.getElementById("start").onclick = async () => {
-            const err = document.getElementById("err");
-            err.hidden = true;
-            try {
-              await HandCheck.api("/api/assessment/battery/start", {
-                method: "POST",
-                body: JSON.stringify({
-                  specialization: document.getElementById("spec").value,
-                  grade: document.getElementById("grade").value,
-                }),
-              });
-              await init();
-            } catch (e) {
-              err.hidden = false;
-              err.textContent =
-                e.status === 409 ? "Пересдача этой специализации пока недоступна (cooldown)." : HandCheck.formatApiError(e);
-            }
-          };
+          await renderStartForm(category);
           return;
         }
-        const next = cur.battery.attempts.find((a) => !a.submitted);
+        const attempts = cur.battery.attempts || [];
+        const submitted = attempts.filter((a) => a.submitted).length;
+        const next = attempts.find((a) => !a.submitted);
         if (!next) {
-          panel.innerHTML = HandCheck.emptyState(
-            "Батарея завершена",
-            "Категория обновится на экране «Сегодня».",
-            "/candidate/today",
-            "Открыть сегодня"
-          );
+          panel.innerHTML =
+            batteryStepIndicator(5, 5) +
+            HandCheck.emptyState(
+              "Батарея завершена",
+              category.label
+                ? `Ваша категория: ${category.label}. Обновление на экране «Сегодня».`
+                : "Категория обновится на экране «Сегодня».",
+              "/candidate/today",
+              "Открыть сегодня"
+            );
           return;
         }
         attemptId = next.id;
@@ -77,7 +157,9 @@
             restored = "";
           }
         }
+        const stepIndex = submitted;
         panel.innerHTML = `
+          ${batteryStepIndicator(stepIndex, 5)}
           <p class="invite-meta">${cur.battery.specialization} · ${cur.battery.claimedGrade} · форма ${cur.battery.formKey}</p>
           <p>${t.prompt}</p>
           <textarea id="answer" rows="8">${restored}</textarea>
@@ -110,9 +192,12 @@
           }
         };
       }
-      init().catch(() => {
-        panel.innerHTML = HandCheck.emptyState("Ошибка", "Войдите как кандидат.", "/auth", "Войти");
-      });
+
+      HandCheck.bootCabinetPage("candidate", () =>
+        init().catch(() => {
+          panel.innerHTML = HandCheck.emptyState("Ошибка", "Войдите как кандидат.", "/auth", "Войти");
+        })
+      );
     </script>
   </body>
 </html>

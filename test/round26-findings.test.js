@@ -112,11 +112,13 @@ describe("round 26 findings", () => {
       title: "Тест Р26: третья",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const dup = await employer.post("/api/employer/needs").send({
       title: "тест р26: третья",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     assert.equal(dup.status, 409);
     assert.equal(dup.body.error, "need_duplicate_title");
@@ -130,16 +132,19 @@ describe("round 26 findings", () => {
       title: "Первая потребность",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const b = await employer.post("/api/employer/needs").send({
       title: "Вторая потребность",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const put = await employer.put(`/api/employer/needs/${b.body.id}`).send({
       title: "первая потребность",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     assert.equal(put.status, 409);
 
@@ -163,6 +168,7 @@ describe("round 26 findings", () => {
       title: "Первая потребность",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     assert.equal(foreign.status, 201);
   });
@@ -194,9 +200,11 @@ describe("round 26 findings", () => {
     await cand.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const cur = await cand.get("/api/assessment/battery/current");
     const attemptId = cur.body.battery.attempts.find((a) => !a.submitted).id;
+    await cand.post(`/api/assessment/tasks/${attemptId}/open`);
     const long = "а".repeat(QUICK_ANSWER_MAX + 1);
     const bad = await cand.post(`/api/assessment/tasks/${attemptId}/submit`).send({ answerText: long });
     assert.equal(bad.status, 400);

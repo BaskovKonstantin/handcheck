@@ -438,7 +438,10 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     db.close();
     await login(page, "boris@demo.local");
     await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit" });
+    await page.check("#assessment-privacy", { force: true });
     await page.click("#start", { force: true });
+    await page.waitForSelector("#open-q", { timeout: 20000 });
+    await page.click("#open-q", { force: true });
     await page.waitForSelector("#submit");
     await page.fill("#answer", "   ");
     await page.click("#submit", { force: true });
@@ -600,7 +603,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       );
       await new Promise((r) => setTimeout(r, 1200));
       await empPage.click("#end", { force: true });
-      await empPage.waitForURL((url) => url.pathname === `/call/${invId}`, { timeout: 20000 });
+      await empPage.waitForURL((url) => url.pathname === `/call/${invId}`, { timeout: 45000 });
       await empPage.waitForSelector(".call-result-card", { timeout: 30000 });
       await candPage.waitForSelector(".call-result-card", { timeout: 45000 });
 
@@ -635,7 +638,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     }
   });
 
-  it("round28: candidate reload rejoin restores WebRTC connection", async () => {
+  it("round31: candidate reload rejoin restores WebRTC connection", async () => {
     const mediaBrowser = await chromium.launch({
       headless: true,
       args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
@@ -687,12 +690,19 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       await cand.waitForSelector("#join:not([disabled])", { timeout: 20000 });
       await cand.click("#join", { force: true });
       await cand.waitForFunction(
-        () => (document.getElementById("panel-title")?.textContent || "").includes("В эфире"),
-        { timeout: 45000 }
+        () => (window.__hcPcs || []).some((pc) => pc.connectionState === "connected"),
+        { timeout: 60000 }
       );
       await emp.waitForFunction(
         () => (window.__hcPcs || []).some((pc) => pc.connectionState === "connected"),
         { timeout: 60000 }
+      );
+      await cand.waitForFunction(
+        () => {
+          const v = document.getElementById("remote");
+          return v && !v.hidden && v.videoWidth > 0;
+        },
+        { timeout: 30000 }
       );
       await empCtx.close();
       await candCtx.close();

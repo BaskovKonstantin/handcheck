@@ -33,6 +33,12 @@ function applyPatches(db) {
     "action_source",
     "TEXT NOT NULL DEFAULT 'web' CHECK (action_source IN ('web', 'mcp'))"
   );
+  ensureColumn(db, "attempts", "late_answer_text", "TEXT");
+  ensureColumn(db, "attempts", "timed_out", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "api_tokens", "privacy_policy_version", "TEXT");
+  ensureColumn(db, "calls", "recording_consent_policy_version", "TEXT");
+  ensureColumn(db, "batteries", "assessment_consent_at", "TEXT");
+  ensureColumn(db, "batteries", "privacy_policy_version", "TEXT");
   const { applyBatteryContentPatch } = require("./task-battery-content");
   applyBatteryContentPatch(db);
 
@@ -64,6 +70,15 @@ function applyPatches(db) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_user ON mcp_tool_calls(user_id, created_at DESC);
+    CREATE TABLE IF NOT EXISTS data_processing_consents (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      context TEXT NOT NULL,
+      policy_version TEXT NOT NULL,
+      consented_at TEXT NOT NULL,
+      meta_json TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_data_consents_user ON data_processing_consents(user_id, consented_at DESC);
   `);
 
   const { shouldMarkUserAsTest } = require("../lib/is-test-user");

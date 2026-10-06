@@ -1,27 +1,10 @@
 "use strict";
 
-const LARGE_INSERT_CHARS = 40;
-
-function recordDraftTelemetry(db, attemptId, previousText, newText) {
+/** Only flag paste when client did not report typing for the same growth window. */
+function recordDraftTelemetry(db, attemptId, previousText, newText, meta = {}) {
+  if (meta.actionSource === "mcp") return;
   const prevLen = String(previousText || "").length;
   const newLen = String(newText || "").length;
-  const delta = newLen - prevLen;
-  if (delta >= LARGE_INSERT_CHARS) {
-    const recentPaste = db
-      .prepare(
-        `SELECT 1 FROM attempt_events WHERE attempt_id = ? AND event_type = 'paste'
-         AND datetime(created_at) >= datetime('now', '-2 seconds') LIMIT 1`
-      )
-      .get(attemptId);
-    if (!recentPaste) {
-      db.prepare(
-        `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'paste', ?)`
-      ).run(
-        attemptId,
-        JSON.stringify({ source: "server_bulk_insert", chars: delta, prevLen, newLen })
-      );
-    }
-  }
   if (prevLen === 0 && newLen > 0) {
     const hasFirst = db
       .prepare(
@@ -36,4 +19,22 @@ function recordDraftTelemetry(db, attemptId, previousText, newText) {
   }
 }
 
-module.exports = { recordDraftTelemetry, LARGE_INSERT_CHARS };
+function sumTypingChars(db, attemptId) {
+  const rows = db
+    .prepare(
+      `SELECT payload_json FROM attempt_events WHERE attempt_id = ? AND event_type = 'typing'`
+    )
+    .all(attemptId);
+  let total = 0;
+  for (const r of rows) {
+    try {
+      const p = JSON.parse(r.payload_json || "{}");
+      total += Number(p.chars) || 0;
+    } catch {
+      /* ignore */
+    }
+  }
+  return total;
+}
+
+module.exports = { recordDraftTelemetry, sumTypingChars };

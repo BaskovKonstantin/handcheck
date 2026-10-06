@@ -136,9 +136,11 @@ describe("round 22 findings", () => {
     await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const battery = await agent.get("/api/assessment/battery/current");
     const attemptId = battery.body.battery.attempts[0].id;
+    await agent.post(`/api/assessment/tasks/${attemptId}/open`);
     const empty = await agent
       .post(`/api/assessment/tasks/${attemptId}/submit`)
       .send({ answerText: "   " });

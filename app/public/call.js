@@ -88,7 +88,7 @@ function renderEndedView(info, me) {
   setBanner("Звонок завершён", false);
   roomHost.innerHTML = `<article class="panel call-result-card">
         <div class="call-result-head">
-          <span class="status-pill ended">Завершён</span>
+          <span class="status-pill ended status-pill-asis">Завершён</span>
           <h2 class="h2">${esc(callHeroTitle(me.role, who))}</h2>
         </div>
         ${metaRows ? `<dl class="call-result-meta">${metaRows}</dl>` : ""}
@@ -112,7 +112,7 @@ function renderRoomShell(peerLabel) {
         <p class="invite-meta" id="peer-state">Собеседник ещё не подключился</p>
         <label class="call-consent-label" id="consent-wrap">
           <input type="checkbox" id="consent" />
-          <span>Разговор сохранится и будет использован, чтобы оценить соответствие задаче.</span>
+          <span>Разговор сохранится (видео, аудио, расшифровка) для оценки соответствия задаче. <a href="/privacy" target="_blank" rel="noopener">Уведомление по 152-ФЗ</a></span>
         </label>
         <p class="invite-meta" id="speech-note" hidden></p>
         <p class="call-rec-row"><span class="rec-dot" id="rec-indicator"></span><span id="rec-label">Запись выключена</span></p>
@@ -174,18 +174,27 @@ function updatePeerUi(state) {
   const peerState = document.getElementById("peer-state");
   const remote = document.getElementById("remote");
   const remotePh = document.getElementById("remote-placeholder");
+  const panelTitle = document.getElementById("panel-title");
   if (!peerState) return;
   if (state.peerConnected && remote) {
     peerState.textContent = "Собеседник в эфире";
     remotePh.hidden = true;
     remote.hidden = false;
+    if (roomPhase === "live" && panelTitle) panelTitle.textContent = "В эфире";
+    setBanner("Эфир — соединение с собеседником", true);
+  } else if (state.connectionState === "disconnected" || state.connectionState === "failed") {
+    peerState.textContent = "Соединение потеряно — переподключаемся…";
+    if (roomPhase === "live" && panelTitle) panelTitle.textContent = "Переподключение";
+    setBanner("Соединение потеряно — переподключаемся", false);
   } else if (state.connectionState === "connecting" || state.connectionState === "new") {
     peerState.textContent = "Подключение к собеседнику…";
+    if (roomPhase === "live" && panelTitle) panelTitle.textContent = "Подключение…";
   } else if (roomPhase === "waiting") {
     peerState.textContent =
       "Ждём, пока собеседник подтвердит согласие и войдёт в комнату";
   } else {
     peerState.textContent = "Собеседник ещё не подключился";
+    if (roomPhase === "live" && panelTitle) panelTitle.textContent = "Ожидание собеседника";
   }
 }
 
@@ -194,7 +203,7 @@ function setLivePanel(peerName, consentLocked) {
   const consent = document.getElementById("consent");
   const consentWrap = document.getElementById("consent-wrap");
   const peerLine = document.getElementById("peer-line");
-  if (title) title.textContent = "В эфире";
+  if (title) title.textContent = "Подключение…";
   if (peerLine && peerName) {
     peerLine.hidden = false;
     peerLine.textContent = `Собеседник: ${peerName}`;
@@ -361,6 +370,10 @@ function bindRoomControls(info, me) {
           roomErr.hidden = false;
           roomErr.textContent = message;
         },
+        onTranscriptError: (message) => {
+          roomErr.hidden = false;
+          roomErr.textContent = message;
+        },
         onState: (state) => {
           if (roomPhase === "live" || state.speechNote || state.recordingUnavailable) {
             updateRecordingLabel(state);
@@ -399,19 +412,28 @@ function bindRoomControls(info, me) {
     clearWaitLivePoll();
     try {
       if (roomPhase === "waiting") {
-        if (callSession) {
-          await callSession.endLocalSide({ skipUpload: true });
-          callSession = null;
+        const liveInfo = await HandCheck.api(`/api/calls/for-invitation/${invitationId}`);
+        if (liveInfo.status === "live") {
+          const peerName =
+            me.role === "employer"
+              ? liveInfo.candidateName || "кандидат"
+              : liveInfo.companyName || "компания";
+          await activateLivePhase(peerName, me);
+        } else {
+          if (callSession) {
+            await callSession.endLocalSide({ skipUpload: true });
+            callSession = null;
+          }
+          clearInterval(timerTick);
+          location.href = me.role === "employer" ? "/employer/calls" : "/candidate/calls";
+          return;
         }
-        clearInterval(timerTick);
-        location.href = me.role === "employer" ? "/employer/calls" : "/candidate/calls";
-        return;
-      }
-      if (callSession) {
-        await callSession.endLocalSide();
-        callSession = null;
       }
       await HandCheck.api(`/api/calls/${callId}/end`, { method: "POST" });
+      if (callSession) {
+        callSession.endLocalSide().catch(() => {});
+        callSession = null;
+      }
       clearInterval(timerTick);
       location.href = `/call/${invitationId}`;
     } catch (e) {

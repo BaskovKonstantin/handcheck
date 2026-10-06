@@ -23,6 +23,8 @@ router.use(requireAuth, requireConfirmedEmail);
 const RECORDING_LIMIT = 80 * 1024 * 1024;
 const RECORDING_GRACE_MS = 45 * 1000;
 const { assertWebmUpload } = require("../../lib/webm");
+const { appendChunk, writeFinalRecording, callDir } = require("../../lib/recording-store");
+const { recordDataConsent, PRIVACY_POLICY_VERSION, privacyNoticeShort } = require("../../lib/privacy-policy");
 
 router.param("id", (req, res, next, id) => {
   if (!isUuid(id)) return next(httpError(400, "invalid_id"));
@@ -148,11 +150,17 @@ router.post("/:id/consent", (req, res, next) => {
   if (!inv || inv.status !== "accepted") return next(httpError(403, "forbidden"));
   const now = new Date().toISOString();
   if (req.user.id === inv.candidate_user_id) {
-    db.prepare("UPDATE calls SET consent_at_candidate = ? WHERE id = ?").run(now, call.id);
+    db.prepare(
+      "UPDATE calls SET consent_at_candidate = ?, recording_consent_policy_version = ? WHERE id = ?"
+    ).run(now, PRIVACY_POLICY_VERSION, call.id);
+    recordDataConsent(db, req.user.id, "call_recording", { callId: call.id, side: "candidate" });
   } else if (req.user.id === inv.employer_user_id) {
-    db.prepare("UPDATE calls SET consent_at_employer = ? WHERE id = ?").run(now, call.id);
+    db.prepare(
+      "UPDATE calls SET consent_at_employer = ?, recording_consent_policy_version = ? WHERE id = ?"
+    ).run(now, PRIVACY_POLICY_VERSION, call.id);
+    recordDataConsent(db, req.user.id, "call_recording", { callId: call.id, side: "employer" });
   } else return next(httpError(403, "forbidden"));
-  res.json({ ok: true });
+  res.json({ ok: true, privacyNotice: privacyNoticeShort() });
 });
 
 router.post("/:id/start", (req, res, next) => {
@@ -217,19 +225,50 @@ router.post("/:id/end", (req, res, next) => {
 });
 
 router.post(
+  "/:id/recording-chunk",
+  rejectOversizedBody(8 * 1024 * 1024),
+  handleMulterUpload,
+  (req, res, next) => {
+    const callId = req.params.id;
+    if (!req.file?.buffer) return next(httpError(400, "file_required"));
+    if (!assertWebmUpload(req.file)) {
+      return next(httpError(400, "invalid_recording"));
+    }
+    const db = getDb();
+    const call = db.prepare("SELECT id, invitation_id, status FROM calls WHERE id = ?").get(callId);
+    if (!call) return next(httpError(404, "not_found"));
+    const inv = db.prepare("SELECT candidate_user_id, employer_user_id FROM invitations WHERE id = ?").get(
+      call.invitation_id
+    );
+    if (!inv || ![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
+      return next(httpError(403, "forbidden"));
+    }
+    if (call.status !== "live" && call.status !== "ended") {
+      return next(httpError(409, "call_not_live"));
+    }
+    const side =
+      req.user.id === inv.candidate_user_id
+        ? "candidate"
+        : req.user.id === inv.employer_user_id
+          ? "employer"
+          : null;
+    try {
+      appendChunk(callId, side, req.file.buffer);
+      const dir = callDir(callId);
+      db.prepare("UPDATE calls SET recording_path = ? WHERE id = ?").run(dir, call.id);
+      res.json({ ok: true });
+    } catch {
+      return next(httpError(400, "invalid_path"));
+    }
+  }
+);
+
+router.post(
   "/:id/recording",
   rejectOversizedBody(RECORDING_LIMIT),
   handleMulterUpload,
   (req, res, next) => {
   const callId = req.params.id;
-  if (!req.file?.buffer) return next(httpError(400, "file_required"));
-  if (!assertWebmUpload(req.file)) {
-    return next(
-      httpError(400, "invalid_recording", {
-        fields: { file: "Нужен файл записи в формате WebM" },
-      })
-    );
-  }
   const db = getDb();
   const call = db.prepare("SELECT id, invitation_id, status, ended_at FROM calls WHERE id = ?").get(callId);
   if (!call) return next(httpError(404, "not_found"));
@@ -246,6 +285,16 @@ router.post(
         ? "employer"
         : null;
   if (!side) return next(httpError(403, "forbidden"));
+  const chunkSideDir = path.join(callDir(callId), "chunks", side);
+  const hasChunks = fs.existsSync(chunkSideDir) && fs.readdirSync(chunkSideDir).length > 0;
+  if (!req.file?.buffer?.length && !hasChunks) return next(httpError(400, "file_required"));
+  if (req.file?.buffer?.length && !assertWebmUpload(req.file)) {
+    return next(
+      httpError(400, "invalid_recording", {
+        fields: { file: "Нужен файл записи в формате WebM" },
+      })
+    );
+  }
   if (call.status === "ended") {
     const endedAt = call.ended_at ? new Date(call.ended_at).getTime() : 0;
     if (Date.now() - endedAt > RECORDING_GRACE_MS) {
@@ -266,10 +315,12 @@ router.post(
   if (path.resolve(filePath) !== filePath || !filePath.endsWith(`${side}.webm`)) {
     return next(httpError(400, "invalid_path"));
   }
-  if (call.status === "ended" && fs.existsSync(filePath)) {
-    return next(httpError(409, "call_ended", { message: "Звонок уже завершён" }));
+  const durationMs = Number(req.body?.durationMs || req.body?.duration_ms || 0);
+  try {
+    writeFinalRecording(callId, side, req.file?.buffer || Buffer.alloc(0), durationMs);
+  } catch {
+    return next(httpError(400, "invalid_path"));
   }
-  fs.writeFileSync(filePath, req.file.buffer);
   db.prepare("UPDATE calls SET recording_path = ? WHERE id = ?").run(dir, call.id);
   res.json({ ok: true });
   }
@@ -339,6 +390,9 @@ router.get("/:id/recording", (req, res, next) => {
   if (!call) return next(httpError(404, "not_found"));
   const inv = db.prepare("SELECT * FROM invitations WHERE id = ?").get(call.invitation_id);
   if (![inv.candidate_user_id, inv.employer_user_id].includes(req.user.id)) {
+    return next(httpError(403, "forbidden"));
+  }
+  if (req.user.id === inv.candidate_user_id && side !== "candidate") {
     return next(httpError(403, "forbidden"));
   }
   const filePath = path.join(call.recording_path || "", `${side}.webm`);

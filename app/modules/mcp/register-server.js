@@ -125,7 +125,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
     server.registerTool(
       "list_tasks",
       {
-        description: "Активная батарея заданий и список попыток.",
+        description:
+          "Активная батарея: 8 коротких вопросов (60 с каждый после открытия) и мини-проект на 7 дней. Тексты неоткрытых вопросов скрыты.",
         ...readToolExtra(z),
       },
       wrapTool(ctx, "list_tasks", false, () => services.listAssessmentTasks(ctx.user.id))
@@ -134,7 +135,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
     server.registerTool(
       "get_task",
       {
-        description: "Текст одного задания по attemptId.",
+        description:
+          "Открыть задание по attemptId и запустить таймер (60 с для короткого, 7 дней для мини-проекта).",
         ...readToolExtra(z),
         inputSchema: mergeSchema(z, {
           attemptId: z.string().describe("ID попытки из list_tasks"),
@@ -148,7 +150,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
     server.registerTool(
       "start_assessment",
       {
-        description: "Начать батарею QuickProbe + WorkSim для specialization × grade.",
+        description:
+          "Начать тест по specialization × grade: 8 коротких ответов (лимит 60 с на вопрос) и мини-проект на неделю.",
         ...writeToolExtra(z, {
           specialization: z.string(),
           grade: z.enum(["junior", "middle", "senior"]),
@@ -421,7 +424,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
             type: "text",
             text:
               "Ты помогаешь кандидату в HandCheck. Сначала проверь категорию (get_my_category). " +
-              "Если категории нет — предложи start_assessment. Затем проверь list_invitations и list_calls. " +
+              "Если категории нет — предложи start_assessment (8 коротких вопросов по 60 с и мини-проект на 7 дней). " +
+              "Открывай вопрос через get_task перед ответом. Затем проверь list_invitations и list_calls. " +
               "Не запрашивай и не показывай числовые оценки теста. " +
               "При вызове инструментов заполняй поле intent одной фразой — что попросил пользователь.",
           },

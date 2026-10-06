@@ -47,7 +47,7 @@ async function registerCandidate(app, email) {
 }
 
 async function completeBattery(agent, specialization, grade, mode) {
-  const start = await agent.post("/api/assessment/battery/start").send({ specialization, grade });
+  const start = await agent.post("/api/assessment/battery/start").send({ specialization, grade, privacyConsent: true });
   assert.equal(start.status, 201, `battery start ${specialization}/${grade}: ${start.body?.error || start.text}`);
   const battery = await agent.get("/api/assessment/battery/current");
   assert.ok(battery.body.battery, "expected active battery");
@@ -59,6 +59,7 @@ async function completeBattery(agent, specialization, grade, mode) {
     } else if (task.body.type === "work") {
       answerText = `${"не знаю ".repeat(12)}`;
     }
+    await agent.post(`/api/assessment/tasks/${a.id}/open`);
     await agent.post(`/api/assessment/tasks/${a.id}/submit`).send({ answerText });
   }
 }

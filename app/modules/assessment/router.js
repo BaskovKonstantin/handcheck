@@ -15,9 +15,24 @@ const {
 } = require("./service");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
 const { validateAnswerText, answerMaxForType, WORK_ANSWER_MIN } = require("../../lib/assessment-answer");
-const { ensureAttemptTimerStarted, deadlineAtIso } = require("../../lib/assessment-timing");
+const {
+  openAttemptTimer,
+  assertCurrentAttempt,
+  assertAttemptOpened,
+  deadlineAtIso,
+  getCurrentAttemptId,
+} = require("../../lib/assessment-timing");
 const { recordDraftTelemetry } = require("../../lib/assessment-telemetry");
 const { submitAttemptAnswer } = require("../../lib/assessment-submit");
+const {
+  validateClientEvent,
+  MAX_EVENTS_PER_REQUEST,
+} = require("../../lib/assessment-events");
+const {
+  PRIVACY_POLICY_VERSION,
+  privacyNoticeShort,
+  recordDataConsent,
+} = require("../../lib/privacy-policy");
 
 const router = express.Router();
 
@@ -25,6 +40,13 @@ router.use(requireAuth, requireConfirmedEmail, requireRole("candidate"));
 
 router.post("/battery/start", (req, res, next) => {
   try {
+    if (req.body?.privacyConsent !== true) {
+      throw httpError(400, "invalid_body", {
+        fields: {
+          privacyConsent: `Подтвердите согласие на обработку данных. ${privacyNoticeShort()}`,
+        },
+      });
+    }
     const specialization = String(req.body?.specialization || "").trim();
     const grade = String(req.body?.grade || "").trim();
     const allowedSpec = new Set(["backend", "frontend", "qa"]);
@@ -59,9 +81,19 @@ router.post("/battery/start", (req, res, next) => {
     const batteryId = newId();
     const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(batteryId, req.user.id, specialization, grade, formKey, now);
+      `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at, assessment_consent_at, privacy_policy_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      batteryId,
+      req.user.id,
+      specialization,
+      grade,
+      formKey,
+      now,
+      now,
+      PRIVACY_POLICY_VERSION
+    );
+    recordDataConsent(getDb(), req.user.id, "assessment", { batteryId });
     const ins = db.prepare(
       `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, opened_at)
        VALUES (?, ?, ?, ?, ?, NULL)`
@@ -111,15 +143,17 @@ router.get("/tasks/:attemptId", (req, res, next) => {
       )
       .get(req.params.attemptId, req.user.id);
     if (!row) return next(httpError(404, "not_found"));
-    let openedAt = row.opened_at;
     if (!row.submitted_at) {
-      const started = ensureAttemptTimerStarted(db, req.user.id, row.id);
-      openedAt = started.opened_at || started.started_at;
+      assertCurrentAttempt(db, req.user.id, row.id);
     }
+    const openedAt = row.opened_at;
+    const needsOpen = !row.submitted_at && !openedAt;
     res.json({
       id: row.id,
-      prompt: row.prompt,
       type: row.type,
+      needsOpen,
+      prompt: row.submitted_at || openedAt ? row.prompt : null,
+      privacyNotice: needsOpen ? privacyNoticeShort() : undefined,
       answerMax: answerMaxForType(row.type),
       workAnswerMin: row.type === "work" ? WORK_ANSWER_MIN : undefined,
       draftText: row.submitted_at ? "" : String(row.answer_text || ""),
@@ -135,15 +169,48 @@ router.get("/tasks/:attemptId", (req, res, next) => {
   }
 });
 
+router.post("/tasks/:attemptId/open", (req, res, next) => {
+  try {
+    const db = getDb();
+    const row = db
+      .prepare(
+        `SELECT a.id, a.submitted_at, a.opened_at, t.prompt, t.type FROM attempts a JOIN tasks t ON t.id = a.task_id
+         WHERE a.id = ? AND a.candidate_user_id = ?`
+      )
+      .get(req.params.attemptId, req.user.id);
+    if (!row) return next(httpError(404, "not_found"));
+    if (row.submitted_at) return next(httpError(409, "already_submitted"));
+    const opened = openAttemptTimer(db, req.user.id, row.id);
+    res.json({
+      id: row.id,
+      type: row.type,
+      needsOpen: false,
+      prompt: row.prompt,
+      openedAt: opened.opened_at,
+      deadlineAt: deadlineAtIso(opened.opened_at, row.type),
+      quickLimitSeconds: row.type === "quick" ? 60 : undefined,
+    });
+  } catch (e) {
+    if (e.code === "not_current_task") {
+      return next(httpError(409, "not_current_task", { message: "Сначала завершите предыдущий шаг теста." }));
+    }
+    next(e);
+  }
+});
+
 router.patch("/tasks/:attemptId/draft", (req, res, next) => {
   const db = getDb();
   const a = loadAttemptForSubmit(req.params.attemptId, req.user.id);
   assertAttemptMutable(a);
   try {
-    ensureAttemptTimerStarted(db, req.user.id, a.id);
+    const current = assertCurrentAttempt(db, req.user.id, a.id);
+    assertAttemptOpened(current);
   } catch (e) {
     if (e.code === "not_current_task") {
       return next(httpError(409, "not_current_task", { message: "Сначала завершите предыдущий шаг теста." }));
+    }
+    if (e.code === "task_not_opened") {
+      return next(httpError(409, "task_not_opened", { message: e.details?.message }));
     }
     return next(e);
   }
@@ -174,23 +241,44 @@ router.post("/tasks/:attemptId/submit", (req, res, next) => {
       if (e.details?.batteryComplete) Object.assign(body, e.details);
       return res.status(e.status || 409).json(body);
     }
+    if (e.code === "not_current_task") {
+      return next(
+        httpError(409, "not_current_task", { message: "Сначала завершите предыдущий шаг теста." })
+      );
+    }
+    if (e.code === "task_not_opened") {
+      return next(httpError(409, "task_not_opened", { message: e.details?.message }));
+    }
     next(e);
   }
 });
 
 router.post("/events", (req, res, next) => {
   const items = Array.isArray(req.body?.events) ? req.body.events : [];
+  if (items.length > MAX_EVENTS_PER_REQUEST) {
+    return next(httpError(400, "invalid_body", { message: "Слишком много событий в одном запросе" }));
+  }
   const db = getDb();
   for (const ev of items) {
-    if (ev.event_type === "opened_at") return next(httpError(400, "invalid_event"));
+    const validated = validateClientEvent(ev);
+    if (!validated.ok) return next(httpError(400, validated.code, { message: validated.message }));
     const attemptId = ev.attemptId;
     const a = db
-      .prepare("SELECT id FROM attempts WHERE id = ? AND candidate_user_id = ?")
+      .prepare(
+        `SELECT a.id, a.submitted_at, a.battery_id FROM attempts a WHERE a.id = ? AND a.candidate_user_id = ?`
+      )
       .get(attemptId, req.user.id);
     if (!a) return next(httpError(404, "not_found"));
+    if (a.submitted_at) return next(httpError(409, "already_submitted"));
+    const currentId = getCurrentAttemptId(db, a.battery_id);
+    if (currentId !== attemptId) {
+      return next(
+        httpError(409, "not_current_task", { message: "Сначала завершите предыдущий шаг теста." })
+      );
+    }
     db.prepare(
       `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, ?, ?)`
-    ).run(attemptId, ev.event_type, ev.payload ? JSON.stringify(ev.payload) : null);
+    ).run(attemptId, validated.eventType, validated.payloadJson);
   }
   res.json({ ok: true });
 });

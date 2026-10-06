@@ -72,11 +72,13 @@ async function passTest(agent) {
   await agent.post("/api/assessment/battery/start").send({
     specialization: "backend",
     grade: "middle",
+      privacyConsent: true,
   });
   const cur = await agent.get("/api/assessment/battery/current");
   for (const a of cur.body.battery.attempts) {
     const task = await agent.get(`/api/assessment/tasks/${a.id}`);
     const text = task.body.type === "work" ? answers.workAnswer : answers.quickAnswer;
+    await agent.post(`/api/assessment/tasks/${a.id}/open`);
     await agent.post(`/api/assessment/tasks/${a.id}/submit`).send({ answerText: text });
   }
 }
@@ -248,6 +250,7 @@ describe("round 24 findings", () => {
     const bat = await agent.post("/api/assessment/battery/start").send({
       specialization: "cobol",
       grade: "god",
+      privacyConsent: true,
     });
     assert.equal(bat.status, 400);
     assert.match(bat.body.details.fields.category, /специализацию/i);
@@ -310,9 +313,11 @@ describe("round 24 findings", () => {
     await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const cur = await agent.get("/api/assessment/battery/current");
     const attemptId = cur.body.battery.attempts[0].id;
+    await agent.post(`/api/assessment/tasks/${attemptId}/open`);
     await agent.patch(`/api/assessment/tasks/${attemptId}/draft`).send({
       answerText: "черновик с сервера",
     });
@@ -326,6 +331,7 @@ describe("round 24 findings", () => {
       title: "D",
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const cand = await registerCandidate(app, `r24defc-${Date.now()}@demo.local`);
     await passTest(cand);

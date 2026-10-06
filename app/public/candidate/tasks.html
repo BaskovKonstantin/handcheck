@@ -136,6 +136,10 @@
             <span class="form-label">Грейд</span>
             ${choiceChips("grade", GRADES, "middle")}
           </div>
+          <label class="consent-option">
+            <input type="checkbox" id="assessment-privacy" />
+            <span>Согласен на обработку персональных данных (ввод текста, вставка из буфера, черновики) по <a href="/privacy" target="_blank" rel="noopener">уведомлению 152-ФЗ</a>.</span>
+          </label>
           <button class="btn-primary" id="start" type="button" ${onCooldown ? "disabled" : ""} ${
             onCooldown ? `title="Пересдача возможна после ${retakeWhen}"` : ""
           }>${onCooldown ? "Пересдача недоступна" : "Пройти тест"}</button>
@@ -145,6 +149,11 @@
           if (onCooldown) return;
           const err = document.getElementById("err");
           err.hidden = true;
+          if (!document.getElementById("assessment-privacy").checked) {
+            err.hidden = false;
+            err.textContent = "Подтвердите согласие на обработку персональных данных.";
+            return;
+          }
           const spec = document.getElementById("spec").value;
           const grade = document.getElementById("grade").value;
           if (spec !== "backend" || grade !== "middle") {
@@ -155,7 +164,7 @@
           try {
             await HandCheck.api("/api/assessment/battery/start", {
               method: "POST",
-              body: JSON.stringify({ specialization: spec, grade }),
+              body: JSON.stringify({ specialization: spec, grade, privacyConsent: true }),
             });
             await init();
           } catch (e) {
@@ -194,7 +203,29 @@
           return;
         }
         attemptId = next.id;
-        const t = await HandCheck.api(`/api/assessment/tasks/${attemptId}`);
+        let t = await HandCheck.api(`/api/assessment/tasks/${attemptId}`);
+        if (t.needsOpen) {
+          panel.innerHTML = `
+            ${batteryStepIndicator(submitted)}
+            <p class="invite-meta">${HandCheck.escapeHtml(
+              HandCheck.formatSpecGradeLabel(cur.battery.specialization, cur.battery.claimedGrade)
+            )}</p>
+            <p class="invite-meta">Короткие вопросы — по одной минуте после нажатия «Начать вопрос». Мини-проект — неделя.</p>
+            <button class="btn-primary" id="open-q" type="button">Начать вопрос</button>
+            <p class="field-error" id="err" hidden></p>`;
+          document.getElementById("open-q").onclick = async () => {
+            const err = document.getElementById("err");
+            err.hidden = true;
+            try {
+              await HandCheck.api(`/api/assessment/tasks/${attemptId}/open`, { method: "POST" });
+              await init();
+            } catch (e) {
+              err.hidden = false;
+              err.textContent = HandCheck.formatApiError(e);
+            }
+          };
+          return;
+        }
         const draftKey = `handcheck:draft:v1:${attemptId}`;
         const saved = localStorage.getItem(draftKey);
         let restored = "";
@@ -249,10 +280,17 @@
           const clip = ev.clipboardData?.getData("text") || "";
           enqueueEvent("paste", { length: clip.length, chars: clip.length });
         });
+        let typedChars = 0;
         ta.addEventListener("input", () => {
-          if (!firstInputSent && ta.value.length > 0) {
+          const len = ta.value.length;
+          if (!firstInputSent && len > 0) {
             firstInputSent = true;
-            enqueueEvent("first_input", { length: ta.value.length });
+            enqueueEvent("first_input", { length: len });
+          }
+          if (len > typedChars) {
+            const delta = len - typedChars;
+            typedChars = len;
+            enqueueEvent("typing", { chars: delta });
           }
         });
         ta.addEventListener("focus", () => enqueueEvent("focus", null));
@@ -266,6 +304,9 @@
           const left = deadlineMs - Date.now();
           timerVal.textContent = formatCountdown(left);
           if (t.type === "quick" && left <= 0 && !submitting) {
+            submitting = true;
+            document.getElementById("submit").disabled = true;
+            ta.readOnly = true;
             document.getElementById("submit").click();
           }
         };
@@ -318,8 +359,9 @@
             if (e.data?.error === "quick_time_expired") {
               err.hidden = false;
               err.textContent = HandCheck.formatApiError(e);
+              err.classList.add("timeout-notice");
               localStorage.removeItem(draftKey);
-              await init();
+              setTimeout(() => init(), 1200);
               return;
             }
             err.hidden = false;

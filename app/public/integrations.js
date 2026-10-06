@@ -180,7 +180,7 @@
           </label>
           <label class="scope-option consent-option">
             <input type="checkbox" id="logging-consent" />
-            <span>Согласен на запись имени клиента, вызовов инструментов (аргументы без секретов) и краткого описания запроса для улучшения продукта</span>
+            <span>Согласен на обработку данных ИИ-клиента (имя клиента, вызовы инструментов без секретов, краткое описание запроса, хэш IP и user-agent) по <a href="/privacy" target="_blank" rel="noopener">уведомлению 152-ФЗ</a>.</span>
           </label>
           <fieldset class="scope-fieldset">
             <legend>Права</legend>

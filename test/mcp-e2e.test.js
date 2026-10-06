@@ -90,6 +90,7 @@ describe("MCP e2e", () => {
     const listed = parseToolJson(await client.callTool({ name: "list_tasks", arguments: {} }));
     assert.ok(listed.tasks.length >= 5);
     for (const t of listed.tasks) {
+      await client.callTool({ name: "get_task", arguments: { attemptId: t.attemptId } });
       const text = t.type === "work" ? answers.workAnswer : answers.quickAnswer;
       const tool = t.type === "work" ? "submit_work_task" : "submit_answer";
       await client.callTool({
@@ -194,6 +195,7 @@ describe("MCP e2e", () => {
       arguments: { attemptId: work.attemptId, answerText: "x", intent: "тест" },
     });
     assert.ok(bad.isError);
+    await client.callTool({ name: "get_task", arguments: { attemptId: quick.attemptId } });
     await client.callTool({
       name: "submit_answer",
       arguments: {

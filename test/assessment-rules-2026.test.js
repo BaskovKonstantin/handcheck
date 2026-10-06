@@ -73,10 +73,11 @@ describe("assessment rules 2026-10-06", () => {
     await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const cur = await agent.get("/api/assessment/battery/current");
     const firstId = cur.body.battery.attempts[0].id;
-    await agent.get(`/api/assessment/tasks/${firstId}`);
+    await agent.post(`/api/assessment/tasks/${firstId}/open`);
     const { getDb } = require("../app/db");
     const db = getDb();
     const expired = new Date(Date.now() - QUICK_DEADLINE_MS - 5000).toISOString();
@@ -90,10 +91,15 @@ describe("assessment rules 2026-10-06", () => {
       .send({ answerText: answers.quickAnswer });
     assert.equal(res.status, 409);
     assert.equal(res.body.error, "quick_time_expired");
-    assert.match(res.body.message || "", /минут/i);
-    const row = db.prepare("SELECT answer_text, submitted_at FROM attempts WHERE id = ?").get(firstId);
+    assert.match(res.body.message || "", /истекло|время/i);
+    const row = db
+      .prepare("SELECT answer_text, late_answer_text, submitted_at FROM attempts WHERE id = ?")
+      .get(firstId);
     assert.ok(row.submitted_at);
-    assert.ok(row.answer_text.length > 20);
+    assert.ok(
+      row.answer_text.length > 20 || String(row.late_answer_text || "").length > 20,
+      "expected stored answer or late text"
+    );
     const cur2 = await agent.get("/api/assessment/battery/current");
     assert.equal(cur2.body.battery.attempts[0].submitted, true);
   });
@@ -103,10 +109,11 @@ describe("assessment rules 2026-10-06", () => {
     await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const cur = await agent.get("/api/assessment/battery/current");
     const attemptId = cur.body.battery.attempts[0].id;
-    await agent.get(`/api/assessment/tasks/${attemptId}`);
+    await agent.post(`/api/assessment/tasks/${attemptId}/open`);
     await agent.post("/api/assessment/events").send({
       events: [{ attemptId, event_type: "paste", payload: { length: 400 } }],
     });
@@ -132,6 +139,7 @@ describe("assessment rules 2026-10-06", () => {
     await agent.post("/api/assessment/battery/start").send({
       specialization: "backend",
       grade: "middle",
+      privacyConsent: true,
     });
     const { getDb } = require("../app/db");
     const db = getDb();
@@ -139,6 +147,7 @@ describe("assessment rules 2026-10-06", () => {
     for (const step of cur.body.battery.attempts.filter((a) => !a.submitted)) {
       const task = await agent.get(`/api/assessment/tasks/${step.id}`);
       if (task.body.type === "work") break;
+      await agent.post(`/api/assessment/tasks/${step.id}/open`);
       await agent.post(`/api/assessment/tasks/${step.id}/submit`).send({
         answerText: answers.quickAnswer,
       });
@@ -146,7 +155,7 @@ describe("assessment rules 2026-10-06", () => {
     }
     const workStep = cur.body.battery.attempts.find((a) => !a.submitted);
     const workId = workStep.id;
-    await agent.get(`/api/assessment/tasks/${workId}`);
+    await agent.post(`/api/assessment/tasks/${workId}/open`);
     const expired = new Date(Date.now() - WORK_DEADLINE_MS - 1000).toISOString();
     db.prepare("UPDATE attempts SET opened_at = ?, started_at = ? WHERE id = ?").run(
       expired,

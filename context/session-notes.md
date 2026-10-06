@@ -11,6 +11,12 @@
 - Candidate calls: auto-expand ended section when no active calls.
 - Mobile stat tiles: 3-up compact for today + employer invitations.
 
+## Round 31 fixes (branch cursor/round31-findings-b461)
+
+- WebRTC: HELLO renegotiation, connectionState-gated UI, chunk recording upload, /end before upload, fix-webm duration.
+- Assessment: explicit question open, 60s server enforcement, typing vs paste telemetry allowlist, 152-FZ notices.
+- MCP/REST call parity, candidate recording access fix, layout polish.
+
 ## Round 28 fixes (branch cursor/round28-webrtc-fixes-5553)
 
 - Signaling: relay WS messages as UTF-8 text (fixes Blob JSON.parse in browsers); reject ended calls; replace duplicate tab per user.

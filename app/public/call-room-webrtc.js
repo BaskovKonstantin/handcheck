@@ -2,14 +2,15 @@
 "use strict";
 
 (function (global) {
-  const WS_SIGNAL = { OFFER: "offer", ANSWER: "answer", ICE: "ice", ENDED: "ended" };
+  const WS_SIGNAL = { OFFER: "offer", ANSWER: "answer", ICE: "ice", ENDED: "ended", HELLO: "hello" };
 
   /** Target total bitrate so ~60 min fits in 80 MB upload limit (with headroom). */
   const RECORDING_LIMIT_BYTES = 80 * 1024 * 1024;
   const RECORDING_TARGET_SECONDS = 60 * 60;
-  const RECORDER_VIDEO_BPS = 130_000;
-  const RECORDER_AUDIO_BPS = 20_000;
+  const RECORDER_VIDEO_BPS = 100_000;
+  const RECORDER_AUDIO_BPS = 15_000;
   const RECORDER_TOTAL_BPS = RECORDER_VIDEO_BPS + RECORDER_AUDIO_BPS;
+  const CHUNK_UPLOAD_MS = 12_000;
 
   function wsUrl(callId) {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -53,7 +54,7 @@
   function recorderFitsPlanLimit() {
     const bytesPerSecond = RECORDER_TOTAL_BPS / 8;
     const projected = bytesPerSecond * RECORDING_TARGET_SECONDS;
-    return projected <= RECORDING_LIMIT_BYTES * 0.92;
+    return projected <= RECORDING_LIMIT_BYTES * 0.85;
   }
 
   /**
@@ -63,27 +64,36 @@
    * @param {() => void} [opts.onPeerEnded]
    * @param {(state: object) => void} [opts.onState]
    * @param {(message: string) => void} [opts.onUploadError]
+   * @param {(message: string) => void} [opts.onTranscriptError]
    */
   function createCallSession(opts) {
-    const { callId, role, onPeerEnded, onState, onUploadError } = opts;
+    const { callId, role, onPeerEnded, onState, onUploadError, onTranscriptError } = opts;
     let ws = null;
     let pc = null;
     let localStream = null;
     let remoteStream = null;
     let recorder = null;
     let recorderChunks = [];
+    let uploadedChunkCount = 0;
+    let chunkUploadTimer = null;
     let speech = null;
     let speechNoteShown = false;
     let speechStopped = false;
+    let speechRestartAttempts = 0;
     let pollTimer = null;
     let ended = false;
     let liveFeaturesStarted = false;
     let liveStartedAt = null;
 
+    function peerIsConnected() {
+      return pc?.connectionState === "connected";
+    }
+
     function emit(patch) {
       if (typeof onState === "function") {
         onState({
-          peerConnected: Boolean(remoteStream?.getTracks?.().some((t) => t.readyState === "live")),
+          peerConnected: peerIsConnected(),
+          connectionState: pc?.connectionState || "new",
           recording: Boolean(recorder && recorder.state === "recording"),
           speechAvailable: Boolean(speech),
           speechNote: speechNoteShown ? "Расшифровка недоступна в этом браузере" : "",
@@ -94,6 +104,19 @@
 
     function sendSignal(msg) {
       if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+    }
+
+    async function resetPeerIfNeeded() {
+      if (!pc) return;
+      if (["disconnected", "failed", "closed"].includes(pc.connectionState)) {
+        try {
+          pc.close();
+        } catch {
+          /* ignore */
+        }
+        pc = null;
+        remoteStream = null;
+      }
     }
 
     async function ensurePeerConnection() {
@@ -111,7 +134,16 @@
         });
         emit({});
       };
-      pc.onconnectionstatechange = () => emit({ connectionState: pc.connectionState });
+      pc.onconnectionstatechange = () => {
+        emit({ connectionState: pc.connectionState });
+        if (
+          role === "employer" &&
+          !ended &&
+          ["disconnected", "failed"].includes(pc.connectionState)
+        ) {
+          setTimeout(() => sendOffer().catch(() => {}), 400);
+        }
+      };
       if (localStream) {
         localStream.getTracks().forEach((tr) => pc.addTrack(tr, localStream));
       }
@@ -120,6 +152,15 @@
 
     async function handleSignal(msg) {
       if (!msg || ended) return;
+      if (msg.t === WS_SIGNAL.HELLO) {
+        if (role === "employer") {
+          await resetPeerIfNeeded();
+          await sendOffer();
+        } else {
+          await ensurePeerConnection();
+        }
+        return;
+      }
       const conn = await ensurePeerConnection();
       if (msg.t === WS_SIGNAL.OFFER && role === "candidate") {
         await conn.setRemoteDescription(msg.sdp);
@@ -144,9 +185,10 @@
 
     async function sendOffer() {
       if (role !== "employer" || ended) return;
+      await resetPeerIfNeeded();
       const conn = await ensurePeerConnection();
       if (conn.connectionState === "connected") return;
-      const offer = await conn.createOffer();
+      const offer = await conn.createOffer({ iceRestart: conn.connectionState === "failed" });
       await conn.setLocalDescription(offer);
       sendSignal({ t: WS_SIGNAL.OFFER, sdp: conn.localDescription });
     }
@@ -161,29 +203,42 @@
       };
       ws.onopen = async () => {
         emit({ wsOpen: true });
+        sendSignal({ t: WS_SIGNAL.HELLO, role });
         if (role === "employer") {
           await sendOffer();
           clearInterval(offerRetryTimer);
           offerRetryTimer = setInterval(() => {
-            if (remoteStream?.getTracks?.().some((t) => t.readyState === "live")) {
+            if (peerIsConnected()) {
               clearInterval(offerRetryTimer);
               return;
             }
             sendOffer().catch(() => {});
           }, 1500);
+        } else {
+          await ensurePeerConnection();
         }
       };
     }
 
-    function restartSpeech() {
+    function restartSpeech(delayMs) {
       if (ended || speechStopped || !speech) return;
-      try {
-        speech.start();
-      } catch {
+      if (speechRestartAttempts > 8) {
         speechNoteShown = true;
         speech = null;
         emit({});
+        return;
       }
+      speechRestartAttempts += 1;
+      setTimeout(() => {
+        if (ended || speechStopped || !speech) return;
+        try {
+          speech.start();
+        } catch {
+          speechNoteShown = true;
+          speech = null;
+          emit({});
+        }
+      }, delayMs);
     }
 
     function startSpeechRecognition() {
@@ -208,21 +263,25 @@
           HandCheck.api(`/api/calls/${callId}/transcript-chunk`, {
             method: "POST",
             body: JSON.stringify({ text, at }),
-          }).catch(() => {});
+          }).catch(() => {
+            if (typeof onTranscriptError === "function") {
+              onTranscriptError("Не удалось сохранить реплику расшифровки");
+            }
+          });
         }
       };
       speech.onerror = (ev) => {
         if (ended || speechStopped) return;
         const code = ev?.error || "";
         if (code === "network" || code === "aborted" || code === "no-speech") {
-          setTimeout(() => restartSpeech(), 300);
+          restartSpeech(300 + speechRestartAttempts * 200);
           return;
         }
         speechNoteShown = true;
         emit({});
       };
       speech.onend = () => {
-        if (!ended && !speechStopped) restartSpeech();
+        if (!ended && !speechStopped) restartSpeech(250 + speechRestartAttempts * 350);
       };
       try {
         speech.start();
@@ -252,17 +311,78 @@
       emit({ recording: true });
     }
 
-    async function uploadRecording() {
+    async function uploadRecordingChunk(blob) {
+      if (!blob?.size) return;
+      const form = new FormData();
+      form.append("file", blob, `chunk-${uploadedChunkCount}.webm`);
+      const res = await fetch(`/api/calls/${callId}/recording-chunk`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+        keepalive: true,
+      });
+      if (!res.ok) throw new Error("chunk_upload_failed");
+      uploadedChunkCount += 1;
+      return true;
+    }
+
+    async function flushRecordingChunks() {
       if (!recorderChunks.length) return;
       const mime = pickRecorderMime() || "video/webm";
       const blob = new Blob(recorderChunks, { type: mime });
+      recorderChunks = [];
       if (!blob.size) return;
+      await uploadRecordingChunk(blob);
+    }
+
+    function startChunkUploadLoop() {
+      clearInterval(chunkUploadTimer);
+      chunkUploadTimer = setInterval(() => {
+        flushRecordingChunks().catch(() => {
+          if (typeof onUploadError === "function") {
+            onUploadError("Не удалось сохранить фрагмент записи — повторим при завершении звонка");
+          }
+        });
+      }, CHUNK_UPLOAD_MS);
+      const onPageHide = () => {
+        if (!recorderChunks.length) return;
+        const mime = pickRecorderMime() || "video/webm";
+        const blob = new Blob(recorderChunks, { type: mime });
+        recorderChunks = [];
+        const form = new FormData();
+        form.append("file", blob, "chunk-emergency.webm");
+        fetch(`/api/calls/${callId}/recording-chunk`, {
+          method: "POST",
+          credentials: "include",
+          body: form,
+          keepalive: true,
+        }).catch(() => {});
+      };
+      global.addEventListener("pagehide", onPageHide);
+    }
+
+    async function uploadRecording() {
+      if (recorder && recorder.state !== "inactive") {
+        await new Promise((resolve) => {
+          recorder.onstop = () => resolve();
+          recorder.stop();
+        });
+      }
+      await flushRecordingChunks();
+      const mime = pickRecorderMime() || "video/webm";
+      const tail = recorderChunks.length ? new Blob(recorderChunks, { type: mime }) : new Blob([], { type: mime });
+      recorderChunks = [];
+      const durationMs =
+        liveStartedAt != null ? Math.max(0, Date.now() - liveStartedAt) : 0;
       const form = new FormData();
-      form.append("file", blob, "recording.webm");
+      const minimalWebm = new Blob([new Uint8Array([0x1a, 0x45, 0xdf, 0xa3])], { type: mime });
+      form.append("file", tail.size ? tail : minimalWebm, "recording.webm");
+      form.append("durationMs", String(durationMs));
       const res = await fetch(`/api/calls/${callId}/recording`, {
         method: "POST",
         credentials: "include",
         body: form,
+        keepalive: true,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -310,6 +430,7 @@
         liveFeaturesStarted = true;
         liveStartedAt = Date.now();
         startRecorder(localStream);
+        startChunkUploadLoop();
         startSpeechRecognition();
         startStatusPoll((info) => {
           if (typeof onPeerEnded === "function") onPeerEnded(info);
@@ -317,12 +438,13 @@
         emit({});
       },
       async endLocalSide(options = {}) {
-        const { skipUpload = false } = options;
+        const { skipUpload = false, waitForUpload = false } = options;
         ended = true;
         speechStopped = true;
         sendSignal({ t: WS_SIGNAL.ENDED });
         clearInterval(pollTimer);
         clearInterval(offerRetryTimer);
+        clearInterval(chunkUploadTimer);
         if (speech) {
           try {
             speech.stop();
@@ -331,15 +453,11 @@
           }
           speech = null;
         }
-        if (recorder && recorder.state !== "inactive") {
-          await new Promise((resolve) => {
-            recorder.onstop = () => resolve();
-            recorder.stop();
-          });
-        }
-        if (!skipUpload && liveFeaturesStarted) {
-          await uploadRecording();
-        }
+        const uploadPromise =
+          !skipUpload && liveFeaturesStarted
+            ? uploadRecording().catch(() => {})
+            : Promise.resolve();
+        if (waitForUpload) await uploadPromise;
         if (ws) {
           ws.close();
           ws = null;
@@ -353,6 +471,7 @@
           localStream = null;
         }
         emit({ recording: false });
+        return uploadPromise;
       },
       notifyPeerEnded() {
         sendSignal({ t: WS_SIGNAL.ENDED });

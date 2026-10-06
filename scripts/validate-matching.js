@@ -22,6 +22,7 @@ async function login(agent, email) {
 async function main() {
   const app = createApp();
   const db = getDb();
+  db.prepare("DELETE FROM users WHERE email GLOB 'demo[3-9]@demo.local'").run();
   const agent = request.agent(app);
   await login(agent, "cafe@demo.local");
 

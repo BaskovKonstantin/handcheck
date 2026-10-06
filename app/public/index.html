@@ -3,51 +3,118 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HandCheck</title>
+    <title>HandCheck — категория по навыку</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body>
+  <body class="landing-page">
     <header id="site-header"></header>
-    <main class="column">
-      <div class="landing-hero-band">
-        <h1 class="display-title">Категория по навыку. Приглашение с вилкой.</h1>
-        <p class="hero-lede">
-          Профиль и тест задают категорию. Работодатель приглашает с вилкой зарплаты — без рейтингов и
-          без публичных контактов до согласия.
-        </p>
+    <section class="landing-hero" aria-labelledby="landing-title">
+      <div class="landing-hero-pattern" aria-hidden="true"></div>
+      <div class="landing-hero-inner">
+        <div class="landing-hero-copy">
+          <p class="hero-eyebrow">Найм без рейтингов и фото</p>
+          <h1 id="landing-title" class="display-title display-title-on-dark">
+            Категория по навыку.<br />Приглашение с вилкой.
+          </h1>
+          <p class="hero-lede hero-lede-on-dark">
+            Профиль и тест задают категорию. Работодатель приглашает с вилкой зарплаты — без баллов в
+            интерфейсе и без публичных контактов до согласия.
+          </p>
+          <div class="hero-cta-row">
+            <a class="btn-primary btn-lg" href="/auth">Начать бесплатно</a>
+            <a class="btn-on-dark-ghost" href="/auth?role=employer">Для работодателей</a>
+          </div>
+        </div>
+        <div class="landing-mockup" aria-hidden="true">
+          <div class="landing-mockup-label">Колода работодателя</div>
+          <div class="landing-mockup-card">
+            <div class="landing-mockup-stack"></div>
+            <div class="landing-mockup-face">
+              <div class="deck-card-head">
+                <div class="avatar-monogram">А</div>
+                <div>
+                  <h2 class="deck-name">Анна</h2>
+                  <span class="category-pill">Backend × Middle</span>
+                </div>
+              </div>
+              <div class="chip-row">
+                <span class="chip chip-domain">официант · HoReCa</span>
+              </div>
+              <div class="chip-row chip-row-skills">
+                <span class="chip chip-skill">node</span>
+                <span class="chip chip-skill">typescript</span>
+              </div>
+              <ul class="deck-phrases">
+                <li>Короткие ответы по API сданы</li>
+                <li>Рабочая задача доведена до конца</li>
+              </ul>
+            </div>
+          </div>
+          <div class="landing-mockup-actions">
+            <span class="mock-pill mock-pill-ghost">Отказать</span>
+            <span class="mock-pill mock-pill-ghost">Отложить</span>
+            <span class="mock-pill mock-pill-clay">Пригласить</span>
+          </div>
+        </div>
       </div>
-      <div class="stats" id="stats"></div>
-      <div class="steps">
-        <div class="step-card"><span class="step-num">1</span><div><strong>Профиль и бэкграунд</strong><p class="invite-meta">Опыт в домене влияет на подбор, не на «рейтинг».</p></div></div>
-        <div class="step-card"><span class="step-num">2</span><div><strong>Короткие ответы и рабочая задача</strong><p class="invite-meta">Категория после теста — без баллов в интерфейсе.</p></div></div>
-        <div class="step-card"><span class="step-num">3</span><div><strong>Приглашения от компаний</strong><p class="invite-meta">Вилка зарплаты и контакты после согласия.</p></div></div>
+    </section>
+    <main class="column landing-main">
+      <div class="stats stats-expressive" id="stats"></div>
+      <h2 class="section-title">Как это работает</h2>
+      <div class="steps steps-icons">
+        <div class="step-card">
+          <span class="step-icon step-icon-forest" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" fill="currentColor"/></svg>
+          </span>
+          <div>
+            <strong>Профиль и бэкграунд</strong>
+            <p class="invite-meta">Опыт в домене влияет на подбор, не на «рейтинг».</p>
+          </div>
+        </div>
+        <div class="step-card">
+          <span class="step-icon step-icon-clay" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 5h14v2H5V5zm0 6h14v2H5v-2zm0 6h10v2H5v-2z" fill="currentColor"/></svg>
+          </span>
+          <div>
+            <strong>Короткие ответы и рабочая задача</strong>
+            <p class="invite-meta">Категория после теста — без баллов в интерфейсе.</p>
+          </div>
+        </div>
+        <div class="step-card">
+          <span class="step-icon step-icon-ink" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 8l8 5 8-5v10H4V8zm16-2H4l8 5 8-5z" fill="currentColor"/></svg>
+          </span>
+          <div>
+            <strong>Приглашения от компаний</strong>
+            <p class="invite-meta">Вилка зарплаты и контакты только после согласия.</p>
+          </div>
+        </div>
       </div>
-      <p style="margin-top: 2rem">
-        <a class="btn-primary" href="/auth">Начать</a>
+      <p class="landing-footer-cta">
+        <a class="btn-primary btn-lg" href="/auth">Создать аккаунт</a>
       </p>
     </main>
     <script src="/app.js"></script>
     <script>
       document.getElementById("site-header").innerHTML = `
-        <div class="site-header cabinet-header-v3">
-          <a class="logo" href="/">${HandCheck.LOGO_MARK}<span>HandCheck</span></a>
+        <div class="site-header site-header-landing cabinet-header-v3">
+          <a class="logo logo-on-dark" href="/">${HandCheck.LOGO_MARK}<span>HandCheck</span></a>
           <nav class="site-nav">
             <a href="/auth?role=candidate">Кандидатам</a>
             <a href="/auth?role=employer">Работодателям</a>
             <a href="/auth">Войти</a>
             <a class="btn-primary" href="/auth">Начать</a>
           </nav>
-        </div>
-        <div class="cabinet-header-glow" aria-hidden="true"></div>`;
+        </div>`;
       fetch("/api/stats")
         .then((r) => r.json())
         .then((s) => {
           const fmt = (v, demo) =>
             demo ? `${v || 2} <span class="stat-label">в демо</span>` : String(v);
           document.getElementById("stats").innerHTML = `
-            <div class="stat"><div class="stat-value">${fmt(s.categories, s.categoriesDemo)}</div><div class="stat-label">категорий подтверждено</div></div>
-            <div class="stat"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты</div></div>
-            <div class="stat"><div class="stat-value">${fmt(s.invitations, s.invitationsDemo)}</div><div class="stat-label">приглашений</div></div>`;
+            <div class="stat stat-forest"><div class="stat-value">${fmt(s.categories, s.categoriesDemo)}</div><div class="stat-label">категорий подтверждено</div></div>
+            <div class="stat stat-clay"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты</div></div>
+            <div class="stat stat-ink"><div class="stat-value">${fmt(s.invitations, s.invitationsDemo)}</div><div class="stat-label">приглашений</div></div>`;
         });
     </script>
   </body>

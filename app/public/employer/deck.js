@@ -29,11 +29,26 @@ function showSalaryError(msg) {
   }
 }
 
+function setDeckVisible(showCard) {
+  const wrap = document.getElementById("deck-wrap");
+  const emptyHost = document.getElementById("deck-empty");
+  if (wrap) wrap.hidden = !showCard;
+  if (emptyHost) emptyHost.hidden = showCard;
+}
+
 async function loadNeed() {
   const needs = await HandCheck.api("/api/employer/needs");
   needId = needs.items[0]?.id;
   if (!needId) {
-    document.getElementById("empty").hidden = false;
+    setDeckVisible(false);
+    const emptyHost = document.getElementById("deck-empty");
+    emptyHost.hidden = false;
+    emptyHost.innerHTML = HandCheck.emptyState(
+      "Нет активной потребности",
+      "Создайте или активируйте потребность, чтобы открыть колоду кандидатов.",
+      "/employer/need",
+      "Настроить потребность"
+    );
     return;
   }
   await loadCard();
@@ -53,6 +68,7 @@ function renderCard(data) {
     .join("");
   const explain = (data.card.explanation || []).join(" ");
 
+  cardEl.hidden = false;
   cardEl.className = "deck-card enter deck-card-swipe";
   cardEl.innerHTML = `
     <div class="deck-card-stack" aria-hidden="true"></div>
@@ -79,25 +95,27 @@ async function loadCard() {
   const empty = document.getElementById("empty");
   if (!data.card) {
     cardEl.innerHTML = "";
+    cardEl.className = "deck-card";
     actions.hidden = true;
-    empty.hidden = false;
+    empty.hidden = true;
+    setDeckVisible(false);
+    let invited = 0;
     try {
       const qs = window.location.search;
       const matches = await HandCheck.api(`/api/employer/needs/${needId}/matches${qs}`);
-      const invited = matches.items?.filter((i) => i.reviewStatus === "invited").length || 0;
-      if (invited > 0) {
-        empty.textContent =
-          "В колоде никого нет — оставшиеся кандидаты уже приглашены. Смотрите раздел «Приглашения».";
-      } else {
-        empty.textContent = "Кандидатов в колоде нет. Попробуйте снять фильтры или проверить потребность.";
-      }
+      invited = matches.items?.filter((i) => i.reviewStatus === "invited").length || 0;
     } catch {
-      empty.textContent = "Кандидатов в колоде нет";
+      invited = 0;
     }
+    const meta = HandCheck.getDeckEmptyState({ invitedInMatches: invited });
+    const emptyHost = document.getElementById("deck-empty");
+    emptyHost.hidden = false;
+    emptyHost.innerHTML = HandCheck.emptyStateActions(meta.title, meta.help, meta.actions);
     candidateId = null;
     return;
   }
   empty.hidden = true;
+  setDeckVisible(true);
   actions.hidden = false;
   candidateId = data.candidateId;
   renderCard(data);

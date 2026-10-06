@@ -140,12 +140,88 @@ function seedDemoUsers(db) {
   ).run(newId(), cafeId, needId, borisId, now);
 }
 
-function seed(db) {
-  const count = db.prepare("SELECT COUNT(*) AS c FROM categories").get().c;
-  if (count > 0) return;
-  seedCategories(db);
-  seedTasks(db);
-  seedDemoUsers(db);
+const DEMO_TOPUP_CANDIDATES = [
+  { email: "demo3@demo.local", displayName: "Виктор", stack: ["node", "postgres"], role: "разработчик зала" },
+  { email: "demo4@demo.local", displayName: "Галина", stack: ["node", "typescript"], role: "официант" },
+  { email: "demo5@demo.local", displayName: "Дмитрий", stack: ["node", "redis"], role: "бармен" },
+  { email: "demo6@demo.local", displayName: "Елена", stack: ["node", "graphql"], role: "хостес" },
+  { email: "demo7@demo.local", displayName: "Игорь", stack: ["node", "docker"], role: "су-шеф" },
+  { email: "demo8@demo.local", displayName: "Мария", stack: ["node", "kafka"], role: "кассир" },
+];
+
+function insertDemoCandidate(db, { email, displayName, stack, role }, hash, now, domainText) {
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  if (existing) return existing.id;
+
+  const userId = newId();
+  const phoneSuffix = email.match(/demo(\d+)@/)?.[1] || "99";
+  const phone = `+79003${phoneSuffix.padStart(6, "0").slice(-6)}`;
+  db.prepare(
+    `INSERT INTO users (id, email, password_hash, role, email_confirmed_at) VALUES (?, ?, ?, 'candidate', ?)`
+  ).run(userId, email, hash, now);
+  db.prepare(
+    `INSERT INTO candidate_profiles (user_id, display_name, stack_json, phone, contact_email, consent_at, availability)
+     VALUES (?, ?, ?, ?, ?, ?, 'open')`
+  ).run(userId, displayName, JSON.stringify(stack), phone, email, now);
+  const sharedScore = 0.72;
+  const sharedMotivation = 0.82;
+  db.prepare(
+    `INSERT INTO candidate_categories
+     (candidate_user_id, category_id, specialization, grade, test_score, knowledge, breadth, motivation, assigned_at)
+     VALUES (?, 'backend_middle', 'backend', 'middle', ?, 0.74, 0.66, ?, ?)`
+  ).run(userId, sharedScore, sharedMotivation, now);
+  db.prepare(
+    `INSERT INTO candidate_private (candidate_user_id, integrity, trust_ok) VALUES (?, 0.2, 1)`
+  ).run(userId);
+  db.prepare(
+    `INSERT INTO background_episodes (id, candidate_user_id, role_title, domain, industry, note)
+     VALUES (?, ?, ?, ?, 'HoReCa', '')`
+  ).run(newId(), userId, role, domainText);
+  return userId;
 }
 
-module.exports = { seed, QUICK_RUBRIC, WORK_RUBRIC };
+/** Idempotent extra demo candidates so cafe deck stays swipeable on long-lived prod DBs. */
+function topUpDemoCandidates(db) {
+  if (!config.DEMO_MODE) return { inserted: 0 };
+
+  const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+  if (!cafe) return { inserted: 0 };
+
+  const need = db
+    .prepare(
+      `SELECT id, domain_text FROM employer_needs WHERE employer_user_id = ? AND active = 1 ORDER BY rowid LIMIT 1`
+    )
+    .get(cafe.id);
+  if (!need) return { inserted: 0 };
+
+  const hash = bcrypt.hashSync(config.DEMO_PASSWORD, 10);
+  const now = new Date().toISOString();
+  const domainText = need.domain_text || "автоматизация работы официанта в ресторане";
+  let inserted = 0;
+
+  for (const spec of DEMO_TOPUP_CANDIDATES) {
+    const before = db.prepare("SELECT id FROM users WHERE email = ?").get(spec.email);
+    insertDemoCandidate(db, spec, hash, now, domainText);
+    if (!before) inserted += 1;
+  }
+
+  return { inserted };
+}
+
+function seed(db) {
+  const count = db.prepare("SELECT COUNT(*) AS c FROM categories").get().c;
+  if (count === 0) {
+    seedCategories(db);
+    seedTasks(db);
+    seedDemoUsers(db);
+  }
+  topUpDemoCandidates(db);
+}
+
+module.exports = {
+  seed,
+  topUpDemoCandidates,
+  DEMO_TOPUP_CANDIDATES,
+  QUICK_RUBRIC,
+  WORK_RUBRIC,
+};

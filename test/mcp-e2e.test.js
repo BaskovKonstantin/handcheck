@@ -209,12 +209,18 @@ describe("MCP e2e", () => {
     assert.match(row.args_masked_json, /attemptId/);
     assert.equal(row.intent_text, "помоги с REST");
     const cafeId = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get().id;
-    const { summarizeAiUsageForEmployer } = require("../app/lib/ai-usage-summary");
+    const {
+      summarizeAiUsageForEmployer,
+      employerMayViewCandidateAiUsage,
+    } = require("../app/lib/ai-usage-summary");
     const demo5Id = db.prepare("SELECT id FROM users WHERE email = 'demo5@demo.local'").get().id;
     assert.ok(
       db.prepare("SELECT COUNT(*) AS c FROM mcp_tool_calls WHERE user_id = ?").get(userId).c > 0
     );
-    assert.equal(summarizeAiUsageForEmployer(cafeId, demo5Id), null);
+    assert.ok(employerMayViewCandidateAiUsage(cafeId, demo5Id));
+    const poolSummary = summarizeAiUsageForEmployer(cafeId, demo5Id);
+    assert.ok(poolSummary);
+    assert.match(poolSummary.headline, /Пока нет записей/i);
     const needId = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafeId).id;
     db.prepare(
       `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)

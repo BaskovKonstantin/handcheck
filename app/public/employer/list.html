@@ -100,7 +100,17 @@
                 r.reviewStatus === "invited"
                   ? '<span class="status-pill accepted">приглашён</span>'
                   : "";
-              const explain = (r.explanation || []).map(esc).join(" · ");
+              const explain = (r.explanation || [])
+                .map((line) => `<li>${esc(line)}</li>`)
+                .join("");
+              const aiBlock =
+                r.aiUsage && (r.aiUsage.activityLines || []).length
+                  ? `<div class="list-ai-usage panel-soft"><p class="invite-meta"><strong>Как работает с ИИ.</strong> ${esc(r.aiUsage.headline)}</p><ul class="deck-phrases">${(r.aiUsage.activityLines || [])
+                      .map((l) => `<li>${esc(l)}</li>`)
+                      .join("")}</ul></div>`
+                  : r.aiUsage
+                    ? `<p class="invite-meta"><strong>Как работает с ИИ.</strong> ${esc(r.aiUsage.headline)}</p>`
+                    : "";
               const stack = (r.stack || [])
                 .map((s) => `<span class="chip chip-skill">${esc(s)}</span>`)
                 .join("");
@@ -122,7 +132,8 @@
                   ${invited}
                   ${domains ? `<div class="chip-row">${domains}</div>` : ""}
                   ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}
-                  <p class="invite-meta">${explain}</p>
+                  ${explain ? `<ul class="deck-explain-lines list-explain">${explain}</ul>` : ""}
+                  ${aiBlock}
                 </div>
                 ${actions}
               </div>`;

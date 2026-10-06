@@ -9,11 +9,17 @@ function validateSalaryRange(fromRaw, toRaw) {
   }
   const from = Number(fromRaw);
   const to = Number(toRaw);
-  if (!Number.isInteger(from) || from < 0) {
+  if (!Number.isInteger(from)) {
     return "Укажите целое число в поле «От»";
   }
-  if (!Number.isInteger(to) || to < 0) {
+  if (from < 0) {
+    return "Вилка не может быть отрицательной";
+  }
+  if (!Number.isInteger(to)) {
     return "Укажите целое число в поле «До»";
+  }
+  if (to < 0) {
+    return "Вилка не может быть отрицательной";
   }
   if (from === 0 && to === 0) {
     return "Укажите вилку зарплаты";
@@ -93,7 +99,9 @@ function renderCard(data) {
   const phrases = (data.card.taskPhrases || [])
     .map((t) => `<li>${esc(t)}</li>`)
     .join("");
-  const explain = (data.card.explanation || []).map(esc).join(". ");
+  const explainLines = (data.card.explanation || [])
+    .map((line) => `<li>${esc(line)}</li>`)
+    .join("");
 
   cardEl.hidden = false;
   cardEl.className = "deck-card enter deck-card-swipe";
@@ -110,7 +118,11 @@ function renderCard(data) {
       ${domains ? `<div class="chip-row">${domains}</div>` : ""}
       ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}
       <ul class="deck-phrases">${phrases}</ul>
-      ${explain ? `<p class="deck-explain"><svg class="inline-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 3a1 1 0 1 1-1 1 1 1 0 0 1 1-1zm2 8H6v-1h1V8H6V7h3v4h1v1z" fill="currentColor"/></svg> ${explain}</p>` : ""}
+      ${
+        explainLines
+          ? `<div class="deck-explain"><svg class="inline-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 3a1 1 0 1 1-1 1 1 1 0 0 1 1-1zm2 8H6v-1h1V8H6V7h3v4h1v1z" fill="currentColor"/></svg><ul class="deck-explain-lines">${explainLines}</ul></div>`
+          : ""
+      }
       ${data.card.integrationNote ? `<p class="deck-integration-note invite-meta">${esc(data.card.integrationNote)}</p>` : ""}
       ${
         data.card.aiUsage

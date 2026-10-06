@@ -114,7 +114,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await login(page, "anna@demo.local");
     const routes = [
       ["/candidate/today", ".stat-tile, .empty-state, .timeline-section"],
-      ["/candidate/tasks", ".battery-steps, .empty-state, .choice-chip, textarea"],
+      ["/candidate/tasks", ".empty-state, .choice-chip, textarea, .battery-steps"],
       ["/candidate/calls", ".stat-tile, .invite-card, .empty-state"],
       ["/candidate/invitations", ".invite-card, .empty-state"],
       ["/candidate/profile", ".panel, #displayName, .episode-list"],
@@ -274,8 +274,42 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     db.close();
     assert.ok(row?.invitation_id, "need ended call in seed");
     await page.goto(`${BASE}/call/${row.invitation_id}`, { waitUntil: "commit" });
+    await page.waitForSelector(".call-result-card", { timeout: 20000 });
     const lede = await page.locator(".call-room-hero .lede").textContent();
     assert.match(lede || "", /закрыта|итог/i);
+    await page.waitForSelector(".call-result-card");
+    await page.waitForSelector("#cabinet-aside");
+    await context.close();
+  });
+
+  it("candidate tasks start form hides battery steps and labels Backend without скоро", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+    db.prepare(
+      "UPDATE batteries SET completed_at = datetime('now') WHERE candidate_user_id = ? AND completed_at IS NULL"
+    ).run(boris.id);
+    db.close();
+    await login(page, "boris@demo.local");
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector('.choice-chip[data-choice="backend"]', { timeout: 20000 });
+    assert.equal(await page.locator(".battery-steps").count(), 0);
+    const text = (await page.locator('.choice-chip[data-choice="backend"]').textContent()) || "";
+    assert.ok(!/скоро/i.test(text), `backend chip should not say скоро: ${text}`);
+    await context.close();
+  });
+
+  it("candidate today does not list finished calls in upcoming steps", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "boris@demo.local");
+    await page.goto(`${BASE}/candidate/today`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".timeline-section", { timeout: 15000 });
+    const ended = page.locator('.timeline-section:has-text("завершён")');
+    assert.equal(await ended.count(), 0);
     await context.close();
   });
 

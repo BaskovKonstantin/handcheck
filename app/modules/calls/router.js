@@ -13,6 +13,7 @@ const { queueAnalyzeCall } = require("./analyze-call");
 const { isUuid } = require("../../lib/uuid");
 const { rejectOversizedBody } = require("../../middleware/reject-oversized-body");
 const { dbDateToIso } = require("../../lib/db-datetime");
+const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail);
@@ -47,6 +48,27 @@ function getInvitationAccess(userId, invitationId) {
   if (!inv || inv.status !== "accepted") return null;
   if (![inv.candidate_user_id, inv.employer_user_id].includes(userId)) return null;
   return inv;
+}
+
+function callRecordingSides(call) {
+  const root = call?.recording_path;
+  if (!root) return [];
+  const sides = [];
+  for (const side of ["candidate", "employer"]) {
+    const filePath = path.join(root, `${side}.webm`);
+    if (fs.existsSync(filePath)) sides.push(side);
+  }
+  return sides;
+}
+
+function callDurationLabel(startedAt, endedAt) {
+  if (!startedAt || !endedAt) return null;
+  const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const sec = Math.round(ms / 1000);
+  if (sec < 60) return `короткий звонок, меньше минуты`;
+  const min = Math.floor(sec / 60);
+  return `длительность около ${min} мин`;
 }
 
 function ensureCall(invitationId) {
@@ -90,6 +112,12 @@ router.get("/for-invitation/:invitationId", (req, res, next) => {
   if (req.user.role === "employer" && call.status === "ended") {
     const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
     if (a) payload.analysisText = a.summary_text;
+    payload.aiUsage = summarizeAiUsageForEmployer(req.user.id, inv.candidate_user_id);
+    payload.recordingSides = callRecordingSides(call);
+    payload.durationHint = callDurationLabel(
+      call.started_at ? dbDateToIso(call.started_at) : null,
+      call.ended_at ? dbDateToIso(call.ended_at) : null
+    );
   }
   res.json(payload);
 });
@@ -241,7 +269,10 @@ router.get("/:id/analysis", (req, res, next) => {
   if (inv.employer_user_id !== req.user.id) return next(httpError(403, "forbidden"));
   const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
   if (!a) return next(httpError(404, "not_ready"));
-  res.json({ summary_text: a.summary_text });
+  res.json({
+    summary_text: a.summary_text,
+    aiUsage: summarizeAiUsageForEmployer(req.user.id, inv.candidate_user_id),
+  });
 });
 
 router.get("/:id/recording", (req, res, next) => {

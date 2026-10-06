@@ -6,6 +6,7 @@ const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
 const { validateOptionalEmail } = require("../../lib/validation");
+const { shouldMarkUserAsTest } = require("../../lib/is-test-user");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -40,6 +41,9 @@ router.put("/profile", (req, res, next) => {
       `UPDATE employer_profiles SET company_name = ?, description = ?, industry = ?, contact_email = ?
        WHERE user_id = ?`
     ).run(companyName, description, industry, contactEmail, req.user.id);
+    const user = db.prepare("SELECT email FROM users WHERE id = ?").get(req.user.id);
+    const isTest = shouldMarkUserAsTest(user.email, companyName) ? 1 : 0;
+    db.prepare("UPDATE users SET is_test = ? WHERE id = ?").run(isTest, req.user.id);
     res.json({ ok: true });
   } catch (e) {
     next(e);

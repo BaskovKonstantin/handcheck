@@ -6,7 +6,12 @@ function buildExplanation(candidate, need) {
   const specLabel = need.specialization.charAt(0).toUpperCase() + need.specialization.slice(1);
   lines.push(`Категория совпадает с потребностью: ${specLabel} × ${gradeLabel}`);
   if (candidate.domain_boost > 0) {
-    lines.push("Прошлый опыт пересекается с доменом задачи");
+    const hint = String(need.domain_text || "").trim();
+    lines.push(
+      hint
+        ? `Доменный бонус: эпизоды опыта совпадают с потребностью («${hint}»)`
+        : "Доменный бонус: прошлый опыт совпадает с доменом задачи"
+    );
   }
   if (candidate.fsp_boost === 1) {
     lines.push("Есть достижения ФСП в профиле");

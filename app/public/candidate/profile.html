@@ -21,7 +21,7 @@
       let snapshot = "";
 
       async function load() {
-        HandCheck.candidateNav();
+        await HandCheck.candidateNav();
         const [profile, bg] = await Promise.all([
           HandCheck.api("/api/candidate/profile"),
           HandCheck.api("/api/candidate/background"),
@@ -120,14 +120,7 @@
         };
       }
 
-      load().catch(() => {
-        main.innerHTML = HandCheck.emptyState(
-          "Не удалось загрузить профиль",
-          "Проверьте соединение и войдите снова.",
-          "/auth",
-          "Войти"
-        );
-      });
+      HandCheck.loadPanel(main, load);
     </script>
   </body>
 </html>

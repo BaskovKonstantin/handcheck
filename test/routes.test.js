@@ -81,4 +81,30 @@ describe("invitation contacts API", () => {
     assert.ok(erow.candidatePhone);
     assert.ok(erow.candidateContactEmail);
   });
+
+  it("returns field error for invalid salary range", async () => {
+    const cafe = request.agent(app);
+    await cafe.post("/api/auth/login").send({
+      email: "cafe@demo.local",
+      password: "demo-demo-demo",
+    });
+    const db = require("../app/db").getDb();
+    const annaId = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get().id;
+    const need = db
+      .prepare(
+        "SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')"
+      )
+      .get();
+    const res = await cafe.post("/api/employer/invitations").send({
+      needId: need.id,
+      candidateId: annaId,
+      salaryFrom: 90000,
+      salaryTo: 1000,
+      offerText: "test",
+      contactChannel: "tg",
+    });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.error, "invalid_body");
+    assert.match(res.body.details.fields.salaryRange, /От/);
+  });
 });

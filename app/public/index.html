@@ -9,11 +9,13 @@
   <body>
     <header id="site-header"></header>
     <main class="column">
-      <h1 class="hero-title">Категория по навыку. Приглашение с вилкой.</h1>
-      <p class="hero-lede">
-        Профиль и тест задают категорию. Работодатель приглашает с вилкой зарплаты — без рейтингов и
-        без публичных контактов до согласия.
-      </p>
+      <div class="landing-hero-band">
+        <h1 class="display-title">Категория по навыку. Приглашение с вилкой.</h1>
+        <p class="hero-lede">
+          Профиль и тест задают категорию. Работодатель приглашает с вилкой зарплаты — без рейтингов и
+          без публичных контактов до согласия.
+        </p>
+      </div>
       <div class="stats" id="stats"></div>
       <div class="steps">
         <div class="step-card"><span class="step-num">1</span><div><strong>Профиль и бэкграунд</strong><p class="invite-meta">Опыт в домене влияет на подбор, не на «рейтинг».</p></div></div>
@@ -27,15 +29,16 @@
     <script src="/app.js"></script>
     <script>
       document.getElementById("site-header").innerHTML = `
-        <div class="site-header">
-          <a class="logo" href="/">HandCheck</a>
+        <div class="site-header cabinet-header-v3">
+          <a class="logo" href="/">${HandCheck.LOGO_MARK}<span>HandCheck</span></a>
           <nav class="site-nav">
             <a href="/auth?role=candidate">Кандидатам</a>
             <a href="/auth?role=employer">Работодателям</a>
             <a href="/auth">Войти</a>
             <a class="btn-primary" href="/auth">Начать</a>
           </nav>
-        </div>`;
+        </div>
+        <div class="cabinet-header-glow" aria-hidden="true"></div>`;
       fetch("/api/stats")
         .then((r) => r.json())
         .then((s) => {

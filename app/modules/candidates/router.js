@@ -337,4 +337,8 @@ router.post("/invitations/:id/decline", (req, res, next) => {
   }
 });
 
+router.use((_req, res) => {
+  res.status(404).json({ error: "not_found" });
+});
+
 module.exports = router;

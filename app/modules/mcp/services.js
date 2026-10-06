@@ -499,46 +499,83 @@ function listShortlist(userId, needId, filters = {}) {
 }
 
 function listEmployerInvitations(userId) {
-  const rows = getDb()
+  const db = getDb();
+  const rows = db
     .prepare(
-      `SELECT i.*, cp.display_name, u.email AS candidate_email FROM invitations i
+      `SELECT i.*, cp.display_name, cp.phone, cp.contact_email, n.title AS need_title, u.email AS candidate_email,
+              c.status AS call_status
+       FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
        JOIN users u ON u.id = i.candidate_user_id
+       JOIN employer_needs n ON n.id = i.need_id
+       LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.employer_user_id = ? ORDER BY i.created_at DESC`
     )
     .all(userId);
-  return rows.map((r) => ({
-    id: r.id,
-    candidateId: r.candidate_user_id,
-    candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
-    salaryFrom: r.salary_from,
-    salaryTo: r.salary_to,
-    status: r.status,
-    viaAiClient: r.action_source === "mcp",
-    createdAt: dbDateToIso(r.created_at),
-  }));
+  return rows.map((r) => {
+    const item = {
+      id: r.id,
+      candidateId: r.candidate_user_id,
+      candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
+      needTitle: r.need_title,
+      callStatus: r.call_status || null,
+      salaryFrom: r.salary_from,
+      salaryTo: r.salary_to,
+      status: r.status,
+      offerText: r.offer_text,
+      contactChannel: r.contact_channel,
+      viaAiClient: r.action_source === "mcp",
+      createdAt: dbDateToIso(r.created_at),
+    };
+    if (r.status === "accepted") {
+      item.candidatePhone = r.phone;
+      item.candidateContactEmail = r.contact_email;
+    }
+    const hadPriorDecline = Boolean(
+      db
+        .prepare(
+          `SELECT 1 FROM invitations i2
+             WHERE i2.employer_user_id = ? AND i2.need_id = ? AND i2.candidate_user_id = ?
+               AND i2.status = 'declined' AND i2.created_at < ? LIMIT 1`
+        )
+        .get(userId, r.need_id, r.candidate_user_id, r.created_at)
+    );
+    item.hadPriorDecline = hadPriorDecline;
+    return item;
+  });
 }
 
 function listEmployerCalls(userId) {
   const rows = getDb()
     .prepare(
-      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, cp.display_name, u.email AS candidate_email,
-              c.id AS call_id, c.status AS call_status, c.ended_at, n.title AS need_title
+      `SELECT i.id AS invitation_id, i.created_at AS invitation_at, i.candidate_user_id, cp.display_name, u.email AS candidate_email,
+              i.salary_from, i.salary_to,
+              c.id AS call_id, c.status AS call_status, c.started_at, c.ended_at, n.title AS need_title,
+              c.recording_path
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
        JOIN users u ON u.id = i.candidate_user_id
        JOIN employer_needs n ON n.id = i.need_id
        LEFT JOIN calls c ON c.invitation_id = i.id
        WHERE i.employer_user_id = ? AND i.status = 'accepted'
-       ORDER BY COALESCE(c.ended_at, i.created_at) DESC`
+       ORDER BY COALESCE(c.ended_at, c.started_at, i.created_at) DESC`
     )
     .all(userId);
   return rows.map((r) => ({
     invitationId: r.invitation_id,
+    candidateId: r.candidate_user_id,
+    invitationAt: dbDateToIso(r.invitation_at),
     callId: r.call_id,
     callStatus: r.call_status || "ready",
+    startedAt: dbDateToIso(r.started_at),
+    endedAt: dbDateToIso(r.ended_at),
     candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
     needTitle: r.need_title,
+    salaryFrom: r.salary_from,
+    salaryTo: r.salary_to,
+    hasRecording: Boolean(r.recording_path),
+    roomUrl: `/call/${r.invitation_id}`,
+    analysisUrl: r.call_id ? `/api/calls/${r.call_id}/analysis` : null,
   }));
 }
 

@@ -1,10 +1,12 @@
 # HandCheck session notes
 
-## Round 26 fixes (branch cursor/round26-findings-fe17)
+## Round 27 fixes (branch cursor/round27-findings-9bcf)
 
-- Duplicate need titles: Unicode case fold in JS (`normalizeNeedTitle`), check on PUT/MCP `update_need`.
-- Answer limits: quick 4000 / work 12000 chars; RU field errors; UI counter + maxlength; `payload_too_large` for JSON 413.
-- AI usage UI: `clientLabel` chip, dash for `client_where`, post-test lines with accept/decline verbs.
-- REST `GET /api/calls/:id/analysis` adds `summaryText` (keeps `summary_text`).
-- Recording after end: one upload per side within grace window.
-- Audit log times: `formatAuditLogTime` (today / yesterday / date).
+- Call room: `call-room-webrtc.js` — WebRTC over `/ws/calls/:callId`, MediaRecorder upload, Web Speech transcript chunks, honest recording labels, camera before `/start`, end propagation via WS + polling + `broadcastCallEnded`.
+- P1 end flow: redirect to ended `/call/:id`, RU errors on `/end` failure.
+- Need titles: collapse whitespace, ё→е in `normalizeNeedTitle`.
+- JSON 404 for unknown `/api/*` and candidate sub-router fallthrough.
+- MCP employer `list_invitations` / `list_calls` parity with REST.
+- Audit log client label via `formatClientDescriptor` (em dash).
+- Candidate calls: auto-expand ended section when no active calls.
+- Mobile stat tiles: 3-up compact for today + employer invitations.

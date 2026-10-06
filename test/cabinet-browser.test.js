@@ -225,7 +225,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await context.close();
   });
 
-  it("candidate today at 390 stacks stat tiles in one column", async () => {
+  it("candidate today at 390 uses compact three-up stat tiles", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
     const page = await context.newPage();
     await login(page, "anna@demo.local");
@@ -234,7 +234,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     const cols = await page.$eval(".stat-tile-grid-today", (el) => {
       return window.getComputedStyle(el).gridTemplateColumns;
     });
-    assert.ok(!cols.includes("110px"), `expected single-column grid, got ${cols}`);
+    const parts = cols.split(" ").filter(Boolean);
+    assert.equal(parts.length, 3, `expected 3-up grid, got ${cols}`);
     const tileCount = await page.locator(".stat-tile-grid-today .stat-tile").count();
     assert.equal(tileCount, 3);
     await context.close();
@@ -461,6 +462,164 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     assert.match(roleErr, /роль/i);
     assert.match(domainErr, /домен/i);
     await context.close();
+  });
+
+  it("round27: two-party call room WebRTC, WS, recording and end propagation", async () => {
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: [
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+      ],
+    });
+    try {
+      const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+      const Database = require("better-sqlite3");
+      const db = new Database(dbPath);
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare("DELETE FROM calls WHERE invitation_id IN (SELECT id FROM invitations WHERE candidate_user_id = ?)").run(
+        boris.id
+      );
+      db.prepare("DELETE FROM invitations WHERE candidate_user_id = ? AND employer_user_id = ?", boris.id, cafe.id);
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round27 call', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+
+      const speechInit = () => {
+        const webmHeader = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x02, 0x03, 0x04]);
+        class FakeRecorder {
+          constructor() {
+            this.state = "inactive";
+          }
+          start() {
+            this.state = "recording";
+            if (this.ondataavailable) {
+              this.ondataavailable({
+                data: new Blob([webmHeader], { type: "video/webm" }),
+              });
+            }
+          }
+          stop() {
+            this.state = "inactive";
+            if (this.ondataavailable) {
+              this.ondataavailable({
+                data: new Blob([webmHeader], { type: "video/webm" }),
+              });
+            }
+            if (this.onstop) this.onstop();
+          }
+        }
+        FakeRecorder.isTypeSupported = () => true;
+        window.MediaRecorder = FakeRecorder;
+
+        class FakeRecognition {
+          constructor() {
+            this.continuous = true;
+            this.interimResults = false;
+            this.lang = "ru-RU";
+          }
+          start() {
+            setTimeout(() => {
+              if (this.onresult) {
+                this.onresult({
+                  resultIndex: 0,
+                  results: [{ 0: { transcript: "тестовая реплика" }, isFinal: true, length: 1 }],
+                });
+              }
+            }, 50);
+          }
+          stop() {}
+        }
+        window.SpeechRecognition = FakeRecognition;
+        window.webkitSpeechRecognition = FakeRecognition;
+      };
+
+      const empCtx = await mediaBrowser.newContext({
+        permissions: ["camera", "microphone"],
+      });
+      const candCtx = await mediaBrowser.newContext({
+        permissions: ["camera", "microphone"],
+      });
+      await empCtx.addInitScript(speechInit);
+      await candCtx.addInitScript(speechInit);
+      const empPage = await empCtx.newPage();
+      const candPage = await candCtx.newPage();
+      empPage.setDefaultTimeout(90000);
+      candPage.setDefaultTimeout(90000);
+
+      const wsSeen = Promise.race([
+        empPage.waitForEvent("websocket", (ws) => ws.url().includes("/ws/calls/"), {
+          timeout: 90000,
+        }),
+        candPage.waitForEvent("websocket", (ws) => ws.url().includes("/ws/calls/"), {
+          timeout: 90000,
+        }),
+      ]);
+
+      await login(empPage, "cafe@demo.local");
+      await login(candPage, "boris@demo.local");
+      await empPage.goto(`${BASE}/call/${invId}`, { waitUntil: "commit", timeout: 30000 });
+      await candPage.goto(`${BASE}/call/${invId}`, { waitUntil: "commit", timeout: 30000 });
+
+      await empPage.waitForSelector("#consent", { timeout: 20000 });
+      await empPage.check("#consent", { force: true });
+      await empPage.click("#join", { force: true });
+      await empPage.waitForSelector("#end:not([hidden])", { timeout: 30000 });
+      await candPage.waitForSelector("#consent", { timeout: 20000 });
+      await candPage.check("#consent", { force: true });
+      await candPage.click("#join", { force: true });
+      await candPage.waitForSelector("#end:not([hidden])", { timeout: 30000 });
+
+      await wsSeen;
+      await empPage.waitForSelector("#local.live", { timeout: 30000 });
+      await candPage.waitForSelector("#local.live", { timeout: 30000 });
+      await empPage.waitForFunction(
+        async (id) => {
+          const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+          const j = await r.json();
+          return j.status === "live";
+        },
+        invId,
+        { timeout: 30000 }
+      );
+      await new Promise((r) => setTimeout(r, 500));
+      await empPage.click("#end", { force: true });
+      await empPage.waitForURL((url) => url.pathname === `/call/${invId}`, { timeout: 20000 });
+      await empPage.waitForSelector(".call-result-card", { timeout: 30000 });
+      await candPage.waitForSelector(".call-result-card", { timeout: 45000 });
+
+      let info = null;
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        info = await empPage.evaluate(async (id) => {
+          const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+          return r.json();
+        }, invId);
+        if (info.status === "ended" && (info.recordingSides || []).length >= 1) break;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      assert.equal(info.status, "ended");
+      const db2 = new Database(dbPath);
+      const transcript = db2
+        .prepare("SELECT transcript_text FROM calls WHERE invitation_id = ?")
+        .get(invId)?.transcript_text;
+      db2.close();
+      assert.ok(
+        (info.recordingSides || []).length >= 1 ||
+          (transcript && /тестовая реплика|Кандидат|Работодатель/i.test(transcript)),
+        "expected recording upload or speech transcript chunk"
+      );
+
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
   });
 
   it("shows created API token once in integrations UI (P0-1)", async () => {

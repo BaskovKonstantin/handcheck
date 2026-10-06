@@ -10,6 +10,7 @@ const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { httpError } = require("../../middleware/errors");
 const config = require("../../config");
 const { queueAnalyzeCall } = require("./analyze-call");
+const { broadcastCallEnded } = require("./signaling");
 const { isUuid } = require("../../lib/uuid");
 const { rejectOversizedBody } = require("../../middleware/reject-oversized-body");
 const { dbDateToIso } = require("../../lib/db-datetime");
@@ -210,6 +211,7 @@ router.post("/:id/end", (req, res, next) => {
   }
   const now = new Date().toISOString();
   db.prepare("UPDATE calls SET status = 'ended', ended_at = ? WHERE id = ?").run(now, call.id);
+  broadcastCallEnded(call.id);
   queueAnalyzeCall(call.id);
   res.json({ ok: true });
 });

@@ -4,9 +4,19 @@ const { WebSocketServer } = require("ws");
 const { loadSession } = require("../../middleware/auth");
 const { getDb } = require("../../db");
 
+const rooms = new Map();
+
+function broadcastCallEnded(callId) {
+  const set = rooms.get(callId);
+  if (!set) return;
+  const payload = JSON.stringify({ t: "ended" });
+  for (const peer of set) {
+    if (peer.readyState === 1) peer.send(payload);
+  }
+}
+
 function attachSignaling(server) {
   const wss = new WebSocketServer({ noServer: true });
-  const rooms = new Map();
 
   server.on("upgrade", (req, socket, head) => {
     const m = req.url?.match(/^\/ws\/calls\/([^/?]+)/);
@@ -54,4 +64,4 @@ function attachSignaling(server) {
   });
 }
 
-module.exports = { attachSignaling };
+module.exports = { attachSignaling, broadcastCallEnded, roomsForTest: rooms };

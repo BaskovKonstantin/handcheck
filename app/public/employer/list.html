@@ -17,6 +17,7 @@
           <p class="lede">Все подходящие категории по потребности — без рейтинга и фото.</p>
         </div>
       </header>
+      <div id="need-switcher-host"></div>
       <form class="filter-bar" id="filters" onsubmit="return false">
         <label>Стек <input id="stack" placeholder="node" autocomplete="off" /></label>
         <label
@@ -63,13 +64,28 @@
         }
       }
 
+      async function mountNeedSwitcher(needs, selectedId) {
+        const host = document.getElementById("need-switcher-host");
+        if (!host) return;
+        host.innerHTML = selectedId ? HandCheck.employerNeedSwitcherHtml(needs, selectedId) : "";
+        HandCheck.bindEmployerNeedSwitcher((id) => {
+          cachedNeedId = id;
+          HandCheck.persistEmployerNeedId(id);
+          loadRows();
+        });
+      }
+
       async function loadRows() {
         const seq = ++loadSeq;
         showSkeleton();
         try {
           if (!cachedNeedId) {
-            const needs = await HandCheck.api("/api/employer/needs");
-            cachedNeedId = needs.items[0]?.id || null;
+            const needsRes = await HandCheck.api("/api/employer/needs");
+            const needs = needsRes.items || [];
+            const params = new URLSearchParams(location.search);
+            cachedNeedId = HandCheck.resolveEmployerNeedId(needs, params);
+            if (cachedNeedId) HandCheck.persistEmployerNeedId(cachedNeedId);
+            await mountNeedSwitcher(needs, cachedNeedId);
           }
           if (seq !== loadSeq) return;
           if (!cachedNeedId) {
@@ -103,14 +119,8 @@
               const explain = (r.explanation || [])
                 .map((line) => `<li>${esc(line)}</li>`)
                 .join("");
-              const aiBlock =
-                r.aiUsage && (r.aiUsage.activityLines || []).length
-                  ? `<div class="list-ai-usage panel-soft"><p class="invite-meta"><strong>Как работает с ИИ.</strong> ${esc(r.aiUsage.headline)}</p><ul class="deck-phrases">${(r.aiUsage.activityLines || [])
-                      .map((l) => `<li>${esc(l)}</li>`)
-                      .join("")}</ul></div>`
-                  : r.aiUsage
-                    ? `<p class="invite-meta"><strong>Как работает с ИИ.</strong> ${esc(r.aiUsage.headline)}</p>`
-                    : "";
+              const aiChip = HandCheck.renderAiUsageSection(r.aiUsage, { compact: true });
+              const aiBlock = aiChip ? `<div class="chip-row">${aiChip}</div>` : "";
               const stack = (r.stack || [])
                 .map((s) => `<span class="chip chip-skill">${esc(s)}</span>`)
                 .join("");
@@ -153,15 +163,25 @@
       }
 
       document.getElementById("apply").onclick = () => {
-        const p = new URLSearchParams();
+        const p = new URLSearchParams(location.search);
         if (document.getElementById("stack").value) p.set("stack", document.getElementById("stack").value);
+        else p.delete("stack");
         if (document.getElementById("fsp").value) p.set("fsp", document.getElementById("fsp").value);
+        else p.delete("fsp");
         const q = p.toString();
         history.replaceState({}, "", q ? `/employer/list?${q}` : "/employer/list");
         loadRows();
       };
 
-      HandCheck.bootCabinetPage("employer", () => loadRows());
+      HandCheck.bootCabinetPage("employer", async () => {
+        const needsRes = await HandCheck.api("/api/employer/needs");
+        const needs = needsRes.items || [];
+        const params = new URLSearchParams(location.search);
+        cachedNeedId = HandCheck.resolveEmployerNeedId(needs, params);
+        if (cachedNeedId) HandCheck.persistEmployerNeedId(cachedNeedId);
+        await mountNeedSwitcher(needs, cachedNeedId);
+        await loadRows();
+      });
     </script>
   </body>
 </html>

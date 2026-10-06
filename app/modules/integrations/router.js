@@ -99,7 +99,7 @@ router.get("/audit", (req, res) => {
        LEFT JOIN mcp_client_sessions s ON s.id = t.session_id
        LEFT JOIN api_tokens tok ON tok.id = t.api_token_id
        WHERE t.user_id = ?
-       ORDER BY t.created_at DESC LIMIT ?`
+       ORDER BY t.created_at DESC, t.id DESC LIMIT ?`
     )
     .all(req.user.id, limit);
   res.json({

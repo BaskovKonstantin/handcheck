@@ -150,7 +150,7 @@ function humanToolSummary(toolName, ok, args) {
     get_my_category: "Проверка категории",
     list_tasks: "Список заданий теста",
     get_task: "Открытие задания",
-    start_assessment: "Старт батареи теста",
+    start_assessment: "Начало теста",
     submit_answer: "Отправка короткого ответа",
     submit_work_task: "Отправка рабочего задания",
     list_invitations: "Список приглашений",

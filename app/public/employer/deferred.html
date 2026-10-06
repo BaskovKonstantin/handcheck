@@ -17,6 +17,7 @@
           <p class="lede">Кандидаты, которых вы отложили в колоде. Верните в подбор или пригласите из списка.</p>
         </div>
       </header>
+      <div id="need-switcher-host"></div>
       <div id="stats"></div>
       <div id="list"></div>
     </main>
@@ -24,13 +25,26 @@
     <script>
       const list = document.getElementById("list");
       const statsEl = document.getElementById("stats");
+      let needId = null;
 
       async function loadDeferred() {
+        const esc = HandCheck.escapeHtml;
         statsEl.innerHTML = HandCheck.skeletonBlocks(2);
         list.innerHTML = HandCheck.skeletonBlocks(2);
-        const needs = await HandCheck.api("/api/employer/needs");
-        const id = needs.items[0]?.id;
-        if (!id) {
+        const needsRes = await HandCheck.api("/api/employer/needs");
+        const needs = needsRes.items || [];
+        const params = new URLSearchParams(location.search);
+        needId = HandCheck.resolveEmployerNeedId(needs, params);
+        if (needId) HandCheck.persistEmployerNeedId(needId);
+        const host = document.getElementById("need-switcher-host");
+        if (host) {
+          host.innerHTML = needId ? HandCheck.employerNeedSwitcherHtml(needs, needId) : "";
+          HandCheck.bindEmployerNeedSwitcher((id) => {
+            needId = id;
+            loadDeferred();
+          });
+        }
+        if (!needId) {
           list.innerHTML = HandCheck.emptyState(
             "Нет потребности",
             "Сначала опишите потребность.",
@@ -39,48 +53,48 @@
           );
           return;
         }
-        const d = await HandCheck.api(`/api/employer/needs/${id}/deferred`);
+        const d = await HandCheck.api(`/api/employer/needs/${needId}/deferred`);
         const count = (d.items || []).length;
         statsEl.innerHTML = HandCheck.statTilesHtml([
           {
             variant: "forest",
             label: "В отложенных",
             value: count,
-            hint: count ? "Можно вернуть в колоду" : "Свайп «позже» в колоде",
-            link: count ? { href: "/employer/deck", label: "Колода" } : null,
+            hint: count ? "Можно вернуть в колоду" : "Кнопка «Отложить» в колоде",
+            link: count ? { href: `/employer/deck?need=${needId}`, label: "Колода" } : null,
           },
           {
             variant: "clay",
             label: "Список",
             value: "→",
             hint: "Все кандидаты по потребности",
-            link: { href: "/employer/list", label: "Открыть" },
+            link: { href: `/employer/list?need=${needId}`, label: "Открыть" },
           },
         ]);
         if (!count) {
           list.innerHTML = HandCheck.emptyState(
             "Нет отложенных",
-            "В колоде нажмите «Позже», если кандидат интересен, но не сейчас.",
-            "/employer/deck",
+            "В колоде нажмите «Отложить», если кандидат интересен, но не сейчас.",
+            `/employer/deck?need=${needId}`,
             "В колоду"
           );
           return;
         }
-        list.innerHTML = d.items
+        list.innerHTML = `<div class="invite-card-grid">${d.items
           .map(
             (x) =>
               `<article class="invite-card invite-card-expressive invite-card-status-sent">
                 <div class="invite-card-top">
-                  <h3>${x.displayName}</h3>
-                  <span class="category-pill">${x.categoryLabel}</span>
+                  <h3>${esc(x.displayName)}</h3>
+                  <span class="category-pill">${esc(x.categoryLabel)}</span>
                 </div>
-                <button class="btn-ghost btn-sm" data-c="${x.candidateId}">Вернуть в колоду</button>
+                <button class="btn-ghost btn-sm" data-c="${esc(x.candidateId)}">Вернуть в колоду</button>
               </article>`
           )
-          .join("");
+          .join("")}</div>`;
         list.querySelectorAll("button[data-c]").forEach((b) => {
           b.onclick = async () => {
-            await HandCheck.api(`/api/employer/needs/${id}/reviews/${b.dataset.c}`, {
+            await HandCheck.api(`/api/employer/needs/${needId}/reviews/${b.dataset.c}`, {
               method: "DELETE",
             });
             location.reload();

@@ -4,6 +4,8 @@ const { getDb } = require("../../db");
 const { rankCandidates } = require("../../lib/ranking");
 const { buildTaskPhrases } = require("../../lib/task-phrases");
 const { buildExplanation } = require("./explain");
+const { buildIntegrationNoteForBattery } = require("../../lib/ai-usage-summary");
+const { stackMatchesFilter } = require("../../lib/stack-normalize");
 
 function loadCandidatesForNeed(need, employerUserId, options = {}) {
   const forDeck = options.forDeck === true;
@@ -79,18 +81,9 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
       });
     }
 
-    let integrationNote = null;
-    if (lastBattery) {
-      const mcpCount = db
-        .prepare(
-          `SELECT COUNT(*) AS c FROM attempts WHERE battery_id = ? AND action_source = 'mcp' AND submitted_at IS NOT NULL`
-        )
-        .get(lastBattery.id).c;
-      if (mcpCount > 0) {
-        integrationNote =
-          "Часть ответов в тесте отправлена через ИИ-клиент — нейтральная пометка, не штраф.";
-      }
-    }
+    const integrationNote = lastBattery
+      ? buildIntegrationNoteForBattery(db, lastBattery.id)
+      : null;
 
     out.push({
       id: r.user_id,
@@ -136,8 +129,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
 function applyFilters(items, query) {
   let list = items;
   if (query.stack) {
-    const s = String(query.stack).toLowerCase();
-    list = list.filter((c) => c.stack.some((x) => String(x).toLowerCase() === s));
+    list = list.filter((c) => stackMatchesFilter(c.stack, query.stack));
   }
   if (query.fsp === "1") list = list.filter((c) => c.fsp_boost === 1);
   if (query.fsp === "0") list = list.filter((c) => c.fsp_boost === 0);

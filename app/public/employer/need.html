@@ -14,7 +14,7 @@
         <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
         <div class="cabinet-page-hero-inner">
           <h1>Потребность</h1>
-          <p class="lede">Название, специализация, грейд, стек и домен задают подбор и доменный бонус в колоде.</p>
+          <p class="lede">Название, специализация, грейд, стек и домен задают, кого покажет колода.</p>
         </div>
       </header>
       <div id="stats"></div>
@@ -46,6 +46,7 @@
           specialization: document.getElementById("spec")?.value || "backend",
           grade: document.getElementById("grade")?.value || "middle",
           stack,
+          active: document.getElementById("need-active")?.checked ?? true,
         };
       }
 
@@ -90,6 +91,14 @@
             </label>
             <button type="button" class="btn-ghost need-create-btn" id="create-need">Создать потребность</button>
           </div>
+          <div id="create-need-sheet" class="need-create-sheet hidden" hidden>
+            <label>Название новой потребности <input id="create-title" maxlength="120" placeholder="Например, Backend middle" /></label>
+            <div class="form-actions">
+              <button type="button" class="btn-primary btn-sm" id="create-need-submit">Создать</button>
+              <button type="button" class="btn-ghost btn-sm" id="create-need-cancel">Отмена</button>
+            </div>
+          </div>
+          <label class="need-active-toggle"><input type="checkbox" id="need-active"${n.active ? " checked" : ""} /> Потребность активна (показывается в колоде и списке)</label>
           <label>Название <input id="title" value="${HandCheck.escapeHtml(n.title || "")}" /></label>
           <label>Специализация
             <select id="spec">
@@ -118,29 +127,52 @@
           document.getElementById("spec").value = picked.specialization || "backend";
           document.getElementById("grade").value = picked.grade || "middle";
           document.getElementById("stack").value = (picked.stack || []).join(", ");
+          const activeEl = document.getElementById("need-active");
+          if (activeEl) activeEl.checked = Boolean(picked.active);
           snapshot = JSON.stringify(currentPayload());
           refreshDirty();
         };
-        document.getElementById("create-need").onclick = async () => {
-          const title = prompt("Название новой потребности", "Новая потребность");
-          if (!title || !title.trim()) return;
-          const res = await HandCheck.api("/api/employer/needs", {
-            method: "POST",
-            body: JSON.stringify({
-              title: title.trim(),
-              specialization: "backend",
-              grade: "middle",
-              domainText: "",
-              stack: [],
-            }),
-          });
-          const d = await HandCheck.api("/api/employer/needs");
-          needs = d.items || [];
-          activeId = res.id;
-          const picked = needs.find((x) => x.id === activeId) || needs[0];
-          paintTiles(picked);
-          paintForm(picked);
-          bindDirty();
+        const createSheet = document.getElementById("create-need-sheet");
+        document.getElementById("create-need").onclick = () => {
+          createSheet.hidden = false;
+          createSheet.classList.remove("hidden");
+          document.getElementById("create-title")?.focus();
+        };
+        document.getElementById("create-need-cancel").onclick = () => {
+          createSheet.hidden = true;
+          createSheet.classList.add("hidden");
+        };
+        document.getElementById("create-need-submit").onclick = async () => {
+          const title = document.getElementById("create-title")?.value?.trim();
+          if (!title) {
+            HandCheck.toast("Укажите название потребности", "error");
+            return;
+          }
+          try {
+            const res = await HandCheck.api("/api/employer/needs", {
+              method: "POST",
+              body: JSON.stringify({
+                title,
+                specialization: "backend",
+                grade: "middle",
+                domainText: "",
+                stack: [],
+              }),
+            });
+            const d = await HandCheck.api("/api/employer/needs");
+            needs = d.items || [];
+            activeId = res.id;
+            HandCheck.persistEmployerNeedId(activeId);
+            const picked = needs.find((x) => x.id === activeId) || needs[0];
+            paintTiles(picked);
+            paintForm(picked);
+            bindDirty();
+            createSheet.hidden = true;
+            createSheet.classList.add("hidden");
+            HandCheck.toast("Потребность создана", "success");
+          } catch (e) {
+            HandCheck.toast(HandCheck.formatApiError(e), "error");
+          }
         };
         bindDirty();
       }

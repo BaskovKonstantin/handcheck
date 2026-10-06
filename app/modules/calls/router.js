@@ -109,15 +109,17 @@ router.get("/for-invitation/:invitationId", (req, res, next) => {
     salaryFrom: inv.salary_from,
     salaryTo: inv.salary_to,
   };
-  if (req.user.role === "employer" && call.status === "ended") {
-    const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
-    if (a) payload.analysisText = a.summary_text;
-    payload.aiUsage = summarizeAiUsageForEmployer(req.user.id, inv.candidate_user_id);
+  if (call.status === "ended") {
     payload.recordingSides = callRecordingSides(call);
     payload.durationHint = callDurationLabel(
       call.started_at ? dbDateToIso(call.started_at) : null,
       call.ended_at ? dbDateToIso(call.ended_at) : null
     );
+    if (req.user.role === "employer") {
+      const a = db.prepare("SELECT summary_text FROM call_analyses WHERE call_id = ?").get(call.id);
+      if (a) payload.analysisText = a.summary_text;
+      payload.aiUsage = summarizeAiUsageForEmployer(req.user.id, inv.candidate_user_id);
+    }
   }
   res.json(payload);
 });

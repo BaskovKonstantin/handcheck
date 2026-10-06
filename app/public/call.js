@@ -147,24 +147,27 @@ async function init() {
           ? `<section class="panel call-analysis-panel"><h2 class="h2">Внутренний разбор</h2><p>${esc(info.analysisText)}</p></section>`
           : "";
       const aiUsage =
-        me.role === "employer" && info.aiUsage
-          ? `<section class="panel call-ai-panel"><h2 class="h2">Как работает с ИИ</h2><p>${esc(info.aiUsage.headline)}</p>${
-              (info.aiUsage.activityLines || []).length
-                ? `<ul class="deck-phrases">${(info.aiUsage.activityLines || [])
-                    .map((l) => `<li>${esc(l)}</li>`)
-                    .join("")}</ul>`
-                : ""
-            }</section>`
+        me.role === "employer" && info.aiUsage && !info.aiUsage.empty
+          ? HandCheck.renderAiUsageSection(info.aiUsage).replace(
+              "deck-ai-usage",
+              "deck-ai-usage call-ai-panel"
+            )
           : "";
-      const recordings =
-        me.role === "employer" && info.recordingSides?.length
-          ? `<section class="panel call-recording-panel"><h2 class="h2">Запись</h2><div class="call-recording-players">${info.recordingSides
-              .map(
-                (side) =>
-                  `<div class="call-recording-side"><span class="invite-meta">${side === "candidate" ? "Кандидат" : "Работодатель"}</span><audio controls preload="metadata" src="/api/calls/${info.callId}/recording?side=${side}"></audio></div>`
-              )
-              .join("")}</div></section>`
-          : "";
+      const visibleSides = (info.recordingSides || []).filter((side) => {
+        if (me.role === "employer") return true;
+        return side === "candidate";
+      });
+      const recordings = visibleSides.length
+        ? `<section class="panel call-recording-panel"><h2 class="h2">Запись</h2><div class="call-recording-players">${visibleSides
+            .map((side) => {
+              const label = side === "candidate" ? "Кандидат" : "Работодатель";
+              const url = `/api/calls/${info.callId}/recording?side=${side}`;
+              return `<div class="call-recording-side"><span class="invite-meta">${label}</span>
+                <video class="call-recording-video" controls playsinline preload="metadata" src="${url}"></video>
+                <a class="btn-ghost btn-sm" href="${url}" download="${side}-recording.webm">Скачать</a></div>`;
+            })
+            .join("")}</div></section>`
+        : "";
       const ledeEmployer =
         "Комната закрыта. Ниже — итог созвона и материалы только для работодателя.";
       const ledeCandidate = "Комната закрыта. Краткий итог созвона — подробности в списке звонков.";

@@ -78,9 +78,11 @@
       }
 
       async function load() {
+        const seq = HandCheck.nextCabinetPageLoad();
         statsEl.innerHTML = HandCheck.skeletonBlocks(3);
         list.innerHTML = HandCheck.skeletonBlocks(3);
         const d = await HandCheck.api("/api/candidate/calls");
+        if (HandCheck.isStaleCabinetPageLoad(seq)) return;
         const items = d.items || [];
         const { active, ended } = splitCalls(items);
         const ready = active.filter((r) => r.callStatus !== "live").length;
@@ -130,7 +132,15 @@
         list.innerHTML = `<div class="invite-card-grid call-list-active">${activeHtml}</div>${endedSection}`;
       }
 
-      HandCheck.bootCabinetPage("candidate", () => HandCheck.loadPanel(list, load));
+      HandCheck.bootCabinetPage("candidate", () =>
+        load().catch(() => {
+          list.innerHTML = HandCheck.loadErrorState(
+            "Не удалось загрузить звонки",
+            "Проверьте соединение или повторите запрос.",
+            () => load()
+          );
+        })
+      );
     </script>
   </body>
 </html>

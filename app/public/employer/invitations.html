@@ -32,9 +32,11 @@
       }
 
       async function loadInvitations() {
+        const seq = HandCheck.nextCabinetPageLoad();
         statsEl.innerHTML = HandCheck.skeletonBlocks(3);
         list.innerHTML = HandCheck.skeletonBlocks(2);
         const d = await HandCheck.api("/api/employer/invitations");
+        if (HandCheck.isStaleCabinetPageLoad(seq)) return;
         const items = d.items || [];
         const sent = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
         const accepted = items.filter((i) => i.status === "accepted").length;

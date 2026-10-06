@@ -88,6 +88,34 @@ function cutoffForGrade(grade) {
   return CUTOFFS[grade] ?? CUTOFFS.middle;
 }
 
+/** Penalize identical or copy-pasted answers across quick questions. */
+function duplicateQuickAnswerMultiplier(quickAttempts) {
+  const texts = quickAttempts
+    .map((a) => normalizeText(a.answer_text || ""))
+    .filter((t) => t.replace(/\s/g, "").length > 40);
+  if (texts.length < 4) return 1;
+  const freq = new Map();
+  for (const t of texts) freq.set(t, (freq.get(t) || 0) + 1);
+  let maxDup = 0;
+  for (const n of freq.values()) maxDup = Math.max(maxDup, n);
+  if (maxDup >= 5) return 0.2;
+  if (maxDup >= 4) return 0.35;
+  if (maxDup >= 3) return 0.55;
+  if (freq.size <= 2 && texts.length >= 6) return 0.45;
+  return 1;
+}
+
+function applyBatteryScoreGuards(agg, attempts) {
+  const quickAttempts = attempts.filter((a) => a.type === "quick");
+  const mult = duplicateQuickAnswerMultiplier(quickAttempts);
+  if (mult >= 1) return agg;
+  return {
+    knowledge: agg.knowledge * mult,
+    breadth: agg.breadth * mult,
+    test_score: agg.test_score * mult,
+  };
+}
+
 module.exports = {
   normalizeText,
   keyHit,
@@ -95,5 +123,7 @@ module.exports = {
   scoreWork,
   aggregateBattery,
   cutoffForGrade,
+  duplicateQuickAnswerMultiplier,
+  applyBatteryScoreGuards,
   CUTOFFS,
 };

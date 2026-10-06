@@ -166,7 +166,27 @@
       }
       const conn = await ensurePeerConnection();
       if (msg.t === WS_SIGNAL.OFFER && role === "candidate") {
-        if (conn.signalingState === "stable" && conn.remoteDescription) return;
+        if (conn.signalingState === "stable" && conn.remoteDescription) {
+          if (conn.connectionState === "connected") return;
+          try {
+            conn.close();
+          } catch {
+            /* ignore */
+          }
+          pc = null;
+          remoteStream = null;
+          const fresh = await ensurePeerConnection();
+          if (fresh.signalingState === "have-local-offer") return;
+          try {
+            await fresh.setRemoteDescription(msg.sdp);
+            const answer = await fresh.createAnswer();
+            await fresh.setLocalDescription(answer);
+            sendSignal({ t: WS_SIGNAL.ANSWER, sdp: fresh.localDescription });
+          } catch {
+            /* glare or stale offer */
+          }
+          return;
+        }
         if (conn.signalingState === "have-local-offer") return;
         try {
           await conn.setRemoteDescription(msg.sdp);
@@ -351,10 +371,15 @@
     async function flushRecordingChunks() {
       if (!recorderChunks.length) return;
       const mime = pickRecorderMime() || "video/webm";
-      const blob = new Blob(recorderChunks, { type: mime });
-      recorderChunks = [];
+      const pending = recorderChunks.slice();
+      const blob = new Blob(pending, { type: mime });
       if (!blob.size) return;
-      await uploadRecordingChunk(blob);
+      try {
+        await uploadRecordingChunk(blob);
+        recorderChunks = [];
+      } catch {
+        throw new Error("chunk_upload_failed");
+      }
     }
 
     function startChunkUploadLoop() {

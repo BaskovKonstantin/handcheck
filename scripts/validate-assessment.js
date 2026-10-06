@@ -16,7 +16,7 @@ const { createApp } = require("../app/server");
 const { getDb } = require("../app/db");
 const { scoreQuick, scoreWork, aggregateBattery } = require("../app/lib/rubric-score");
 const canonical = require("./fixtures/canonical-answer-ab.json");
-const strong = require("./fixtures/backend-middle-strong.json");
+const strong = require("./fixtures/distinct-quick-answers");
 const weak = require("./fixtures/backend-middle-weak.json");
 
 function scoreForm(db, formKey, answers) {
@@ -85,6 +85,7 @@ async function main() {
   const attempts = db
     .prepare("SELECT id, task_id FROM attempts WHERE battery_id = ?")
     .all(batteryId);
+  let quickIdx = 0;
   while (true) {
     const cur = await agent.get("/api/assessment/battery/current");
     const next = cur.body.battery?.attempts?.find((a) => !a.submitted);
@@ -93,7 +94,8 @@ async function main() {
     const t = db.prepare("SELECT type FROM tasks WHERE id = ?").get(
       db.prepare("SELECT task_id FROM attempts WHERE id = ?").get(next.id).task_id
     );
-    const ans = t.type === "quick" ? strong.quickAnswer : strong.workAnswer;
+    const ans =
+      t.type === "quick" ? strong.quickAnswerForIndex(quickIdx++) : strong.workAnswer;
     const sub = await agent
       .post(`/api/assessment/tasks/${next.id}/submit`)
       .send({ answerText: ans });

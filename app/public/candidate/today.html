@@ -94,12 +94,20 @@
         const statusByInv = callStatusByInvitation(callItems);
         const steps = [];
         const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
-        if (!cat.label) {
+        if (!cat.label && !onCooldown) {
           steps.push({
             tone: "clay",
             title: "Пройти тест",
             meta: "Без теста категория не появится в подборе",
             cta: '<a class="btn-primary btn-sm" href="/candidate/tasks">Начать</a>',
+          });
+        } else if (!cat.label && onCooldown) {
+          const retakeDate = HandCheck.formatRetakeDateMoscow(cat.retakeAt);
+          steps.push({
+            tone: "muted",
+            title: "Категория не подтверждена",
+            meta: `Пересдача с ${retakeDate} (Москва)`,
+            cta: `<button class="btn-improve-locked btn-sm" type="button" disabled title="Пересдача с ${retakeDate}"><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача с ${retakeDate}</button>`,
           });
         } else if (!onCooldown) {
           steps.push({
@@ -161,13 +169,16 @@
         const callsHint =
           joinableCount > 0 ? "принято — можно в комнату" : "нет активных комнат";
         if (!cat.label) {
+          const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
+          const retakeDate = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
+          const body = onCooldown
+            ? `Категория не подтверждена. Пересдача возможна после ${retakeDate} (Москва).`
+            : "Пройдите тест — специализация и грейд появятся здесь.";
+          const empty = onCooldown
+            ? `<div class="panel"><h2 class="h2">Категория ещё не подтверждена</h2><p class="invite-meta">${body}</p></div>`
+            : HandCheck.emptyState("Категория ещё не подтверждена", body, "/candidate/tasks", "Пройти тест");
           dash.innerHTML =
-            HandCheck.emptyState(
-              "Категория ещё не подтверждена",
-              "Пройдите тест — специализация и грейд появятся здесь.",
-              "/candidate/tasks",
-              "Пройти тест"
-            ) + HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat, callItems));
+            empty + HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat, callItems));
           return;
         }
         const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);

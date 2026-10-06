@@ -52,7 +52,7 @@
           <span class="battery-step-num">${QUICK_COUNT + 1}</span>
           <span class="battery-step-label">Мини-проект</span>
         </li>`);
-        return `<ol class="battery-steps" aria-label="Шаги батареи">${steps.join("")}</ol>`;
+        return `<ol class="battery-steps" aria-label="Шаги теста">${steps.join("")}</ol>`;
       }
 
       function formatCountdown(ms) {
@@ -190,16 +190,16 @@
         const submitted = attempts.filter((a) => a.submitted).length;
         const next = attempts.find((a) => !a.submitted);
         if (!next) {
+          const onCooldown = Boolean(category?.cooldownActive && category?.retakeAt);
+          const retakeWhen = onCooldown ? HandCheck.formatRetakeDateMoscow(category.retakeAt) : "";
+          const doneMsg = category.label
+            ? `Ваша категория: ${category.label}. Обновление на экране «Сегодня».`
+            : onCooldown
+              ? `Категория не подтверждена. Пересдача возможна после ${retakeWhen} (Москва).`
+              : "Категория обновится на экране «Сегодня».";
           panel.innerHTML =
             batteryStepIndicator(QUICK_COUNT + 1) +
-            HandCheck.emptyState(
-              "Тест завершён",
-              category.label
-                ? `Ваша категория: ${category.label}. Обновление на экране «Сегодня».`
-                : "Категория обновится на экране «Сегодня».",
-              "/candidate/today",
-              "Открыть сегодня"
-            );
+            HandCheck.emptyState("Тест завершён", doneMsg, "/candidate/today", "Открыть сегодня");
           return;
         }
         attemptId = next.id;
@@ -257,7 +257,7 @@
           <p class="invite-meta">${HandCheck.escapeHtml(metaLine)}</p>
           <p class="battery-timer" id="timer-line" aria-live="polite"><span class="battery-timer-label">${timerLabel}:</span> <strong id="timer-val">—</strong></p>
           <p>${HandCheck.escapeHtml(t.prompt)}</p>
-          <textarea id="answer" rows="8" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
+          <textarea id="answer" rows="5" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
           <p class="invite-meta" id="answer-len">0 / ${answerMax} символов</p>
           <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
           <button class="btn-primary" id="submit">Отправить ответ</button>
@@ -272,9 +272,15 @@
         ta.addEventListener("input", syncLen);
         let firstInputSent = false;
         const telemetryQueue = [];
+        let telemetryChain = Promise.resolve();
+        const flushTelemetry = () => {
+          if (!telemetryQueue.length) return telemetryChain;
+          const batch = telemetryQueue.splice(0, telemetryQueue.length);
+          telemetryChain = telemetryChain.then(() => postTelemetry(batch));
+          return telemetryChain;
+        };
         const enqueueEvent = (event_type, payload) => {
           telemetryQueue.push({ attemptId, event_type, payload });
-          if (telemetryQueue.length >= 4) postTelemetry(telemetryQueue.splice(0));
         };
         let pendingPasteChars = 0;
         ta.addEventListener("paste", (ev) => {
@@ -316,11 +322,15 @@
         ta.addEventListener("focus", () => enqueueEvent("focus", null));
         ta.addEventListener("blur", () => enqueueEvent("blur", null));
         let submitting = false;
+        let suppressDraft = false;
         const deadlineMs = t.deadlineAt ? new Date(t.deadlineAt).getTime() : null;
         const timerVal = document.getElementById("timer-val");
         let tickTimer = null;
         const submitBtn = document.getElementById("submit");
         const errEl = document.getElementById("err");
+        submitBtn.addEventListener("mousedown", () => {
+          suppressDraft = true;
+        });
         const submitAnswer = async (fromTimeout = false) => {
           if (submitting) return;
           errEl.hidden = true;
@@ -336,7 +346,7 @@
           flushTyping();
           ta.readOnly = true;
           submitBtn.disabled = true;
-          await postTelemetry(telemetryQueue.splice(0));
+          await flushTelemetry();
           try {
             await HandCheck.api(`/api/assessment/tasks/${attemptId}/submit`, {
               method: "POST",
@@ -345,16 +355,16 @@
             localStorage.removeItem(draftKey);
             if (attemptsLeft === 1) {
               const cat = await HandCheck.api("/api/candidate/category").catch(() => ({ label: null }));
+              const onCooldown = Boolean(cat?.cooldownActive && cat?.retakeAt);
+              const retakeWhen = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
+              const doneMsg = cat.label
+                ? `Ваша категория: ${cat.label}. Обновление на экране «Сегодня».`
+                : onCooldown
+                  ? `Категория не подтверждена. Пересдача возможна после ${retakeWhen} (Москва).`
+                  : "Категория обновится на экране «Сегодня».";
               panel.innerHTML =
                 batteryStepIndicator(QUICK_COUNT + 1) +
-                HandCheck.emptyState(
-                  "Тест завершён",
-                  cat.label
-                    ? `Ваша категория: ${cat.label}. Обновление на экране «Сегодня».`
-                    : "Категория обновится на экране «Сегодня».",
-                  "/candidate/today",
-                  "Открыть сегодня"
-                );
+                HandCheck.emptyState("Тест завершён", doneMsg, "/candidate/today", "Открыть сегодня");
               return;
             }
             await init();
@@ -394,7 +404,7 @@
           }
         }
         const persistDraft = async () => {
-          if (submitting) return;
+          if (submitting || suppressDraft) return;
           const text = ta.value;
           localStorage.setItem(draftKey, JSON.stringify({ text, at: Date.now() }));
           try {

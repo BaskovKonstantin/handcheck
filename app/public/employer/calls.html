@@ -125,7 +125,7 @@
               : "";
             html.push(`<article class="invite-card call-entry">
               <div class="call-entry-meta">
-                <span class="status-pill ${statusCls}">${HandCheck.callStatusLabel(c.callStatus)}</span>
+                <span class="status-pill ${statusCls}${c.callStatus === "ended" ? " status-pill-asis" : ""}">${HandCheck.callStatusLabel(c.callStatus)}</span>
                 <span>${esc(when)}</span>
                 ${rec}
               </div>

@@ -933,6 +933,240 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     }
   });
 
+  it("round34: employer reload rejoin restores WebRTC connection", async () => {
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+      const Database = require("better-sqlite3");
+      const db = new Database(dbPath);
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round34 emp reload', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+      const hooks = () => {
+        window.__hcPcs = [];
+        const Orig = window.RTCPeerConnection;
+        window.RTCPeerConnection = class extends Orig {
+          constructor(...args) {
+            super(...args);
+            window.__hcPcs.push(this);
+          }
+        };
+      };
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      await empCtx.addInitScript(hooks);
+      await candCtx.addInitScript(hooks);
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await emp.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await cand.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await emp.check("#consent", { force: true });
+      await emp.click("#join", { force: true });
+      await cand.check("#consent", { force: true });
+      await cand.click("#join", { force: true });
+      await emp.waitForFunction(
+        () => (window.__hcPcs || []).some((pc) => pc.connectionState === "connected"),
+        { timeout: 60000 }
+      );
+      await emp.reload({ waitUntil: "commit" });
+      await emp.waitForSelector("#join:not([disabled])", { timeout: 20000 });
+      await emp.click("#join", { force: true });
+      await emp.waitForFunction(
+        () => (window.__hcPcs || []).some((pc) => pc.connectionState === "connected"),
+        { timeout: 15000 }
+      );
+      await cand.waitForFunction(
+        () => (window.__hcPcs || []).some((pc) => pc.connectionState === "connected"),
+        { timeout: 15000 }
+      );
+      await cand.waitForFunction(
+        () => {
+          const v = document.getElementById("remote");
+          return v && !v.hidden && v.videoWidth > 0;
+        },
+        { timeout: 30000 }
+      );
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
+  });
+
+  it("round34: live call has no 4xx on recording-chunk uploads", async () => {
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+      const Database = require("better-sqlite3");
+      const db = new Database(dbPath);
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round34 chunks', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+      const chunkStatuses = { employer: [], candidate: [] };
+      const trackChunks = async (page, side) => {
+        page.on("response", (res) => {
+          const u = res.url();
+          if (u.includes("/recording-chunk")) chunkStatuses[side].push(res.status());
+        });
+      };
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      await trackChunks(emp, "employer");
+      await trackChunks(cand, "candidate");
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await emp.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await cand.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await emp.check("#consent", { force: true });
+      await emp.click("#join", { force: true });
+      await cand.check("#consent", { force: true });
+      await cand.click("#join", { force: true });
+      await emp.waitForFunction(
+        () => (document.getElementById("panel-title")?.textContent || "").includes("В эфире"),
+        { timeout: 60000 }
+      );
+      const liveStarted = Date.now();
+      await new Promise((r) => setTimeout(r, 32000));
+      await emp.click("#end", { force: true });
+      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      const liveMs = Date.now() - liveStarted;
+      for (const side of ["employer", "candidate"]) {
+        const bad = chunkStatuses[side].filter((s) => s >= 400);
+        assert.equal(bad.length, 0, `${side} chunk 4xx: ${bad.join(",")}`);
+        assert.ok(chunkStatuses[side].length >= 2, `${side} expected >=2 chunks, got ${chunkStatuses[side].length}`);
+      }
+      let info = null;
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        info = await emp.evaluate(async (id) => {
+          const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+          return r.json();
+        }, invId);
+        const sides = info.recordingSides || [];
+        if (info.status === "ended" && sides.includes("employer") && sides.includes("candidate")) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      assert.ok(info.recordingSides?.includes("employer"));
+      assert.ok(info.recordingSides?.includes("candidate"));
+      const minBytes = Math.max(120 * 1024, Math.floor(liveMs * 0.004));
+      const sizes = await emp.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        const info = await r.json();
+        const out = {};
+        for (const side of info.recordingSides || []) {
+          const res = await fetch(`/api/calls/${info.callId}/recording?side=${side}`, {
+            credentials: "include",
+          });
+          out[side] = (await res.arrayBuffer()).byteLength;
+        }
+        return out;
+      }, invId);
+      assert.ok(sizes.employer >= minBytes, `employer bytes ${sizes.employer} < ${minBytes}`);
+      assert.ok(sizes.candidate >= minBytes, `candidate bytes ${sizes.candidate} < ${minBytes}`);
+      const durs = await emp.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        const info = await r.json();
+        const out = {};
+        for (const side of info.recordingSides || []) {
+          const v = document.createElement("video");
+          v.preload = "metadata";
+          v.src = `/api/calls/${info.callId}/recording?side=${side}`;
+          await new Promise((resolve, reject) => {
+            v.onloadedmetadata = () => resolve();
+            v.onerror = () => reject(new Error("video metadata"));
+            setTimeout(() => reject(new Error("timeout")), 15000);
+          });
+          out[side] = v.duration;
+        }
+        return out;
+      }, invId);
+      const minDurSec = liveMs * 0.001 * 0.75;
+      for (const side of ["employer", "candidate"]) {
+        if (Number.isFinite(durs[side]) && durs[side] > 0 && Number.isFinite(minDurSec)) {
+          assert.ok(durs[side] >= minDurSec * 0.5, `${side} dur ${durs[side]}`);
+        }
+      }
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
+  });
+
+  it("round34: paste and immediate submit stores paste telemetry", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const email = `r34-paste-${Date.now()}@demo.local`;
+    await context.request.post(`${BASE}/api/auth/register`, {
+      data: { email, password: PASS, role: "candidate" },
+    });
+    await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
+    const loginRes = await context.request.post(`${BASE}/api/auth/login`, {
+      data: { email, password: PASS },
+    });
+    assert.ok(loginRes.ok());
+    const page = await context.newPage();
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit" });
+    await page.waitForSelector("#assessment-privacy", { timeout: 15000 });
+    await page.check("#assessment-privacy", { force: true });
+    await page.click("#start", { force: true });
+    await page.waitForSelector("#open-q", { timeout: 15000 });
+    await page.click("#open-q", { force: true });
+    await page.waitForSelector("#answer", { timeout: 15000 });
+    const pasteText =
+      "HTTP API версии пагинация идемпотентность кэш Redis JWT очередь миграции метрики логи алерты мониторинг.";
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.evaluate(async (text) => {
+      await navigator.clipboard.writeText(text);
+    }, pasteText);
+    await page.focus("#answer");
+    await page.keyboard.press("Control+V");
+    await page.click("#submit", { force: true });
+    await page.waitForFunction(
+      () => !document.getElementById("submit") || document.querySelector("#open-q"),
+      { timeout: 30000 }
+    );
+    const attemptId = await page.evaluate(async () => {
+      const cur = await fetch("/api/assessment/battery/current", { credentials: "include" }).then((r) => r.json());
+      const submitted = cur.battery?.attempts?.find((a) => a.submitted);
+      return submitted?.id || cur.battery?.attempts?.[0]?.id;
+    });
+    assert.ok(attemptId);
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const pasteCount = db
+      .prepare(
+        `SELECT COUNT(*) AS c FROM attempt_events WHERE attempt_id = ? AND event_type = 'paste'`
+      )
+      .get(attemptId).c;
+    db.close();
+    assert.ok(pasteCount >= 1, `paste events ${pasteCount}`);
+    await context.close();
+  });
+
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

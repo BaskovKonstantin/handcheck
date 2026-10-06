@@ -30,6 +30,7 @@ const {
   callDir,
   listChunkFiles,
   totalChunkBytes,
+  finalizeOrphanChunkSides,
 } = require("../../lib/recording-store");
 const {
   listPlayableRecordingSides,
@@ -224,6 +225,14 @@ router.post("/:id/end", (req, res, next) => {
   }
   const now = new Date().toISOString();
   db.prepare("UPDATE calls SET status = 'ended', ended_at = ? WHERE id = ?").run(now, call.id);
+  const durationMs = call.started_at
+    ? Math.max(0, new Date(now).getTime() - new Date(call.started_at).getTime())
+    : 0;
+  try {
+    finalizeOrphanChunkSides(call.id, durationMs);
+  } catch {
+    /* keep ended even if merge fails */
+  }
   broadcastCallEnded(call.id);
   queueAnalyzeCall(call.id);
   res.json({ ok: true });

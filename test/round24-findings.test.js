@@ -14,7 +14,7 @@ const {
 } = require("../app/lib/public-candidate-name");
 const { validateOptionalPhone, validateBackgroundEpisode } = require("../app/lib/validation");
 const { parseSalaryRange } = require("../app/lib/salary-range");
-const answers = require("../scripts/fixtures/canonical-answer-ab.json");
+const answers = require("../scripts/fixtures/distinct-quick-answers");
 
 function bootServer() {
   const tmpDb = path.join(os.tmpdir(), `hc-r24-${process.pid}-${Date.now()}.sqlite`);
@@ -75,9 +75,11 @@ async function passTest(agent) {
       privacyConsent: true,
   });
   const cur = await agent.get("/api/assessment/battery/current");
+  let quickIdx = 0;
   for (const a of cur.body.battery.attempts) {
     const task = await agent.get(`/api/assessment/tasks/${a.id}`);
-    const text = task.body.type === "work" ? answers.workAnswer : answers.quickAnswer;
+    const text =
+      task.body.type === "work" ? answers.workAnswer : answers.quickAnswerForIndex(quickIdx++);
     await agent.post(`/api/assessment/tasks/${a.id}/open`);
     await agent.post(`/api/assessment/tasks/${a.id}/submit`).send({ answerText: text });
   }

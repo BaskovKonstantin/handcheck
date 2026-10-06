@@ -6,6 +6,7 @@ const {
   scoreWork,
   aggregateBattery,
   cutoffForGrade,
+  applyBatteryScoreGuards,
 } = require("../../lib/rubric-score");
 const { computeMotivation } = require("../../lib/motivation");
 const { computeIntegrityFromWorkEvents } = require("../../lib/integrity");
@@ -74,7 +75,8 @@ function scoreBatteryAttempts(batteryId, claimedGrade) {
       workScore = scoreWork(a.answer_text, rubric);
     }
   }
-  const agg = aggregateBattery(quickScores, workScore);
+  let agg = aggregateBattery(quickScores, workScore);
+  agg = applyBatteryScoreGuards(agg, attempts);
   const cutoff = cutoffForGrade(claimedGrade);
   const passed = agg.test_score >= cutoff;
   let label = null;

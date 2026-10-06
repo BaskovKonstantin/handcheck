@@ -69,8 +69,19 @@ function showDeckLoading() {
 
 async function loadNeed() {
   showDeckLoading();
-  const needs = await HandCheck.api("/api/employer/needs");
-  needId = needs.items[0]?.id;
+  const needsRes = await HandCheck.api("/api/employer/needs");
+  const needs = needsRes.items || [];
+  const params = new URLSearchParams(location.search);
+  needId = HandCheck.resolveEmployerNeedId(needs, params);
+  if (needId) HandCheck.persistEmployerNeedId(needId);
+  const switchHost = document.getElementById("need-switcher-host");
+  if (switchHost) {
+    switchHost.innerHTML = needId ? HandCheck.employerNeedSwitcherHtml(needs, needId) : "";
+    HandCheck.bindEmployerNeedSwitcher((id) => {
+      needId = id;
+      loadCard();
+    });
+  }
   if (!needId) {
     setDeckVisible(false);
     const emptyHost = document.getElementById("deck-empty");
@@ -123,18 +134,16 @@ function renderCard(data) {
           ? `<div class="deck-explain"><svg class="inline-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 7 7 7 7 0 0 0-7-7zm0 3a1 1 0 1 1-1 1 1 1 0 0 1 1-1zm2 8H6v-1h1V8H6V7h3v4h1v1z" fill="currentColor"/></svg><ul class="deck-explain-lines">${explainLines}</ul></div>`
           : ""
       }
-      ${data.card.integrationNote ? `<p class="deck-integration-note invite-meta">${esc(data.card.integrationNote)}</p>` : ""}
-      ${
-        data.card.aiUsage
-          ? `<div class="deck-ai-usage panel-soft"><h3 class="h3">Как работает с ИИ</h3><p class="invite-meta">${esc(data.card.aiUsage.headline)}</p>${
-              (data.card.aiUsage.activityLines || []).length
-                ? `<ul class="deck-phrases">${(data.card.aiUsage.activityLines || [])
-                    .map((l) => `<li>${esc(l)}</li>`)
-                    .join("")}</ul>`
-                : ""
-            }</div>`
-          : ""
-      }
+      ${(() => {
+        const ai = data.card.aiUsage;
+        const showAi =
+          ai && !ai.empty && (ai.headline || (ai.activityLines || []).length > 0);
+        const note =
+          data.card.integrationNote && !showAi
+            ? `<p class="deck-integration-note invite-meta">${esc(data.card.integrationNote)}</p>`
+            : "";
+        return `${note}${showAi ? HandCheck.renderAiUsageSection(ai) : ""}`;
+      })()}
     </div>`;
 }
 

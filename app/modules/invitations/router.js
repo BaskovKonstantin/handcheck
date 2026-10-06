@@ -63,7 +63,9 @@ router.get("/calls", (req, res) => {
   const rows = getDb()
     .prepare(
       `SELECT i.id AS invitation_id, i.created_at AS invitation_at, i.candidate_user_id, cp.display_name,
-              c.id AS call_id, c.status AS call_status, c.started_at, c.ended_at, n.title AS need_title
+              i.salary_from, i.salary_to,
+              c.id AS call_id, c.status AS call_status, c.started_at, c.ended_at, n.title AS need_title,
+              c.recording_path
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
        JOIN employer_needs n ON n.id = i.need_id
@@ -75,6 +77,7 @@ router.get("/calls", (req, res) => {
   res.json({
     items: rows.map((r) => ({
       invitationId: r.invitation_id,
+      candidateId: r.candidate_user_id,
       invitationAt: dbDateToIso(r.invitation_at),
       callId: r.call_id,
       callStatus: r.call_status || "ready",
@@ -82,6 +85,9 @@ router.get("/calls", (req, res) => {
       endedAt: dbDateToIso(r.ended_at),
       candidateName: r.display_name,
       needTitle: r.need_title,
+      salaryFrom: r.salary_from,
+      salaryTo: r.salary_to,
+      hasRecording: Boolean(r.recording_path),
       roomUrl: `/call/${r.invitation_id}`,
       analysisUrl: r.call_id ? `/api/calls/${r.call_id}/analysis` : null,
     })),

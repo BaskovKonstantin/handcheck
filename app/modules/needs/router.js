@@ -6,6 +6,7 @@ const { newId } = require("../../lib/ids");
 const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
+const { validateNeedBody } = require("../../lib/need-validation");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -28,22 +29,26 @@ router.get("/needs", (req, res) => {
   });
 });
 
-router.post("/needs", (req, res) => {
+router.post("/needs", (req, res, next) => {
+  const parsed = validateNeedBody(req.body || {}, { requireTitle: true });
+  if (!parsed.ok) return next(httpError(400, "invalid_body", { fields: parsed.fields }));
   const id = newId();
-  const {
-    title = "",
-    specialization = "backend",
-    grade = "middle",
-    stack = [],
-    domainText = "",
-    notes = "",
-  } = req.body || {};
+  const v = parsed.value;
   getDb()
     .prepare(
-      `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`
     )
-    .run(id, req.user.id, title, specialization, grade, JSON.stringify(stack), domainText, notes);
+    .run(
+      id,
+      req.user.id,
+      v.title,
+      v.specialization || "backend",
+      v.grade || "middle",
+      JSON.stringify(v.stack || []),
+      v.domainText || "",
+      v.notes || ""
+    );
   res.status(201).json({ id });
 });
 
@@ -53,18 +58,29 @@ router.put("/needs/:id", (req, res, next) => {
     .prepare("SELECT * FROM employer_needs WHERE id = ? AND employer_user_id = ?")
     .get(req.params.id, req.user.id);
   if (!n) return next(httpError(404, "not_found"));
-  const body = req.body || {};
+  const merged = {
+    title: req.body?.title ?? n.title,
+    specialization: req.body?.specialization ?? n.specialization,
+    grade: req.body?.grade ?? n.grade,
+    stack: req.body?.stack !== undefined ? req.body.stack : JSON.parse(n.stack_json || "[]"),
+    domainText: req.body?.domainText ?? n.domain_text,
+    notes: req.body?.notes ?? n.notes,
+    active: req.body?.active,
+  };
+  const parsed = validateNeedBody(merged, { requireTitle: true });
+  if (!parsed.ok) return next(httpError(400, "invalid_body", { fields: parsed.fields }));
+  const v = parsed.value;
   db.prepare(
     `UPDATE employer_needs SET title = ?, specialization = ?, grade = ?, stack_json = ?, domain_text = ?, notes = ?, active = ?
      WHERE id = ?`
   ).run(
-    body.title ?? n.title,
-    body.specialization ?? n.specialization,
-    body.grade ?? n.grade,
-    JSON.stringify(body.stack ?? JSON.parse(n.stack_json)),
-    body.domainText ?? n.domain_text,
-    body.notes ?? n.notes,
-    body.active === undefined ? n.active : body.active ? 1 : 0,
+    v.title,
+    v.specialization,
+    v.grade,
+    JSON.stringify(v.stack || []),
+    v.domainText || "",
+    v.notes || "",
+    v.active === undefined ? n.active : v.active ? 1 : 0,
     n.id
   );
   res.json({ ok: true });

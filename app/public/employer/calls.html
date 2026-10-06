@@ -35,12 +35,18 @@
         });
       }
 
-      function shortRef(id) {
-        if (!id) return "";
-        return `#${String(id).replace(/-/g, "").slice(-6).toUpperCase()}`;
+      function groupCountLabel(n) {
+        if (n <= 1) return "";
+        const mod10 = n % 10;
+        const mod100 = n % 100;
+        let word = "звонков";
+        if (mod10 === 1 && mod100 !== 11) word = "звонок";
+        else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) word = "звонка";
+        return `${n} ${word}`;
       }
 
       async function render() {
+        const esc = HandCheck.escapeHtml;
         list.innerHTML = HandCheck.skeletonBlocks(3);
         const d = await HandCheck.api("/api/employer/calls");
         if (!d.items.length) {
@@ -59,9 +65,9 @@
         });
         const groups = new Map();
         for (const c of sorted) {
-          const key = c.candidateName || "—";
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key).push(c);
+          const key = c.candidateId || c.candidateName || "—";
+          if (!groups.has(key)) groups.set(key, { name: c.candidateName || "—", calls: [] });
+          groups.get(key).calls.push(c);
         }
         const analyses = await Promise.all(
           sorted.map(async (c) => {
@@ -77,28 +83,33 @@
         const analysisByCall = new Map(analyses.filter((a) => a.id).map((a) => [a.id, a.text]));
 
         const html = [];
-        for (const [name, calls] of groups.entries()) {
-          const monogram = HandCheck.initials(name);
-          html.push(`<section class="call-group"><h2 class="call-group-title">
-            <span class="avatar-monogram" style="width:2.25rem;height:2.25rem;font-size:0.85rem">${monogram}</span>
-            ${name} <span class="invite-meta">(${calls.length})</span></h2>`);
+        for (const { name, calls } of groups.values()) {
+          const countLabel = groupCountLabel(calls.length);
+          html.push(`<section class="call-group"><h2 class="call-group-title">${esc(name)}${
+            countLabel ? ` <span class="invite-meta">${esc(countLabel)}</span>` : ""
+          }</h2>`);
           for (const c of calls) {
             const when = formatTs(c.endedAt || c.startedAt || c.invitationAt);
             const statusCls = HandCheck.callStatusClass(c.callStatus);
             const analysis = analysisByCall.get(c.callId);
             const analysisBlock = analysis
-              ? `<p class="contacts-block">${analysis}</p>`
+              ? `<p class="contacts-block">${esc(analysis)}</p>`
               : c.callStatus === "ended"
                 ? '<p class="invite-meta">Разбор готовится…</p>'
                 : "";
+            const salary = HandCheck.formatSalaryRange(c.salaryFrom, c.salaryTo);
+            const rec = c.hasRecording
+              ? '<span class="status-pill accepted">есть запись</span>'
+              : "";
             html.push(`<article class="invite-card call-entry">
               <div class="call-entry-meta">
                 <span class="status-pill ${statusCls}">${HandCheck.callStatusLabel(c.callStatus)}</span>
-                <span>${when}</span>
-                <span class="call-ref">${shortRef(c.invitationId)}</span>
+                <span>${esc(when)}</span>
+                ${rec}
               </div>
-              <p class="invite-meta" style="margin-top:0">${c.needTitle}</p>
-              <a class="btn-primary btn-sm" href="${c.roomUrl}">Комната</a>
+              <p class="invite-meta" style="margin-top:0">${esc(c.needTitle || "")}</p>
+              <p class="salary-hero salary-hero-sm">${salary}</p>
+              <a class="btn-primary btn-sm" href="${esc(c.roomUrl)}">Комната</a>
               ${analysisBlock}
             </article>`);
           }

@@ -29,6 +29,13 @@ function parseSalaryRange(salaryFrom, salaryTo) {
       fields.salaryRange = "Вилка зарплаты: «От» не может быть больше «До»";
     }
   }
+  const SALARY_MAX = 100_000_000;
+  if (Number.isInteger(from) && from > SALARY_MAX) {
+    fields.salaryRange = "Слишком большая сумма в поле «От»";
+  }
+  if (Number.isInteger(to) && to > SALARY_MAX) {
+    fields.salaryRange = fields.salaryRange || "Слишком большая сумма в поле «До»";
+  }
   return { fields, from, to };
 }
 

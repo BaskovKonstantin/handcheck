@@ -17,8 +17,8 @@
           <p class="lede">После принятия здесь появятся телефон и email кандидата.</p>
         </div>
       </header>
-      <div id="stats"></div>
-      <div id="list"></div>
+      <div id="stats" class="invite-stats-block"></div>
+      <div id="list" class="invite-list-block"></div>
     </main>
     <script src="/app.js"></script>
     <script>
@@ -31,8 +31,16 @@
         return "invite-card-status-sent";
       }
 
+      function formatInviteDate(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" });
+      }
+
       async function loadInvitations() {
         const seq = HandCheck.nextCabinetPageLoad();
+        const esc = HandCheck.escapeHtml;
         statsEl.innerHTML = HandCheck.skeletonBlocks(3);
         list.innerHTML = HandCheck.skeletonBlocks(2);
         const d = await HandCheck.api("/api/employer/invitations");
@@ -59,23 +67,34 @@
           .map((i) => {
             const contacts =
               i.status === "accepted"
-                ? `<div class="contacts-block"><strong>Контакты кандидата</strong><br>Телефон: ${i.candidatePhone || "—"}<br>Email: ${i.candidateContactEmail || "—"}</div>`
+                ? `<div class="contacts-block"><strong>Контакты кандидата</strong><br>Телефон: ${esc(i.candidatePhone || "—")}<br>Email: ${esc(i.candidateContactEmail || "—")}</div>`
                 : "";
             const call =
               i.status === "accepted"
-                ? `<a class="btn-primary" href="/call/${i.id}">Комната звонка</a>`
+                ? `<a class="btn-primary" href="/call/${esc(i.id)}">Комната звонка</a>`
                 : "";
             const aiBadge = i.viaAiClient
               ? `<span class="status-pill status-pill-asis sent">через ИИ-клиент</span>`
               : "";
             const stCls = HandCheck.invitationStatusClass(i.status);
+            const sentOn = formatInviteDate(i.createdAt);
+            const meta = HandCheck.joinMetaParts([i.needTitle, sentOn ? `отправлено ${sentOn}` : ""]);
+            const channel = i.contactChannel
+              ? `<p class="invite-meta">Канал связи: ${esc(i.contactChannel)}</p>`
+              : "";
+            const offer = i.offerText
+              ? `<p class="invite-offer-text">${esc(i.offerText)}</p>`
+              : "";
             return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
               <div class="invite-card-top">
-                <h3>${i.candidateName}</h3>
+                <h3>${esc(i.candidateName)}</h3>
                 <span class="status-pill ${stCls}">${HandCheck.invitationStatusLabel(i.status)}</span>
                 ${aiBadge}
               </div>
+              ${meta ? `<p class="invite-meta">${esc(meta)}</p>` : ""}
               <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
+              ${offer}
+              ${channel}
               ${contacts}
               <div class="invite-actions">${call}</div>
             </article>`;

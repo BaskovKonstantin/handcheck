@@ -31,13 +31,14 @@
           HandCheck.api("/api/candidate/background"),
         ]);
         snapshot = JSON.stringify({ profile, bg });
+        const esc = HandCheck.escapeHtml;
         main.innerHTML = `
           <section class="panel">
             <h2 class="h2">Основное</h2>
-            <label>Имя <input id="displayName" value="${profile.displayName || ""}" /></label>
-            <label>Телефон <input id="phone" autocomplete="tel" value="${profile.phone || ""}" /></label>
-            <label>Email для контактов <input id="contactEmail" autocomplete="email" value="${profile.contactEmail || ""}" /></label>
-            <label>Стек (через запятую) <input id="stack" value="${(profile.stack || []).join(", ")}" /></label>
+            <label>Имя <input id="displayName" value="${esc(profile.displayName || "")}" /></label>
+            <label>Телефон <input id="phone" autocomplete="tel" value="${esc(profile.phone || "")}" /></label>
+            <label>Email для контактов <input id="contactEmail" autocomplete="email" value="${esc(profile.contactEmail || "")}" /></label>
+            <label>Стек (через запятую) <input id="stack" value="${esc((profile.stack || []).join(", "))}" /></label>
             <label>Доступность
               <select id="availability">
                 <option value="open" ${profile.availability === "open" ? "selected" : ""}>Открыт к приглашениям</option>
@@ -54,7 +55,7 @@
             <div class="episode-list" id="episodes">${(bg.items || [])
               .map(
                 (e) =>
-                  `<div class="episode-item" data-id="${e.id}"><strong>${e.roleTitle}</strong> · ${e.industry}<br><span class="invite-meta">${e.domain}</span>
+                  `<div class="episode-item" data-id="${esc(e.id)}"><strong>${esc(e.roleTitle)}</strong> · ${esc(e.industry)}<br><span class="invite-meta">${esc(e.domain)}</span>
                   <button type="button" class="btn-ghost btn-sm del-ep" data-id="${e.id}">Удалить</button></div>`
               )
               .join("") || '<p class="invite-meta">Пока нет эпизодов — добавьте хотя бы один для доменного совпадения.</p>'}</div>

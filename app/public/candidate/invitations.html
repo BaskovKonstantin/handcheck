@@ -23,50 +23,51 @@
     <script>
       const list = document.getElementById("list");
       async function load() {
+        const esc = HandCheck.escapeHtml;
         list.innerHTML = HandCheck.skeletonBlocks(2);
         const d = await HandCheck.api("/api/candidate/invitations");
-          if (!d.items.length) {
-            list.innerHTML = HandCheck.emptyState(
-              "Пока нет приглашений",
-              "Пройдите тест и держите профиль открытым — компании приглашают сами.",
-              "/candidate/tasks",
-              "К заданиям"
-            );
-            return;
-          }
-          list.innerHTML = d.items
-            .map((i) => {
-              const contacts =
-                i.status === "accepted"
-                  ? `<div class="contacts-block"><strong>Контакты компании</strong><br>Email: ${i.employerContactEmail || "—"}<br>Канал: ${i.contactChannel}</div>`
-                  : "";
-              const actions =
-                i.status === "sent" || i.status === "viewed"
-                  ? `<div class="invite-actions">
-                <button class="btn-primary" data-id="${i.id}" data-a="accept">Принять</button>
-                <button class="btn-ghost" data-id="${i.id}" data-a="decline">Отклонить</button>
+        if (!d.items.length) {
+          list.innerHTML = HandCheck.emptyState(
+            "Пока нет приглашений",
+            "Пройдите тест и держите профиль открытым — компании приглашают сами.",
+            "/candidate/tasks",
+            "К заданиям"
+          );
+          return;
+        }
+        list.innerHTML = `<div class="invite-card-grid">${d.items
+          .map((i) => {
+            const contacts =
+              i.status === "accepted"
+                ? `<div class="contacts-block"><strong>Контакты компании</strong><br>Email: ${esc(i.employerContactEmail || "—")}<br>Канал: ${esc(i.contactChannel || "—")}</div>`
+                : "";
+            const actions =
+              i.status === "sent" || i.status === "viewed"
+                ? `<div class="invite-actions">
+                <button class="btn-primary" data-id="${esc(i.id)}" data-a="accept">Принять</button>
+                <button class="btn-ghost" data-id="${esc(i.id)}" data-a="decline">Отклонить</button>
               </div>`
-                  : i.status === "accepted"
-                    ? `<a class="btn-primary" href="/call/${i.id}">Перейти к звонку</a>`
-                    : "";
-              const stCls = HandCheck.invitationStatusClass(i.status);
-              return `<article class="invite-card invite-card-expressive">
+                : i.status === "accepted"
+                  ? `<a class="btn-primary" href="/call/${esc(i.id)}">Перейти к звонку</a>`
+                  : "";
+            const stCls = HandCheck.invitationStatusClass(i.status);
+            return `<article class="invite-card invite-card-expressive">
               <div class="invite-card-top">
-                <h3>${i.companyName}</h3>
+                <h3>${esc(i.companyName)}</h3>
                 <span class="status-pill ${stCls}">${HandCheck.invitationStatusLabel(i.status)}</span>
               </div>
               <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
-              <p>${i.offerText}</p>${contacts}${actions}</article>`;
-            })
-            .join("");
-          list.querySelectorAll("button[data-a]").forEach((b) => {
-            b.onclick = async () => {
-              await HandCheck.api(`/api/candidate/invitations/${b.dataset.id}/${b.dataset.a}`, {
-                method: "POST",
-              });
-              location.reload();
-            };
-          });
+              <p class="invite-offer-text">${esc(i.offerText || "")}</p>${contacts}${actions}</article>`;
+          })
+          .join("")}</div>`;
+        list.querySelectorAll("button[data-a]").forEach((b) => {
+          b.onclick = async () => {
+            await HandCheck.api(`/api/candidate/invitations/${b.dataset.id}/${b.dataset.a}`, {
+              method: "POST",
+            });
+            location.reload();
+          };
+        });
       }
       HandCheck.bootCabinetPage("candidate", () => load());
     </script>

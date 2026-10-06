@@ -188,7 +188,88 @@ function escapeHtml(text) {
   return String(text || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/"/g, "&quot;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const EMPLOYER_NEED_STORAGE_KEY = "handcheck:employer-need-id";
+
+function resolveEmployerNeedId(needs, searchParams) {
+  if (!needs?.length) return null;
+  const byId = new Map(needs.map((n) => [n.id, n]));
+  const fromQuery = searchParams?.get?.("need");
+  if (fromQuery && byId.has(fromQuery)) return fromQuery;
+  try {
+    const stored = localStorage.getItem(EMPLOYER_NEED_STORAGE_KEY);
+    if (stored && byId.has(stored)) {
+      const item = byId.get(stored);
+      if (item.active) return stored;
+    }
+  } catch {
+    /* ignore */
+  }
+  const active = needs.filter((n) => n.active);
+  const pick = active[0] || needs[0];
+  return pick?.id || null;
+}
+
+function persistEmployerNeedId(needId) {
+  try {
+    if (needId) localStorage.setItem(EMPLOYER_NEED_STORAGE_KEY, needId);
+  } catch {
+    /* ignore */
+  }
+}
+
+function employerNeedSwitcherHtml(needs, selectedId) {
+  const esc = escapeHtml;
+  const active = needs.filter((n) => n.active);
+  const pool = active.length ? active : needs;
+  const options = pool
+    .map(
+      (n) =>
+        `<option value="${n.id}"${n.id === selectedId ? " selected" : ""}>${esc(n.title || "Без названия")}</option>`
+    )
+    .join("");
+  return `<div class="need-switcher-bar"><label class="form-label need-switcher">Потребность
+    <select id="employer-need-switch">${options}</select></label></div>`;
+}
+
+function bindEmployerNeedSwitcher(onChange) {
+  const sel = document.getElementById("employer-need-switch");
+  if (!sel) return;
+  sel.addEventListener("change", () => {
+    const id = sel.value;
+    persistEmployerNeedId(id);
+    const p = new URLSearchParams(location.search);
+    p.set("need", id);
+    const qs = p.toString();
+    history.replaceState({}, "", qs ? `${location.pathname}?${qs}` : location.pathname);
+    onChange(id);
+  });
+}
+
+function joinMetaParts(parts) {
+  return parts.filter((p) => p != null && String(p).trim()).join(" · ");
+}
+
+function renderAiUsageSection(aiUsage, { compact = false } = {}) {
+  if (!aiUsage) return "";
+  const esc = escapeHtml;
+  const lines = aiUsage.activityLines || [];
+  const hasData = Boolean(aiUsage.headline) || lines.length > 0;
+  if (!hasData) {
+    if (compact) return `<span class="chip chip-muted">ИИ-клиенты не использовались</span>`;
+    return "";
+  }
+  if (compact) {
+    return `<p class="invite-meta">${esc(aiUsage.headline)}</p>`;
+  }
+  const list = lines.length
+    ? `<ul class="deck-phrases">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`
+    : "";
+  return `<div class="deck-ai-usage panel-soft"><h3 class="h3">Как работает с ИИ</h3><p class="invite-meta">${esc(aiUsage.headline)}</p>${list}</div>`;
 }
 
 function formatCabinetEmailMarkup(email) {
@@ -412,13 +493,14 @@ function timelineSection(title, items) {
   if (!items?.length) {
     return `<section class="timeline-section"><h2 class="timeline-heading">${title}</h2><p class="invite-meta">Пока ничего нового — держите профиль открытым и проверяйте приглашения.</p></section>`;
   }
+  const esc = escapeHtml;
   const rows = items
     .map(
       (it) => `<li class="timeline-item">
         <span class="timeline-dot timeline-dot-${it.tone || "forest"}" aria-hidden="true"></span>
         <div class="timeline-body">
-          <p class="timeline-title">${it.title}</p>
-          ${it.meta ? `<p class="timeline-meta">${it.meta}</p>` : ""}
+          <p class="timeline-title">${esc(it.title)}</p>
+          ${it.meta ? `<p class="timeline-meta">${esc(it.meta)}</p>` : ""}
           ${it.cta || ""}
         </div>
       </li>`
@@ -660,5 +742,11 @@ window.HandCheck = {
   formatDateTimeMoscow,
   formatRetakeDateMoscow,
   escapeHtml,
+  resolveEmployerNeedId,
+  persistEmployerNeedId,
+  employerNeedSwitcherHtml,
+  bindEmployerNeedSwitcher,
+  joinMetaParts,
+  renderAiUsageSection,
   LOGO_MARK,
 };

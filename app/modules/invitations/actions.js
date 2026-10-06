@@ -28,6 +28,7 @@ function createInvitation(employerUserId, body, actionSource = "web") {
   const offer = String(offerText || "").trim();
   const channel = String(contactChannel || "").trim();
   if (!offer) fields.offerText = "Напишите текст приглашения";
+  else if (offer.length > 2000) fields.offerText = "Текст приглашения слишком длинный (максимум 2000 символов)";
   if (!channel) fields.contactChannel = "Укажите канал связи";
   else if (channel.length > 64) fields.contactChannel = "Канал связи слишком длинный";
   if (!needId || !candidateId || Object.keys(fields).length) {

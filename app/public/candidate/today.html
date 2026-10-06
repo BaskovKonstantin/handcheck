@@ -54,7 +54,7 @@
         (items || [])
           .filter((i) => i.status === "accepted")
           .forEach((i) => {
-            const key = `${i.companyName}|${i.salaryFrom}|${i.salaryTo}`;
+            const key = i.id;
             const list = groups.get(key) || [];
             list.push(i);
             groups.set(key, list);
@@ -137,9 +137,9 @@
         if (!steps.length) {
           steps.push({
             tone: "muted",
-            title: "Профиль и доступность",
-            meta: "Откройте профиль и держите статус «Открыт к приглашениям»",
-            cta: '<a class="btn-ghost btn-sm" href="/candidate/profile">Профиль</a>',
+            title: "Новых шагов нет — приглашения придут сами",
+            meta: "Держите профиль открытым к приглашениям",
+            cta: '<a class="btn-primary btn-sm" href="/candidate/tasks">Задания</a>',
           });
         }
         return steps;
@@ -172,11 +172,8 @@
         }
         const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
         const retakeDate = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
-        const retake = retakeDate
-          ? `<p class="invite-meta">Пересдача возможна после ${retakeDate}</p>`
-          : "";
         const improveBtn = onCooldown
-          ? `<button class="btn-ghost btn-sm btn-disabled-visual" type="button" disabled title="Пересдача с ${retakeDate}">Улучшить категорию</button>`
+          ? `<button class="btn-improve-locked btn-sm" type="button" disabled title="Пересдача с ${retakeDate}"><span class="btn-lock" aria-hidden="true">🔒</span> Улучшить до ${retakeDate}</button>`
           : `<a class="btn-primary btn-sm" href="/candidate/tasks">Улучшить категорию</a>`;
         const categoryHint = `<p class="invite-meta">Задания подтверждают навык — при успешной пересдаче категория обновится.</p>
               ${improveBtn}`;
@@ -190,7 +187,6 @@
               <div class="stat-tile-label">${ICON_CAT} Категория</div>
               <div class="stat-tile-value"><span class="category-pill">${cat.label}</span></div>
               ${categoryHint}
-              ${retake}
             </article>
             <article class="stat-tile stat-tile-clay">
               <div class="stat-tile-label">${ICON_MAIL} Приглашения</div>
@@ -205,11 +201,7 @@
               <a class="btn-ghost btn-sm" href="/candidate/calls">Звонки</a>
             </article>
           </div>
-          ${timeline}
-          <div class="form-actions" style="margin-top:1.5rem">
-            <a class="btn-ghost" href="/candidate/profile">Профиль</a>
-            <a class="btn-primary" href="/candidate/tasks">Задания</a>
-          </div>`;
+          ${timeline}`;
       }
 
       HandCheck.bootCabinetPage("candidate", () => render());

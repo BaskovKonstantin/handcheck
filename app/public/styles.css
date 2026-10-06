@@ -2775,6 +2775,89 @@ label.consent-option input {
   border: 1px dashed var(--line);
 }
 
+.invite-stats-block + .invite-list-block,
+.invite-stats-block + #list,
+#stats + #list {
+  margin-top: 1.25rem;
+}
+
+.need-switcher-bar {
+  margin: 0 0 1rem;
+}
+
+.chip-muted {
+  background: var(--paper);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.btn-improve-locked {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 92%, var(--muted));
+  color: var(--muted);
+  font: inherit;
+  cursor: not-allowed;
+}
+
+.btn-improve-locked .btn-lock {
+  opacity: 0.75;
+  font-size: 0.85em;
+}
+
+.call-recording-video {
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #111;
+  border-radius: 10px;
+}
+
+.call-recording-players {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 700px) {
+  .call-recording-players {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.salary-hero-sm {
+  font-size: 1.05rem;
+  margin: 0.35rem 0 0.5rem;
+}
+
+body.has-cabinet-chrome {
+  min-height: 100vh;
+}
+
+@media (min-width: 900px) {
+  .cabinet-aside {
+    min-height: 100vh;
+  }
+}
+
+.need-create-sheet {
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.need-active-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1rem;
+}
+
 @media (max-width: 599px) {
   .stat-tile-grid-today {
     grid-template-columns: 1fr;

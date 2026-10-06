@@ -88,9 +88,6 @@
       async function renderStartForm(category) {
         const onCooldown = Boolean(category?.cooldownActive && category?.retakeAt);
         const retakeWhen = onCooldown ? HandCheck.formatRetakeDateMoscow(category.retakeAt) : "";
-        const retakeLine = retakeWhen
-          ? `<p class="field-error">Пересдача возможна после ${retakeWhen}</p>`
-          : "";
         const retakeExplain = retakeWhen
           ? `<p class="invite-meta">Пересдать тест можно после ${retakeWhen} — успешная пересдача обновит категорию.</p>`
           : `<p class="invite-meta">Успешная пересдача обновит категорию.</p>`;
@@ -99,9 +96,8 @@
               <span class="invite-meta">Текущая категория</span>
               <span class="category-pill">${category.label}</span>
               ${retakeExplain}
-              ${retakeLine}
             </div>`
-          : `<p class="invite-meta">${onCooldown ? "Категория не подтверждена." : "Категория появится после первого завершённого теста."}</p>${retakeLine}`;
+          : `<p class="invite-meta">${onCooldown ? "Категория не подтверждена." : "Категория появится после первого завершённого теста."}</p>${retakeWhen ? retakeExplain : ""}`;
         panel.innerHTML = `
           ${catBlock}
           <p class="invite-meta">Выберите специализацию и грейд. Сейчас доступна только категория Backend × Middle — другие тесты готовятся.</p>

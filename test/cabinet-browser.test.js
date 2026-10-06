@@ -313,6 +313,67 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await context.close();
   });
 
+  it("employer invitations escape XSS in candidate name", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+    const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+    const payload = 'Тест <img src=x onerror="document.title=\'HC-XSS-BROWSER\'">';
+    db.prepare("UPDATE candidate_profiles SET display_name = ? WHERE user_id = ?").run(payload, boris.id);
+    db.close();
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/invitations`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".invite-card", { timeout: 20000 });
+    assert.equal(await page.locator(".invite-card img").count(), 0);
+    const title = await page.title();
+    assert.notEqual(title, "HC-XSS-BROWSER");
+    await context.close();
+  });
+
+  it("employer deck shows need switcher and honors ?need=", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+    const { newId } = require("../app/lib/ids");
+    const secondId = newId();
+    db.prepare(
+      `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, active)
+       VALUES (?, ?, 'R21 switch need', 'backend', 'middle', '[]', '', 1)`
+    ).run(secondId, cafe.id);
+    db.close();
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/deck?need=${secondId}`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector("#employer-need-switch", { timeout: 20000 });
+    const selected = await page.$eval("#employer-need-switch", (el) => el.value);
+    assert.equal(selected, secondId);
+    await context.close();
+  });
+
+  it("candidate tasks template uses single neutral cooldown copy", () => {
+    const src = fs.readFileSync(path.join(ROOT, "app/public/candidate/tasks.html"), "utf8");
+    assert.match(src, /Пересдать тест можно после/);
+    assert.ok(!src.includes('field-error">Пересдача возможна'));
+  });
+
+  it("candidate today uses locked improve control without duplicate footer CTAs", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "boris@demo.local");
+    await page.goto(`${BASE}/candidate/today`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".stat-tile-grid-today", { timeout: 20000 });
+    const footerDup = await page.locator('.form-actions a:has-text("Профиль")').count();
+    assert.equal(footerDup, 0);
+    const locked = await page.locator(".btn-improve-locked, .btn-primary:has-text('Улучшить')").count();
+    assert.ok(locked >= 1);
+    await context.close();
+  });
+
   it("call room sets live lede after join handler (source check)", () => {
     const src = fs.readFileSync(path.join(ROOT, "app/public/call.js"), "utf8");
     assert.match(src, /setCallLede\([\s\S]*эфир/i);
@@ -326,8 +387,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await page.goto(`${BASE}/candidate/integrations`, { waitUntil: "commit", timeout: 30000 });
     await page.fill("#token-name", "Browser test token");
     await page.fill("#client-where", "Cursor");
-    await page.check("#logging-consent");
-    await page.check("#scope-write");
+    await page.check("#logging-consent", { force: true });
+    await page.check("#scope-write", { force: true });
     await page.click("#create-token", { force: true });
     await page.waitForFunction(() => {
       const raw = document.getElementById("token-raw");

@@ -11,7 +11,7 @@
     "validate:assessment": "node scripts/validate-assessment.js",
     "validate:matching": "node scripts/validate-matching.js",
     "validate:privacy": "node scripts/validate-privacy.js",
-    "validate": "npm run validate:assessment && npm run validate:matching && npm run validate:privacy",
+    "validate": "npm run validate:assessment && npm run validate:matching && npm run validate:privacy && node scripts/check-public-template-escape.js",
     "test:browser": "RUN_BROWSER=1 node --test test/cabinet-browser.test.js && node --test scripts/browser-integrations.test.js"
   },
   "bin": {

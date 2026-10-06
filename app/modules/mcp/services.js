@@ -22,6 +22,7 @@ const {
   validateOptionalEmail,
   validateOptionalPhone,
 } = require("../../lib/validation");
+const { validateNeedBody } = require("../../lib/need-validation");
 
 function mcpError(message, code = "invalid_request") {
   const err = new Error(message);
@@ -305,21 +306,28 @@ function listEmployerNeeds(userId) {
 }
 
 function createEmployerNeed(userId, body) {
+  const parsed = validateNeedBody(body || {}, { requireTitle: true });
+  if (!parsed.ok) {
+    const msg = Object.values(parsed.fields)[0] || "Некорректные данные потребности";
+    throw mcpError(msg, "invalid_body");
+  }
   const id = newId();
-  const {
-    title = "",
-    specialization = "backend",
-    grade = "middle",
-    stack = [],
-    domainText = "",
-    notes = "",
-  } = body || {};
+  const v = parsed.value;
   getDb()
     .prepare(
-      `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`
     )
-    .run(id, userId, title, specialization, grade, JSON.stringify(stack), domainText, notes);
+    .run(
+      id,
+      userId,
+      v.title,
+      v.specialization || "backend",
+      v.grade || "middle",
+      JSON.stringify(v.stack || []),
+      v.domainText || "",
+      v.notes || ""
+    );
   return { id };
 }
 
@@ -329,17 +337,32 @@ function updateEmployerNeed(userId, needId, body) {
     .prepare("SELECT * FROM employer_needs WHERE id = ? AND employer_user_id = ?")
     .get(needId, userId);
   if (!n) throw mcpError("Потребность не найдена", "not_found");
+  const merged = {
+    title: body?.title ?? n.title,
+    specialization: body?.specialization ?? n.specialization,
+    grade: body?.grade ?? n.grade,
+    stack: body?.stack !== undefined ? body.stack : JSON.parse(n.stack_json || "[]"),
+    domainText: body?.domainText ?? n.domain_text,
+    notes: body?.notes ?? n.notes,
+    active: body?.active,
+  };
+  const parsed = validateNeedBody(merged, { requireTitle: true });
+  if (!parsed.ok) {
+    const msg = Object.values(parsed.fields)[0] || "Некорректные данные потребности";
+    throw mcpError(msg, "invalid_body");
+  }
+  const v = parsed.value;
   db.prepare(
     `UPDATE employer_needs SET title = ?, specialization = ?, grade = ?, stack_json = ?, domain_text = ?, notes = ?, active = ?
      WHERE id = ?`
   ).run(
-    body.title ?? n.title,
-    body.specialization ?? n.specialization,
-    body.grade ?? n.grade,
-    JSON.stringify(body.stack ?? JSON.parse(n.stack_json)),
-    body.domainText ?? n.domain_text,
-    body.notes ?? n.notes,
-    body.active === undefined ? n.active : body.active ? 1 : 0,
+    v.title,
+    v.specialization,
+    v.grade,
+    JSON.stringify(v.stack || []),
+    v.domainText || "",
+    v.notes || "",
+    v.active === undefined ? n.active : v.active ? 1 : 0,
     n.id
   );
   return { ok: true };

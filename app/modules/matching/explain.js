@@ -1,5 +1,7 @@
 "use strict";
 
+const { stackOverlapTokens } = require("../../lib/stack-normalize");
+
 function buildExplanation(candidate, need) {
   const lines = [];
   const gradeLabel = need.grade.charAt(0).toUpperCase() + need.grade.slice(1);
@@ -17,9 +19,7 @@ function buildExplanation(candidate, need) {
     lines.push("Есть достижения ФСП в профиле");
   }
   const needStack = JSON.parse(need.stack_json || "[]");
-  const overlap = needStack.filter((s) =>
-    candidate.stack.some((c) => String(c).toLowerCase() === String(s).toLowerCase())
-  );
+  const overlap = stackOverlapTokens(needStack, candidate.stack);
   if (overlap.length) {
     lines.push(`Совпадает стек: ${overlap.join(", ")}`);
   }

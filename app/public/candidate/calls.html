@@ -56,18 +56,19 @@
       }
 
       function callCard(row, prominent) {
+        const esc = HandCheck.escapeHtml;
         const statusCls = HandCheck.callStatusClass(row.callStatus);
         const salary = HandCheck.formatSalaryRange(row.salaryFrom, row.salaryTo);
         const when = formatCallWhen(row);
         const cta =
           row.callStatus === "ready" || row.callStatus === "live"
-            ? `<a class="btn-primary${prominent ? "" : " btn-sm"}" href="${row.roomUrl}">Комната</a>`
+            ? `<a class="btn-primary${prominent ? "" : " btn-sm"}" href="${esc(row.roomUrl)}">Комната</a>`
             : "";
         return `<article class="invite-card invite-card-expressive call-card call-card-${statusCls}">
           <div class="invite-card-top">
             <div>
-              <h3>${row.companyName}</h3>
-              <p class="invite-meta">${row.needTitle}</p>
+              <h3>${esc(row.companyName)}</h3>
+              <p class="invite-meta">${esc(row.needTitle || "")}</p>
             </div>
             <span class="status-pill ${statusCls}">${HandCheck.callStatusLabel(row.callStatus)}</span>
           </div>

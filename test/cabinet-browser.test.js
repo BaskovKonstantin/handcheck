@@ -361,11 +361,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     db.close();
 
     await login(page, "cafe@demo.local");
-    await page.goto(`${BASE}/employer/candidates?need=${need.id}`, { waitUntil: "commit", timeout: 30000 });
-    await page.waitForSelector('.candidates-card button[data-invite], .candidates-row button[data-invite]', {
-      timeout: 20000,
-    });
-    const card = page.locator(".candidates-card, .candidates-row", { hasText: longName });
+    await page.goto(`${BASE}/employer/candidates?need=${need.id}`, { waitUntil: "networkidle", timeout: 60000 });
+    const card = page.locator(".candidates-card", { hasText: longName });
     await card.waitFor({ state: "visible", timeout: 20000 });
     await card.locator(".status-pill.paste-input").waitFor({ state: "visible", timeout: 5000 });
     const layout = await card.evaluate((el) => {

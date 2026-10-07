@@ -4,6 +4,7 @@
   const DRAFT_KEY_PREFIX = "handcheck:draft:v1:";
   const LOCAL_DRAFT_DEBOUNCE_MS = 1000;
   const WORK_SERVER_DRAFT_INTERVAL_MS = 10000;
+  const LIFECYCLE_KEEPALIVE_DEDUPE_MS = 3000;
   const KEEPALIVE_BODY_LIMIT = 60 * 1024;
 
   function draftStorageKey(attemptId) {
@@ -76,6 +77,7 @@
     const draftKey = draftStorageKey(attemptId);
     let localTimer = null;
     let serverTimer = null;
+    let lastLifecycleKeepaliveAt = 0;
 
     const writeLocalNow = () => {
       if (shouldSkip?.()) return;
@@ -98,7 +100,11 @@
       if (shouldSkip?.()) return;
       clearTimeout(localTimer);
       writeLocalNow();
-      if (taskType === "work") sendDraftPatchKeepalive(attemptId, getText());
+      if (taskType !== "work") return;
+      const now = Date.now();
+      if (now - lastLifecycleKeepaliveAt < LIFECYCLE_KEEPALIVE_DEDUPE_MS) return;
+      lastLifecycleKeepaliveAt = now;
+      sendDraftPatchKeepalive(attemptId, getText());
     };
 
     const start = () => {

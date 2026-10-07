@@ -5,6 +5,8 @@ const { KEEPALIVE_BODY_LIMIT } = require("./recording-chunk-policy");
 const DRAFT_KEY_PREFIX = "handcheck:draft:v1:";
 const LOCAL_DRAFT_DEBOUNCE_MS = 1000;
 const WORK_SERVER_DRAFT_INTERVAL_MS = 10000;
+/** pagehide and visibilitychange both fire on reload — one keepalive per hide */
+const LIFECYCLE_KEEPALIVE_DEDUPE_MS = 3000;
 
 function draftStorageKey(attemptId) {
   return `${DRAFT_KEY_PREFIX}${attemptId}`;
@@ -83,6 +85,7 @@ function createWorkDraftLifecycle(options) {
   const draftKey = draftStorageKey(attemptId);
   let localTimer = null;
   let serverTimer = null;
+  let lastLifecycleKeepaliveAt = 0;
 
   const writeLocalNow = () => {
     if (shouldSkip?.()) return;
@@ -105,9 +108,11 @@ function createWorkDraftLifecycle(options) {
     if (shouldSkip?.()) return;
     clearTimeout(localTimer);
     writeLocalNow();
-    if (taskType === "work") {
-      sendDraftPatchKeepalive(attemptId, getText(), keepaliveDeps);
-    }
+    if (taskType !== "work") return;
+    const now = Date.now();
+    if (now - lastLifecycleKeepaliveAt < LIFECYCLE_KEEPALIVE_DEDUPE_MS) return;
+    lastLifecycleKeepaliveAt = now;
+    sendDraftPatchKeepalive(attemptId, getText(), keepaliveDeps);
   };
 
   const start = () => {
@@ -139,6 +144,7 @@ module.exports = {
   DRAFT_KEY_PREFIX,
   LOCAL_DRAFT_DEBOUNCE_MS,
   WORK_SERVER_DRAFT_INTERVAL_MS,
+  LIFECYCLE_KEEPALIVE_DEDUPE_MS,
   draftStorageKey,
   parseStoredDraft,
   pickRestoredDraftText,

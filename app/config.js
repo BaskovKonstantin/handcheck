@@ -40,6 +40,7 @@ function resolveSessionSecret() {
   return secret;
 }
 
+/** 152-ФЗ operator notice: PRIVACY_OPERATOR_NAME, PRIVACY_OPERATOR_INN, PRIVACY_OPERATOR_EMAIL */
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://127.0.0.1:8810";
 
 function cookieSecureFromAppUrl(baseUrl) {

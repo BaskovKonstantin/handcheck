@@ -82,7 +82,8 @@ function callDurationLabel(startedAt, endedAt) {
   const sec = Math.round(ms / 1000);
   if (sec < 60) return `Короткий звонок, меньше минуты`;
   const min = Math.floor(sec / 60);
-  return `Длительность около ${min} мин`;
+  if (min === 1) return `Около минуты`;
+  return `Около ${min} мин`;
 }
 
 function ensureCall(invitationId) {

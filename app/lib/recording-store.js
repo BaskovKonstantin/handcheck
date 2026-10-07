@@ -3,8 +3,14 @@
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
-const { fixWebmDuration } = require("fix-webm-duration");
 const { isWebmBuffer } = require("./webm");
+const {
+  ffmpegAvailable,
+  concatSessionWebmBuffers,
+  remuxWebmBuffer,
+  readDurationSecondsFromBuffer,
+  patchWebmDurationHint,
+} = require("./webm-ffmpeg");
 const { MIN_PLAYABLE_RECORDING_BYTES, isPlayableRecordingFile } = require("./call-recording");
 
 function callsRoot() {
@@ -62,6 +68,55 @@ function mergeBuffers(buffers) {
   return Buffer.concat(parts.map((b, i) => normalizeChunkPart(b, i === 0)));
 }
 
+function groupChunkBuffersIntoSessions(buffers) {
+  const sessions = [];
+  let current = [];
+  for (const buf of buffers) {
+    if (!buf?.length) continue;
+    if (isWebmBuffer(buf) && current.length > 0) {
+      sessions.push(mergeBuffers(current));
+      current = [buf];
+    } else {
+      current.push(buf);
+    }
+  }
+  if (current.length) sessions.push(mergeBuffers(current));
+  return sessions;
+}
+
+function finalizeMergedWebm(buffers, durationMs) {
+  const parts = buffers.filter((b) => b && b.length);
+  if (!parts.length) return null;
+  const sessions = groupChunkBuffersIntoSessions(parts);
+  if (
+    ffmpegAvailable() &&
+    sessions.length > 0 &&
+    sessions.every((s) => isWebmBuffer(s) && s.length >= 1024)
+  ) {
+    try {
+      let merged =
+        sessions.length === 1 ? remuxWebmBuffer(sessions[0]) : concatSessionWebmBuffers(sessions);
+      if (merged?.length) {
+        merged = remuxWebmBuffer(merged);
+        if (merged.length >= MIN_PLAYABLE_RECORDING_BYTES) {
+          const probed = readDurationSecondsFromBuffer(merged);
+          if (!probed || probed <= 0) {
+            merged = patchWebmDurationHint(merged, durationMs);
+          }
+          const after = readDurationSecondsFromBuffer(merged);
+          if ((after && after > 0) || merged.length >= MIN_PLAYABLE_RECORDING_BYTES) {
+            return merged;
+          }
+        }
+      }
+    } catch {
+      /* invalid WebM fixture or ffmpeg error — fall back to byte merge */
+    }
+  }
+  const merged = mergeBuffers(parts);
+  return merged?.length ? merged : null;
+}
+
 function totalChunkBytes(callId, side) {
   return listChunkFiles(callId, side).reduce((sum, p) => sum + fs.statSync(p).size, 0);
 }
@@ -70,14 +125,8 @@ function mergeChunksToFinal(callId, side, tailBuffer, durationMs) {
   const parts = listChunkFiles(callId, side).map((p) => fs.readFileSync(p));
   if (tailBuffer?.length) parts.push(tailBuffer);
   if (!parts.length) return null;
-  let merged = mergeBuffers(parts);
-  if (durationMs && Number.isFinite(durationMs) && durationMs > 0) {
-    try {
-      merged = Buffer.from(fixWebmDuration(merged, durationMs));
-    } catch {
-      /* keep merged without duration patch */
-    }
-  }
+  const merged = finalizeMergedWebm(parts, durationMs);
+  if (!merged) return null;
   const finalPath = path.join(callDir(callId), `${side}.webm`);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
   if (merged.length < MIN_PLAYABLE_RECORDING_BYTES) return null;
@@ -89,14 +138,8 @@ function writeFinalRecording(callId, side, buffer, durationMs) {
   const parts = listChunkFiles(callId, side).map((p) => fs.readFileSync(p));
   if (buffer?.length) parts.push(buffer);
   if (!parts.length) return null;
-  let merged = mergeBuffers(parts);
-  if (durationMs && Number.isFinite(durationMs) && durationMs > 0) {
-    try {
-      merged = Buffer.from(fixWebmDuration(merged, durationMs));
-    } catch {
-      /* ignore */
-    }
-  }
+  const merged = finalizeMergedWebm(parts, durationMs);
+  if (!merged) return null;
   const finalPath = path.join(callDir(callId), `${side}.webm`);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
   if (merged.length < MIN_PLAYABLE_RECORDING_BYTES) {
@@ -132,5 +175,7 @@ module.exports = {
   listChunkFiles,
   totalChunkBytes,
   mergeBuffers,
+  groupChunkBuffersIntoSessions,
+  finalizeMergedWebm,
   finalizeOrphanChunkSides,
 };

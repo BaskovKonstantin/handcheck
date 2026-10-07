@@ -75,10 +75,13 @@
     let localStream = null;
     let remoteStream = null;
     let recorder = null;
-    let recorderChunks = [];
     let uploadedChunkCount = 0;
     let chunkUploadFailed = false;
     let chunkUploadTimer = null;
+    let chunkQueue = null;
+    let peerLeft = false;
+    let peerWasConnected = false;
+    let disconnectSince = null;
     let speech = null;
     let speechNoteShown = false;
     let speechStopped = false;
@@ -138,11 +141,29 @@
         emit({});
       };
       pc.onconnectionstatechange = () => {
-        emit({ connectionState: pc.connectionState });
+        const state = pc.connectionState;
+        if (state === "connected") {
+          peerWasConnected = true;
+          disconnectSince = null;
+        } else if (
+          peerWasConnected &&
+          !peerLeft &&
+          !ended &&
+          ["disconnected", "failed"].includes(state)
+        ) {
+          if (!disconnectSince) disconnectSince = Date.now();
+          const stuckMs = Date.now() - disconnectSince;
+          if (stuckMs > 25_000) {
+            peerLeft = true;
+            emit({ peerLeft: true, peerConnected: false, connectionState: state });
+          }
+        }
+        emit({ connectionState: state, peerLeft });
         if (
           role === "employer" &&
           !ended &&
-          ["disconnected", "failed"].includes(pc.connectionState)
+          !peerLeft &&
+          ["disconnected", "failed"].includes(state)
         ) {
           setTimeout(() => sendOffer().catch(() => {}), 400);
         }
@@ -156,6 +177,8 @@
     async function handleSignal(msg) {
       if (!msg || ended) return;
       if (msg.t === WS_SIGNAL.HELLO) {
+        peerLeft = false;
+        disconnectSince = null;
         if (role === "employer") {
           await resetPeerIfNeeded();
           await sendOffer();
@@ -211,6 +234,8 @@
         }
       } else if (msg.t === WS_SIGNAL.ENDED) {
         if (ended) return;
+        peerLeft = true;
+        emit({ peerLeft: true, peerConnected: false });
         ended = true;
         if (typeof onPeerEnded === "function") onPeerEnded();
       }
@@ -333,14 +358,24 @@
         emit({ recording: false, recordingUnavailable: true });
         return;
       }
-      recorderChunks = [];
+      const { createRecordingChunkQueue } = global.HandCheckRecordingChunkQueue || {};
+      chunkQueue = createRecordingChunkQueue
+        ? createRecordingChunkQueue({
+            uploadBlob: async (parts) => {
+              const blob = new Blob(parts, { type: mime });
+              await uploadRecordingChunk(blob);
+            },
+          })
+        : null;
       recorder = new MediaRecorder(stream, {
         mimeType: mime,
         videoBitsPerSecond: RECORDER_VIDEO_BPS,
         audioBitsPerSecond: RECORDER_AUDIO_BPS,
       });
       recorder.ondataavailable = (ev) => {
-        if (ev.data && ev.data.size > 0) recorderChunks.push(ev.data);
+        if (ev.data && ev.data.size > 0) {
+          if (chunkQueue) chunkQueue.push(ev.data);
+        }
       };
       recorder.start(1000);
       emit({ recording: true });
@@ -369,17 +404,20 @@
     }
 
     async function flushRecordingChunks() {
-      if (!recorderChunks.length) return;
-      const mime = pickRecorderMime() || "video/webm";
-      const pending = recorderChunks.slice();
-      const blob = new Blob(pending, { type: mime });
-      if (!blob.size) return;
+      if (!chunkQueue) return;
+      await chunkQueue.flush();
+    }
+
+    function liveDurationMs() {
+      const key = `handcheck_call_live_${callId}`;
+      let since = liveStartedAt;
       try {
-        await uploadRecordingChunk(blob);
-        recorderChunks = [];
+        const stored = global.sessionStorage?.getItem(key);
+        if (stored) since = Number(stored) || since;
       } catch {
-        throw new Error("chunk_upload_failed");
+        /* ignore */
       }
+      return since != null ? Math.max(0, Date.now() - since) : 0;
     }
 
     function startChunkUploadLoop() {
@@ -394,34 +432,39 @@
         });
       }, CHUNK_UPLOAD_MS);
       const onPageHide = () => {
-        if (!recorderChunks.length) return;
         const mime = pickRecorderMime() || "video/webm";
-        const blob = new Blob(recorderChunks, { type: mime });
-        recorderChunks = [];
-        const form = new FormData();
-        form.append("file", blob, "chunk-emergency.webm");
-        void postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size).catch(() => {});
+        void flushRecordingChunks()
+          .then(() => {
+            const tail = chunkQueue?.drainRemainingBlobs(mime);
+            if (!tail?.size) return;
+            const form = new FormData();
+            form.append("file", tail, "chunk-emergency.webm");
+            return postMultipart(`/api/calls/${callId}/recording-chunk`, form, tail.size);
+          })
+          .catch(() => {});
       };
       global.addEventListener("pagehide", onPageHide);
     }
 
+    let uploadRecordingLock = Promise.resolve();
+
     async function uploadRecording() {
-      if (recorder && recorder.state !== "inactive") {
-        await new Promise((resolve) => {
-          recorder.onstop = () => resolve();
-          recorder.stop();
-        });
-      }
-      try {
-        await flushRecordingChunks();
-      } catch {
-        chunkUploadFailed = true;
-      }
-      const mime = pickRecorderMime() || "video/webm";
-      const tail = recorderChunks.length ? new Blob(recorderChunks, { type: mime }) : null;
-      recorderChunks = [];
-      const durationMs =
-        liveStartedAt != null ? Math.max(0, Date.now() - liveStartedAt) : 0;
+      const run = async () => {
+        if (recorder && recorder.state !== "inactive") {
+          await new Promise((resolve) => {
+            recorder.onstop = () => resolve();
+            recorder.stop();
+          });
+        }
+        try {
+          await flushRecordingChunks();
+          if (chunkQueue) await chunkQueue.waitForIdle();
+        } catch {
+          chunkUploadFailed = true;
+        }
+        const mime = pickRecorderMime() || "video/webm";
+        const tail = chunkQueue ? chunkQueue.drainRemainingBlobs(mime) : null;
+        const durationMs = liveDurationMs();
       const form = new FormData();
       if (tail?.size) {
         form.append("file", tail, "recording.webm");
@@ -429,16 +472,19 @@
       form.append("durationMs", String(durationMs));
       const bodySize = tail?.size || 0;
       const res = await postMultipart(`/api/calls/${callId}/recording`, form, bodySize);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        const code = err?.error || `recording_upload_${res.status}`;
-        const message =
-          res.status === 413
-            ? "Запись слишком большая (максимум 80 МБ). Сократите звонок или обратитесь в поддержку."
-            : HandCheck.formatApiError?.({ data: err, message: code }) || "Не удалось сохранить запись";
-        if (typeof onUploadError === "function") onUploadError(message);
-        throw new Error(code);
-      }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const code = err?.error || `recording_upload_${res.status}`;
+          const message =
+            res.status === 413
+              ? "Запись слишком большая (максимум 80 МБ). Сократите звонок или обратитесь в поддержку."
+              : HandCheck.formatApiError?.({ data: err, message: code }) || "Не удалось сохранить запись";
+          if (typeof onUploadError === "function") onUploadError(message);
+          throw new Error(code);
+        }
+      };
+      uploadRecordingLock = uploadRecordingLock.then(run, run);
+      return uploadRecordingLock;
     }
 
     function startStatusPoll(onEndedRemote) {
@@ -474,6 +520,14 @@
         if (liveFeaturesStarted) return;
         liveFeaturesStarted = true;
         liveStartedAt = Date.now();
+        try {
+          const key = `handcheck_call_live_${callId}`;
+          if (!global.sessionStorage?.getItem(key)) {
+            global.sessionStorage?.setItem(key, String(liveStartedAt));
+          }
+        } catch {
+          /* ignore */
+        }
         startRecorder(localStream);
         startChunkUploadLoop();
         startSpeechRecognition();

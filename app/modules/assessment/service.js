@@ -67,8 +67,10 @@ function scoreBatteryAttempts(batteryId, claimedGrade) {
     .all(batteryId);
   const quickScores = [];
   let workScore = { knowledge: 0, breadth: 0 };
+  const rubricsByAttemptId = new Map();
   for (const a of attempts) {
     const rubric = JSON.parse(a.rubric_json);
+    rubricsByAttemptId.set(a.id, rubric);
     if (a.type === "quick") {
       quickScores.push(scoreQuick(a.answer_text, rubric));
     } else {
@@ -76,7 +78,7 @@ function scoreBatteryAttempts(batteryId, claimedGrade) {
     }
   }
   let agg = aggregateBattery(quickScores, workScore);
-  agg = applyBatteryScoreGuards(agg, attempts);
+  agg = applyBatteryScoreGuards(agg, attempts, { rubricsByAttemptId });
   const cutoff = cutoffForGrade(claimedGrade);
   const passed = agg.test_score >= cutoff;
   let label = null;

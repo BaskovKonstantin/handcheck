@@ -17,11 +17,20 @@ function callDurationSeconds(call) {
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
 }
 
+function formatMinutesAboutRu(mins) {
+  const n = Math.max(1, Math.round(mins));
+  if (n === 1) return "минуты";
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} минуты`;
+  return `${n} минут`;
+}
+
 function durationPhrase(seconds) {
   if (seconds == null) return "Длительность звонка не зафиксирована.";
   if (seconds < 60) return "Короткий звонок, меньше минуты.";
   const mins = Math.max(1, Math.round(seconds / 60));
-  return `Около ${mins} минут разговора.`;
+  return `Около ${formatMinutesAboutRu(mins)} разговора.`;
 }
 
 function bothSidesSpokeInTranscript(transcript) {
@@ -87,6 +96,7 @@ function buildCallAnalysisSummary({ needDomainText, transcript, call, hasRecordi
 
 module.exports = {
   callDurationSeconds,
+  formatMinutesAboutRu,
   durationPhrase,
   bothSidesSpokeInTranscript,
   buildCallAnalysisSummary,

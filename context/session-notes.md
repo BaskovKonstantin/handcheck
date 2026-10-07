@@ -1,12 +1,7 @@
 # HandCheck session notes
 
-## Round 33 fixes (branch cursor/round33-findings-f12b)
+## Round 38 (branch cursor/round38-findings-0d57)
 
-- **P0-1 recordings:** removed keepalive on large chunk/final uploads; continuation WebM chunks accepted; no minimalWebm stub; merge strips duplicate EBML; playable-only `hasRecording` / `recordingSides` (≥4 KB); upload before `/end` to avoid race with broadcast ENDED.
-- **P1-1 timeout UI:** direct timeout submit (not disabled `.click()`); reload auto-submit when deadline passed; empty submit after 60s server timeout path.
-- **P1-2:** PATCH draft rejected after quick/work deadline.
-- **P1-3:** `bootPublicPage` for `/privacy`; no auth redirect when role is null; links on landing/auth.
-- **P1-4:** transactional battery start returns existing open battery.
-- **P1-5:** WebRTC signalingState guards + ignore duplicate ENDED.
-- **P1-6:** login wait timeouts increased in cabinet browser tests.
-- **P2:** typing batches / excludes paste chars; mobile test layout; lowercase ended pill; sidebar full-height background; test completion after last answer; honest recording upload label.
+- **P0-1 recordings:** server-side ffmpeg remux (`webm-ffmpeg.js`), session grouping on EBML boundaries, duration patch via `-t`; client serialised chunk queue (`recording-chunk-queue.js`), no wholesale `recorderChunks` clear; cumulative `durationMs` via sessionStorage; removed broken `fix-webm-duration` in Node.
+- **P2:** keyword-list / duplicate-body traps in `rubric-score.js`; honest per-question fixture answers; mobile test step strip; privacy operator from env + `/api/privacy-notice`; telemetry flush on pagehide; copy fixes (duration label, minutes plural, Today dedupe, peer left, «Есть запись»).
+- **CI:** ffmpeg in Dockerfile and GitHub Actions.

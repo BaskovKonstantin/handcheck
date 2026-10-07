@@ -1105,9 +1105,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       }, invId);
       const minDurSec = liveMs * 0.001 * 0.75;
       for (const side of ["employer", "candidate"]) {
-        if (Number.isFinite(durs[side]) && durs[side] > 0 && Number.isFinite(minDurSec)) {
-          assert.ok(durs[side] >= minDurSec * 0.5, `${side} dur ${durs[side]}`);
-        }
+        assert.ok(Number.isFinite(durs[side]) && durs[side] > 0, `${side} video.duration must be finite, got ${durs[side]}`);
+        assert.ok(durs[side] >= minDurSec * 0.5, `${side} dur ${durs[side]} < ${minDurSec * 0.5}`);
       }
       await empCtx.close();
       await candCtx.close();
@@ -1164,6 +1163,35 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       .get(attemptId).c;
     db.close();
     assert.ok(pasteCount >= 1, `paste events ${pasteCount}`);
+    await context.close();
+  });
+
+  it("round38: mobile test question keeps submit above tab bar at 390x844", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const email = `r38-layout-${Date.now()}@demo.local`;
+    await context.request.post(`${BASE}/api/auth/register`, {
+      data: { email, password: PASS, role: "candidate" },
+    });
+    await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
+    const loginRes = await context.request.post(`${BASE}/api/auth/login`, {
+      data: { email, password: PASS },
+    });
+    assert.ok(loginRes.ok());
+    const page = await context.newPage();
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit" });
+    await page.waitForSelector("#assessment-privacy", { timeout: 15000 });
+    await page.check("#assessment-privacy", { force: true });
+    await page.click("#start", { force: true });
+    await page.waitForSelector("#open-q", { timeout: 15000 });
+    await page.click("#open-q", { force: true });
+    await page.waitForSelector("#submit", { timeout: 15000 });
+    const box = await page.locator("#submit").boundingBox();
+    assert.ok(box, "submit missing");
+    const tabTop = await page.evaluate(() => {
+      const nav = document.querySelector(".cabinet-mobile-nav");
+      return nav ? nav.getBoundingClientRect().top : window.innerHeight;
+    });
+    assert.ok(box.y + box.height <= tabTop - 4, `submit bottom ${box.y + box.height} tab ${tabTop}`);
     await context.close();
   });
 

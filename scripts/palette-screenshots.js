@@ -4,7 +4,7 @@ const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
 
-const OUT = path.join(__dirname, "..", "handcheck-ui", "round66", "mercor-after");
+const OUT = path.join(__dirname, "..", "handcheck-ui", "round66", "palette-after");
 const BASE = process.env.HC_SCREEN_BASE || "http://127.0.0.1:8811";
 const PASS = "demo-demo-demo";
 
@@ -13,11 +13,8 @@ const PAGES = [
   { name: "auth", url: "/auth", auth: false },
   { name: "candidate-today", url: "/candidate/today", auth: "anna@demo.local" },
   { name: "candidate-tasks", url: "/candidate/tasks", auth: "anna@demo.local" },
-  { name: "candidate-invitations", url: "/candidate/invitations", auth: "anna@demo.local" },
-  { name: "candidate-calls", url: "/candidate/calls", auth: "anna@demo.local" },
   { name: "employer-deck", url: "/employer/deck", auth: "cafe@demo.local" },
   { name: "employer-list", url: "/employer/list", auth: "cafe@demo.local" },
-  { name: "employer-need", url: "/employer/need", auth: "cafe@demo.local" },
 ];
 
 async function login(page, email) {
@@ -37,11 +34,12 @@ async function main() {
       const page = await context.newPage();
       if (p.auth) await login(page, p.auth);
       await page.goto(`${BASE}${p.url}`, { waitUntil: "networkidle", timeout: 45000 });
-      await page.waitForTimeout(500);
-      const file = path.join(OUT, `${p.name}-${width}.png`);
-      await page.screenshot({ path: file, fullPage: true });
+      await page.waitForTimeout(400);
+      await page.screenshot({
+        path: path.join(OUT, `${p.name}-${width}.png`),
+        fullPage: true,
+      });
       await context.close();
-      console.log("wrote", file);
     }
   }
   await browser.close();

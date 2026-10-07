@@ -49,8 +49,8 @@ const API_RETRIES = 2;
 
 (function preloadAppFonts() {
   const hrefs = [
-    "/fonts/inter/inter-cyrillic-wght-normal.woff2",
-    "/fonts/inter/inter-latin-wght-normal.woff2",
+    "/fonts/manrope/manrope-cyrillic-wght-normal.woff2",
+    "/fonts/onest/onest-cyrillic-wght-normal.woff2",
   ];
   for (const href of hrefs) {
     if (document.querySelector(`link[data-hc-preload="${href}"]`)) continue;
@@ -470,10 +470,10 @@ function renderGradeRelationBar(label, gradeRelation, categoryStatus) {
   const hint = GRADE_RELATION_HINT[rel] || GRADE_RELATION_HINT.exact;
   const fillClass =
     rel === "lower"
-      ? "grade-relation-fill-orange"
+      ? "grade-relation-fill-lower"
       : rel === "higher"
-        ? "grade-relation-fill-blue"
-        : "grade-relation-fill-indigo";
+        ? "grade-relation-fill-higher"
+        : "grade-relation-fill-exact";
   return `<div class="grade-relation-row" role="img" aria-label="${escapeHtml(label)}: ${hint}">
     <div class="grade-relation-head">
       <span class="grade-relation-label">${escapeHtml(label)}</span>

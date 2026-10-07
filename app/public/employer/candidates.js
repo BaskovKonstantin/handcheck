@@ -225,6 +225,7 @@ function cardHtml(r) {
       ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}
     </div>
     <div class="chip-row chip-row-skills">${stack}</div>
+    ${HandCheck.renderPasteInputMark(r.pasteInputMark)}
     <p class="invite-meta">${esc(statusLabel(r))} · ${r.hasFsp ? "ФСП" : "без ФСП"}</p>
     <button type="button" class="btn-primary btn-sm" data-invite="${esc(r.id)}">Пригласить</button>
   </article>`;

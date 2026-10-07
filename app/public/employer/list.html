@@ -140,7 +140,7 @@
               return `<div class="list-row-card list-row-card-rich">
                 <div class="list-row-main">
                   <strong>${esc(r.displayName || "Кандидат")}</strong>
-                  ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus)}
+                  ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}
                   ${invited}
                   ${domains ? `<div class="chip-row">${domains}</div>` : ""}
                   ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}

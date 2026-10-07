@@ -1,5 +1,12 @@
 # Session notes
 
+## 2026-10-07 — round 66 P2-1 (off-grade confirmed pool labels)
+
+- Branch: `cursor/round66-p2-1-grade-mismatch-dd1a`
+- Fix: same-spec confirmed Junior/Senior in Middle need pool keep real `categoryLabel` + `categoryStatus: confirmed`; `gradeRelation` + honest Russian `explanation`; rank exact → off-grade → unconfirmed.
+- UI: amber `.category-pill-grade-mismatch`; MCP `getDeckNext` passes `categoryStatus` / `gradeRelation`.
+- Tests: `test/round66-findings.test.js`.
+
 ## 2026-10-07 — CI ffmpeg install (PR apt stall)
 
 - Branch: `cursor/ci-ffmpeg-robust-2ebc`

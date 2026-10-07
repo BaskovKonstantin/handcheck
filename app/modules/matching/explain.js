@@ -1,12 +1,19 @@
 "use strict";
 
 const { stackOverlapTokens } = require("../../lib/stack-normalize");
+const {
+  buildGradeMatchExplanationLine,
+  gradeRelationForNeed,
+} = require("../../lib/grade-match");
 
 function buildExplanation(candidate, need) {
   const lines = [];
-  const gradeLabel = need.grade.charAt(0).toUpperCase() + need.grade.slice(1);
-  const specLabel = need.specialization.charAt(0).toUpperCase() + need.specialization.slice(1);
-  lines.push(`Категория совпадает с потребностью: ${specLabel} × ${gradeLabel}`);
+  const gradeRelation =
+    candidate.gradeRelation ||
+    gradeRelationForNeed(candidate.confirmedGrade, need.grade, candidate.categoryStatus);
+  lines.push(
+    buildGradeMatchExplanationLine(gradeRelation, candidate.confirmedGrade, need)
+  );
   if (candidate.domain_boost > 0) {
     const hint = String(need.domain_text || "").trim();
     lines.push(

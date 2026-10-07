@@ -5,6 +5,7 @@ const {
   CATEGORY_STATUS_CONFIRMED,
   applyUnconfirmedRankPenalty,
 } = require("./category-status");
+const { gradeMatchSortTier } = require("./grade-match");
 
 function fspBoost(hasAchievements) {
   return hasAchievements ? 1 : 0;
@@ -34,6 +35,9 @@ function rankCandidates(candidates, need) {
     return { ...c, domain_boost: db, fsp_boost: fb, rank, categoryStatus };
   });
   ranked.sort((a, b) => {
+    const aTier = gradeMatchSortTier(a.gradeRelation);
+    const bTier = gradeMatchSortTier(b.gradeRelation);
+    if (aTier !== bTier) return aTier - bTier;
     const aConfirmed = a.categoryStatus === CATEGORY_STATUS_CONFIRMED;
     const bConfirmed = b.categoryStatus === CATEGORY_STATUS_CONFIRMED;
     if (aConfirmed !== bConfirmed) return aConfirmed ? -1 : 1;

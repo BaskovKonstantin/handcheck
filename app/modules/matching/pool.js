@@ -12,6 +12,7 @@ const {
   CATEGORY_STATUS_UNCONFIRMED,
   unconfirmedLabelForNeed,
 } = require("../../lib/category-status");
+const { gradeRelationForNeed } = require("../../lib/grade-match");
 const { isEligibleForEmployerPool } = require("../../lib/employer-pool-eligibility");
 
 const UNCONFIRMED_TEST_SCORE = 0.38;
@@ -93,6 +94,7 @@ function pushCandidateRow(out, ctx) {
     row,
     categoryLabel,
     categoryStatus,
+    confirmedGrade,
     test_score,
     motivation,
     assigned_at,
@@ -105,12 +107,15 @@ function pushCandidateRow(out, ctx) {
     .prepare("SELECT COUNT(*) AS c FROM fsp_achievements WHERE candidate_user_id = ?")
     .get(row.user_id).c;
 
+  const gradeRelation = gradeRelationForNeed(confirmedGrade, need.grade, categoryStatus);
   out.push({
     id: row.user_id,
     reviewDecision: decision,
     displayName: publicCandidateDisplayName(row.display_name, row.email),
     categoryLabel,
     categoryStatus,
+    confirmedGrade: confirmedGrade || null,
+    gradeRelation,
     stack: JSON.parse(row.stack_json || "[]"),
     phone: row.phone,
     contact_email: row.contact_email,
@@ -131,17 +136,33 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
   const employerIsTest = Boolean(
     db.prepare("SELECT is_test FROM users WHERE id = ?").get(employerUserId)?.is_test
   );
+  const confirmedSelect = `SELECT u.id AS user_id, u.email, u.email_confirmed_at, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
+              cc.test_score, cc.motivation, cc.assigned_at, cc.grade AS confirmed_grade, c.label AS category_label,
+              priv.trust_ok`;
+
   const confirmedRows = db
     .prepare(
-      `SELECT u.id AS user_id, u.email, u.email_confirmed_at, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
-              cc.test_score, cc.motivation, cc.assigned_at, c.label AS category_label,
-              priv.trust_ok
+      `${confirmedSelect}
        FROM candidate_categories cc
        JOIN users u ON u.id = cc.candidate_user_id
        JOIN candidate_profiles cp ON cp.user_id = u.id
        JOIN categories c ON c.id = cc.category_id
        JOIN candidate_private priv ON priv.candidate_user_id = u.id
        WHERE cc.specialization = ? AND cc.grade = ?
+         AND cp.availability = 'open' AND priv.trust_ok = 1
+         AND u.email_confirmed_at IS NOT NULL`
+    )
+    .all(need.specialization, need.grade);
+
+  const offGradeRows = db
+    .prepare(
+      `${confirmedSelect}
+       FROM candidate_categories cc
+       JOIN users u ON u.id = cc.candidate_user_id
+       JOIN candidate_profiles cp ON cp.user_id = u.id
+       JOIN categories c ON c.id = cc.category_id
+       JOIN candidate_private priv ON priv.candidate_user_id = u.id
+       WHERE cc.specialization = ? AND cc.grade <> ?
          AND cp.availability = 'open' AND priv.trust_ok = 1
          AND u.email_confirmed_at IS NOT NULL`
     )
@@ -165,9 +186,14 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
            SELECT 1 FROM candidate_categories cc_other
            WHERE cc_other.candidate_user_id = u.id
              AND cc_other.specialization <> ?
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM candidate_categories cc_same_spec
+           WHERE cc_same_spec.candidate_user_id = u.id
+             AND cc_same_spec.specialization = ?
          )`
     )
-    .all(need.specialization, need.grade, need.specialization);
+    .all(need.specialization, need.grade, need.specialization, need.specialization);
 
   const out = [];
   const seen = new Set();
@@ -184,6 +210,27 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
       row: r,
       categoryLabel: r.category_label,
       categoryStatus: CATEGORY_STATUS_CONFIRMED,
+      confirmedGrade: r.confirmed_grade,
+      test_score: r.test_score,
+      motivation: r.motivation,
+      assigned_at: r.assigned_at,
+    });
+  }
+
+  for (const r of offGradeRows) {
+    if (!employerIsTest && r.is_test) continue;
+    if (!isEligibleForEmployerPool(r)) continue;
+    if (seen.has(r.user_id)) continue;
+    seen.add(r.user_id);
+    pushCandidateRow(out, {
+      db,
+      need,
+      employerUserId,
+      forDeck,
+      row: r,
+      categoryLabel: r.category_label,
+      categoryStatus: CATEGORY_STATUS_CONFIRMED,
+      confirmedGrade: r.confirmed_grade,
       test_score: r.test_score,
       motivation: r.motivation,
       assigned_at: r.assigned_at,
@@ -202,6 +249,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
       row: r,
       categoryLabel: unconfirmedLabelForNeed(need),
       categoryStatus: CATEGORY_STATUS_UNCONFIRMED,
+      confirmedGrade: null,
       test_score: UNCONFIRMED_TEST_SCORE,
       motivation: UNCONFIRMED_MOTIVATION,
       assigned_at: r.assigned_at,
@@ -215,6 +263,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
       id: c.id,
       categoryLabel: c.categoryLabel,
       categoryStatus: c.categoryStatus,
+      gradeRelation: c.gradeRelation,
       stack: c.stack,
       backgroundDomains: c.backgroundDomains,
       explanation,
@@ -247,6 +296,7 @@ function publicMatchShape(c) {
     displayName: c.displayName,
     categoryLabel: c.categoryLabel,
     categoryStatus: c.categoryStatus,
+    gradeRelation: c.gradeRelation,
     stack: c.stack,
     backgroundDomains: c.backgroundDomains,
     explanation: c.explanation,

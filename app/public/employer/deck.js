@@ -1,5 +1,29 @@
 let needId = null;
 let candidateId = null;
+let cachedNeeds = [];
+
+function setDeckLayoutVisible(show) {
+  const layout = document.getElementById("deck-layout");
+  if (layout) layout.hidden = !show;
+}
+
+async function refreshDeckNeedPanel(needs) {
+  const panel = document.getElementById("deck-need-panel");
+  if (!panel || !needId) return;
+  const need = (needs || cachedNeeds).find((n) => n.id === needId);
+  if (!need) {
+    panel.innerHTML = "";
+    return;
+  }
+  try {
+    const qs = window.location.search || "";
+    const data = await HandCheck.api(`/api/employer/needs/${needId}/matches${qs}`);
+    const stats = HandCheck.deckStatsFromMatches(data.items || []);
+    panel.innerHTML = HandCheck.renderDeckNeedPanel(need, stats);
+  } catch {
+    panel.innerHTML = HandCheck.renderDeckNeedPanel(need, { deckLeft: "—", invited: "—", deferred: "—" });
+  }
+}
 
 function validateSalaryRange(fromRaw, toRaw) {
   const fromMissing = fromRaw === "" || fromRaw === null || fromRaw === undefined;
@@ -71,6 +95,7 @@ async function loadNeed() {
   showDeckLoading();
   const needsRes = await HandCheck.api("/api/employer/needs");
   const needs = needsRes.items || [];
+  cachedNeeds = needs;
   const params = new URLSearchParams(location.search);
   needId = HandCheck.resolveEmployerNeedId(needs, params);
   if (needId) HandCheck.persistEmployerNeedId(needId);
@@ -83,6 +108,7 @@ async function loadNeed() {
     });
   }
   if (!needId) {
+    setDeckLayoutVisible(false);
     setDeckVisible(false);
     const emptyHost = document.getElementById("deck-empty");
     emptyHost.hidden = false;
@@ -94,6 +120,8 @@ async function loadNeed() {
     );
     return;
   }
+  setDeckLayoutVisible(true);
+  await refreshDeckNeedPanel(needs);
   await loadCard();
 }
 
@@ -124,6 +152,11 @@ function renderCard(data) {
         <div>
           <h2 class="deck-name">${esc(data.card.displayName)}</h2>
           ${HandCheck.renderCategoryPill(data.card.categoryLabel, data.card.categoryStatus, data.card.gradeRelation)}
+          ${HandCheck.renderGradeRelationBar(
+            data.card.categoryLabel,
+            data.card.gradeRelation,
+            data.card.categoryStatus
+          )}
           ${HandCheck.renderPasteInputMark(data.card.pasteInputMark)}
         </div>
       </div>
@@ -188,6 +221,7 @@ async function loadCard() {
   if (roundActions) roundActions.hidden = false;
   candidateId = data.candidateId;
   renderCard(data);
+  await refreshDeckNeedPanel(cachedNeeds);
 }
 
 function animateExit(cls) {

@@ -1,5 +1,18 @@
 # Session notes
 
+## 2026-10-07 — round 66 (cabinet UI polish)
+
+- Branch: `cursor/round66-design-polish-ec59`
+- Mobile deck: safe padding under floating actions + tab bar; deck-wrap overflow visible.
+- Desktop: full-width cabinet heroes; deck need stats panel; employer list grouped by match tier with collapse + «Показать ещё»; quieter list secondary actions; amber paste chip; candidate today zero-states + profile/integration steps + cooldown copy.
+- Sidebar tagline removed; screenshots in `handcheck-ui/round66/{before,after}/`.
+- Tests: `npm test`, `test/round66-design.test.js`.
+- Mobile list: stack actions under `.list-row-main` ≤640px; Playwright asserts `.list-row-main` width >200px at 360–430.
+- Merged `origin/main` (P2-1 grade mismatch labels): `gradeRelation` on pills + grouping.
+- Palette refresh: ocean slate + teal brand + rose CTA (`--forest`/`--clay` tokens); Golos Text body + Unbounded display (self-hosted woff2); iOS-like motion + `prefers-reduced-motion`.
+- Mercor restyle **reverted** per owner (PR #48 keeps round-66 polish only).
+- Palette **Slate Teal + Violet**: paper `#F4F7FB`, ink `#0C1222`, brand hero `#163B47`, primary CTA `#0D9488`, secondary `#7C3AED`; grade bars teal/amber/violet; fonts **Onest** (display) + **Manrope** (UI), self-hosted woff2. `renderGradeRelationBar` + amber paste chip retained.
+
 ## 2026-10-07 — round 66 P2-1 (off-grade confirmed pool labels)
 
 - Branch: `cursor/round66-p2-1-grade-mismatch-dd1a`

@@ -47,6 +47,80 @@ function formatSpecGradeLabel(specialization, grade) {
 const API_TIMEOUT_MS = 14000;
 const API_RETRIES = 2;
 
+(function preloadAppFonts() {
+  const hrefs = [
+    "/fonts/manrope/manrope-cyrillic-wght-normal.woff2",
+    "/fonts/onest/onest-cyrillic-wght-normal.woff2",
+  ];
+  for (const href of hrefs) {
+    if (document.querySelector(`link[data-hc-preload="${href}"]`)) continue;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "font";
+    link.type = "font/woff2";
+    link.crossOrigin = "anonymous";
+    link.href = href;
+    link.dataset.hcPreload = href;
+    document.head.appendChild(link);
+  }
+})();
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+}
+
+function updateCabinetNavIndicators() {
+  const asideIndicator = document.getElementById("cabinet-nav-indicator");
+  const asideActive = document.querySelector(".cabinet-aside .cabinet-nav-link.active");
+  if (asideIndicator && asideActive) {
+    asideIndicator.style.height = `${asideActive.offsetHeight}px`;
+    asideIndicator.style.transform = `translateY(${asideActive.offsetTop}px)`;
+    asideIndicator.hidden = false;
+  }
+  const tabsIndicator = document.getElementById("cabinet-tabs-indicator");
+  const tabActive = document.querySelector(".cabinet-tabs .tab-link.active");
+  if (tabsIndicator && tabActive) {
+    tabsIndicator.style.width = `${tabActive.offsetWidth}px`;
+    tabsIndicator.style.transform = `translateX(${tabActive.offsetLeft}px)`;
+    tabsIndicator.hidden = false;
+  }
+}
+
+function animateStatCounters(root, { duration = 680 } = {}) {
+  if (!root || prefersReducedMotion()) return;
+  root.querySelectorAll(".stat-tile-value").forEach((el) => {
+    if (el.querySelector(".category-pill, .stat-zero")) return;
+    const raw = (el.textContent || "").trim();
+    if (!/^\d+$/.test(raw)) return;
+    const target = Number(raw);
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - t) ** 3;
+      el.textContent = String(Math.round(target * eased));
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    el.textContent = "0";
+    requestAnimationFrame(tick);
+  });
+}
+
+function initUiMotion() {
+  updateCabinetNavIndicators();
+  window.addEventListener("resize", updateCabinetNavIndicators, { passive: true });
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".cabinet-nav-link, .tab-link")) {
+      requestAnimationFrame(updateCabinetNavIndicators);
+    }
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initUiMotion);
+} else {
+  initUiMotion();
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -380,7 +454,97 @@ function formatAuditLogTime(iso) {
 
 function renderPasteInputMark(pasteInputMark) {
   if (!pasteInputMark?.label) return "";
-  return `<span class="status-pill paste-input" title="${escapeHtml(pasteInputMark.label)}">${escapeHtml(pasteInputMark.label)}</span>`;
+  const label = escapeHtml(pasteInputMark.label);
+  return `<span class="status-pill paste-input" title="${label}">${label}</span>`;
+}
+
+const GRADE_RELATION_HINT = {
+  exact: "совпадает с потребностью",
+  lower: "ниже потребности",
+  higher: "выше потребности",
+};
+
+function renderGradeRelationBar(label, gradeRelation, categoryStatus) {
+  if (!label || categoryStatus === "unconfirmed") return "";
+  const rel = gradeRelation || "exact";
+  const hint = GRADE_RELATION_HINT[rel] || GRADE_RELATION_HINT.exact;
+  const fillClass =
+    rel === "lower"
+      ? "grade-relation-fill-lower"
+      : rel === "higher"
+        ? "grade-relation-fill-higher"
+        : "grade-relation-fill-exact";
+  return `<div class="grade-relation-row" role="img" aria-label="${escapeHtml(label)}: ${hint}">
+    <div class="grade-relation-head">
+      <span class="grade-relation-label">${escapeHtml(label)}</span>
+      <span class="grade-relation-hint">${escapeHtml(hint)}</span>
+    </div>
+    <div class="grade-relation-track"><span class="grade-relation-fill ${fillClass}"></span></div>
+  </div>`;
+}
+
+const EMPLOYER_MATCH_GROUPS = [
+  { id: "exact", title: "Точное совпадение грейда", defaultOpen: true, initialVisible: 10 },
+  { id: "other_grade", title: "Другой грейд, та же специализация", defaultOpen: false, initialVisible: 10 },
+  { id: "unconfirmed", title: "Категория не подтверждена", defaultOpen: false, initialVisible: 10 },
+];
+
+function classifyEmployerMatchGroup(item, need) {
+  const status = item.categoryStatus || "confirmed";
+  if (status === "unconfirmed") return "unconfirmed";
+  if (item.gradeRelation === "lower" || item.gradeRelation === "higher") {
+    return "other_grade";
+  }
+  if (status === "other_grade" || status === "off_grade" || status === "grade_mismatch") {
+    return "other_grade";
+  }
+  if (need && status === "confirmed") {
+    const needLabel = formatSpecGradeLabel(need.specialization, need.grade);
+    const raw = String(item.categoryLabel || "").replace(/\s*—\s*неподтверждён\s*$/i, "").trim();
+    if (needLabel && raw && raw !== needLabel) return "other_grade";
+  }
+  return "exact";
+}
+
+function renderStatZeroState(iconSvg, hint) {
+  return `<div class="stat-zero" role="status">
+    <span class="stat-zero-icon" aria-hidden="true">${iconSvg}</span>
+    <p class="stat-zero-hint">${escapeHtml(hint)}</p>
+  </div>`;
+}
+
+function renderDeckNeedPanel(need, stats) {
+  if (!need) return "";
+  const esc = escapeHtml;
+  const specGrade = formatSpecGradeLabel(need.specialization, need.grade);
+  const title = need.title || "Потребность";
+  const inactive = need.active
+    ? ""
+    : `<p class="deck-need-panel-note">Потребность неактивна — приглашения недоступны.</p>`;
+  return `<div class="deck-need-panel-inner">
+    <h2 class="deck-need-panel-title">${esc(title)}</h2>
+    ${specGrade ? `<p class="deck-need-panel-spec">${esc(specGrade)}</p>` : ""}
+    ${inactive}
+    <dl class="deck-need-stats">
+      <div><dt>В колоде</dt><dd>${esc(String(stats.deckLeft ?? "—"))}</dd></div>
+      <div><dt>Приглашено</dt><dd>${esc(String(stats.invited ?? 0))}</dd></div>
+      <div><dt>Отложено</dt><dd>${esc(String(stats.deferred ?? 0))}</dd></div>
+    </dl>
+  </div>`;
+}
+
+function deckStatsFromMatches(items) {
+  const skip = new Set(["rejected", "later", "invited", "declined"]);
+  let deckLeft = 0;
+  let invited = 0;
+  let deferred = 0;
+  for (const item of items || []) {
+    const st = item.reviewStatus;
+    if (st === "invited") invited += 1;
+    else if (st === "later") deferred += 1;
+    if (!skip.has(st)) deckLeft += 1;
+  }
+  return { deckLeft, invited, deferred };
 }
 
 function renderAiUsageSection(aiUsage, { compact = false } = {}) {
@@ -550,9 +714,11 @@ function ensureCabinetChrome(links, role, meEmail) {
   aside.innerHTML = `
     <div class="cabinet-aside-brand">
       <a class="logo cabinet-aside-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
-      <p class="cabinet-aside-tagline">Категория по навыку</p>
     </div>
-    <div class="cabinet-aside-inner">${navLinks}</div>
+    <div class="cabinet-aside-inner">
+      <span class="cabinet-nav-indicator" id="cabinet-nav-indicator" hidden></span>
+      ${navLinks}
+    </div>
     <div class="cabinet-user-card">
       ${formatCabinetEmailMarkup(meEmail)}
       <button type="button" class="btn-ghost btn-sm" id="logout-btn-aside">Выход</button>
@@ -571,8 +737,9 @@ function ensureCabinetChrome(links, role, meEmail) {
   const tabLinks = tabHrefs
     .map((href) => links.find((l) => l.href === href))
     .filter(Boolean);
-  tabs.innerHTML = tabLinks.map((l) => navLinkHtml(l, true)).join("");
+  tabs.innerHTML = `<span class="cabinet-tabs-indicator" id="cabinet-tabs-indicator" hidden></span>${tabLinks.map((l) => navLinkHtml(l, true)).join("")}`;
   bindCabinetMoreMenu(role, links);
+  requestAnimationFrame(updateCabinetNavIndicators);
 }
 
 function mountCabinetChromeSync(links, role) {
@@ -943,6 +1110,7 @@ window.HandCheck = {
     }
     return `<span class="${cls}">${escapeHtml(label || "")}</span>`;
   },
+  renderGradeRelationBar,
   escapeHtml,
   resolveEmployerNeedId,
   persistEmployerNeedId,
@@ -951,5 +1119,12 @@ window.HandCheck = {
   joinMetaParts,
   renderAiUsageSection,
   renderPasteInputMark,
+  EMPLOYER_MATCH_GROUPS,
+  classifyEmployerMatchGroup,
+  renderStatZeroState,
+  renderDeckNeedPanel,
+  deckStatsFromMatches,
+  animateStatCounters,
+  updateCabinetNavIndicators,
   LOGO_MARK,
 };

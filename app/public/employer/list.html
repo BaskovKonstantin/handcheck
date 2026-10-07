@@ -43,6 +43,95 @@
 
       let loadSeq = 0;
       let cachedNeedId = null;
+      let cachedNeed = null;
+      let cachedNeeds = [];
+
+      function renderListRow(r) {
+        const esc = HandCheck.escapeHtml;
+        const invited =
+          r.reviewStatus === "invited"
+            ? '<span class="status-pill accepted">Приглашён</span>'
+            : r.reviewStatus === "declined"
+              ? '<span class="status-pill declined">Отклонил приглашение</span>'
+              : "";
+        const explain = (r.explanation || []).map((line) => `<li>${esc(line)}</li>`).join("");
+        const aiChip = HandCheck.renderAiUsageSection(r.aiUsage, { compact: true });
+        const aiBlock = aiChip ? `<div class="chip-row">${aiChip}</div>` : "";
+        const stack = (r.stack || []).map((s) => `<span class="chip chip-skill">${esc(s)}</span>`).join("");
+        const domains = (r.backgroundDomains || [])
+          .map((d) => `<span class="chip">${esc(d)}</span>`)
+          .join("");
+        const actions =
+          r.reviewStatus === "invited"
+            ? `<div class="list-row-actions"><a class="btn-quiet btn-sm" href="/employer/invitations">К приглашениям</a></div>`
+            : `<div class="list-row-actions">
+                  <button type="button" class="btn-quiet btn-sm" data-decision="later" data-id="${r.id}">Отложить</button>
+                  <button type="button" class="btn-quiet btn-sm" data-decision="rejected" data-id="${r.id}">Отказать</button>
+                  <a class="btn-primary btn-sm list-invite-cta" href="/employer/deck">Пригласить</a>
+                </div>`;
+        return `<div class="list-row-card list-row-card-rich">
+                <div class="list-row-main">
+                  <div class="list-row-head">
+                    <strong>${esc(r.displayName || "Кандидат")}</strong>
+                    ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}
+                    ${invited}
+                  </div>
+                  ${HandCheck.renderPasteInputMark(r.pasteInputMark)}
+                  ${domains ? `<div class="chip-row">${domains}</div>` : ""}
+                  ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}
+                  ${explain ? `<ul class="deck-explain-lines list-explain">${explain}</ul>` : ""}
+                  ${aiBlock}
+                </div>
+                ${actions}
+              </div>`;
+      }
+
+      function bindListRowActions(root) {
+        root.querySelectorAll("[data-decision]").forEach((btn) => {
+          btn.onclick = () => review(btn.dataset.decision, btn.dataset.id);
+        });
+        root.querySelectorAll("[data-list-more]").forEach((btn) => {
+          btn.onclick = () => {
+            const section = btn.closest(".list-match-group");
+            const hidden = section?.querySelector(".list-group-hidden");
+            if (hidden) hidden.hidden = false;
+            btn.remove();
+          };
+        });
+      }
+
+      function renderGroupedList(items, need) {
+        const esc = HandCheck.escapeHtml;
+        const buckets = new Map(HandCheck.EMPLOYER_MATCH_GROUPS.map((g) => [g.id, []]));
+        for (const item of items) {
+          const key = HandCheck.classifyEmployerMatchGroup(item, need);
+          if (!buckets.has(key)) buckets.set(key, []);
+          buckets.get(key).push(item);
+        }
+        const sections = HandCheck.EMPLOYER_MATCH_GROUPS
+          .map((group) => {
+            const list = buckets.get(group.id) || [];
+            if (!list.length) return "";
+            const visible = list.slice(0, group.initialVisible);
+            const hidden = list.slice(group.initialVisible);
+            const openAttr = group.defaultOpen ? " open" : "";
+            const rows = visible.map((r) => renderListRow(r)).join("");
+            const hiddenRows = hidden.length
+              ? `<div class="list-group-hidden" hidden>${hidden.map((r) => renderListRow(r)).join("")}</div>
+                 <button type="button" class="btn-ghost btn-sm list-show-more" data-list-more="1">Показать ещё (${hidden.length})</button>`
+              : "";
+            return `<details class="list-match-group"${openAttr}>
+              <summary class="list-match-group-head">
+                <span class="list-match-group-title">${esc(group.title)}</span>
+                <span class="list-match-group-count">${list.length}</span>
+              </summary>
+              <div class="list-match-group-body">${rows}${hiddenRows}</div>
+            </details>`;
+          })
+          .filter(Boolean)
+          .join("");
+        return `<div class="list-grouped">${sections}</div>`;
+      }
 
       function showSkeleton() {
         rowsEl.innerHTML = HandCheck.skeletonBlocks(4);
@@ -70,6 +159,7 @@
         host.innerHTML = selectedId ? HandCheck.employerNeedSwitcherHtml(needs, selectedId) : "";
         HandCheck.bindEmployerNeedSwitcher((id) => {
           cachedNeedId = id;
+          cachedNeed = needs.find((n) => n.id === id) || null;
           HandCheck.persistEmployerNeedId(id);
           loadRows();
         });
@@ -82,9 +172,11 @@
           if (!cachedNeedId) {
             const needsRes = await HandCheck.api("/api/employer/needs");
             const needs = needsRes.items || [];
+            cachedNeeds = needs;
             const params = new URLSearchParams(location.search);
             cachedNeedId = HandCheck.resolveEmployerNeedId(needs, params);
             if (cachedNeedId) HandCheck.persistEmployerNeedId(cachedNeedId);
+            cachedNeed = needs.find((n) => n.id === cachedNeedId) || null;
             await mountNeedSwitcher(needs, cachedNeedId);
           }
           if (seq !== loadSeq) return;
@@ -109,52 +201,11 @@
             );
             return;
           }
-          const esc = HandCheck.escapeHtml;
-          rowsEl.innerHTML = data.items
-            .map((r) => {
-              const invited =
-                r.reviewStatus === "invited"
-                  ? '<span class="status-pill accepted">Приглашён</span>'
-                  : r.reviewStatus === "declined"
-                    ? '<span class="status-pill declined">Отклонил приглашение</span>'
-                    : "";
-              const explain = (r.explanation || [])
-                .map((line) => `<li>${esc(line)}</li>`)
-                .join("");
-              const aiChip = HandCheck.renderAiUsageSection(r.aiUsage, { compact: true });
-              const aiBlock = aiChip ? `<div class="chip-row">${aiChip}</div>` : "";
-              const stack = (r.stack || [])
-                .map((s) => `<span class="chip chip-skill">${esc(s)}</span>`)
-                .join("");
-              const domains = (r.backgroundDomains || [])
-                .map((d) => `<span class="chip">${esc(d)}</span>`)
-                .join("");
-              const actions =
-                r.reviewStatus === "invited"
-                  ? `<div class="list-row-actions"><a class="btn-ghost btn-sm" href="/employer/invitations">К приглашениям</a></div>`
-                  : `<div class="list-row-actions">
-                  <button type="button" class="btn-ghost btn-sm" data-decision="later" data-id="${r.id}">Отложить</button>
-                  <button type="button" class="btn-ghost btn-sm" data-decision="rejected" data-id="${r.id}">Отказать</button>
-                  <a class="btn-primary btn-sm" href="/employer/deck">Пригласить</a>
-                </div>`;
-              return `<div class="list-row-card list-row-card-rich">
-                <div class="list-row-main">
-                  <strong>${esc(r.displayName || "Кандидат")}</strong>
-                  ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}
-                  ${HandCheck.renderPasteInputMark(r.pasteInputMark)}
-                  ${invited}
-                  ${domains ? `<div class="chip-row">${domains}</div>` : ""}
-                  ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}
-                  ${explain ? `<ul class="deck-explain-lines list-explain">${explain}</ul>` : ""}
-                  ${aiBlock}
-                </div>
-                ${actions}
-              </div>`;
-            })
-            .join("");
-          rowsEl.querySelectorAll("[data-decision]").forEach((btn) => {
-            btn.onclick = () => review(btn.dataset.decision, btn.dataset.id);
-          });
+          if (!cachedNeed && cachedNeeds.length) {
+            cachedNeed = cachedNeeds.find((n) => n.id === cachedNeedId) || null;
+          }
+          rowsEl.innerHTML = renderGroupedList(data.items, cachedNeed);
+          bindListRowActions(rowsEl);
         } catch {
           if (seq !== loadSeq) return;
           rowsEl.innerHTML = HandCheck.loadErrorState(
@@ -179,8 +230,10 @@
       HandCheck.bootCabinetPage("employer", async () => {
         const needsRes = await HandCheck.api("/api/employer/needs");
         const needs = needsRes.items || [];
+        cachedNeeds = needs;
         const params = new URLSearchParams(location.search);
         cachedNeedId = HandCheck.resolveEmployerNeedId(needs, params);
+        cachedNeed = needs.find((n) => n.id === cachedNeedId) || null;
         if (cachedNeedId) HandCheck.persistEmployerNeedId(cachedNeedId);
         await mountNeedSwitcher(needs, cachedNeedId);
         await loadRows();

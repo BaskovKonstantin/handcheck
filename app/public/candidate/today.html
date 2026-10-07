@@ -29,6 +29,10 @@
         '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M4 8l8 5 8-5v10H4V8zm16-2H4l8 5 8-5z" fill="currentColor"/></svg></span>';
       const ICON_CALL =
         '<span class="stat-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg></span>';
+      const ZERO_MAIL =
+        '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M4 8l8 5 8-5v10H4V8zm16-2H4l8 5 8-5z" fill="currentColor"/></svg>';
+      const ZERO_CALL =
+        '<svg viewBox="0 0 24 24" width="28" height="28"><path d="M7 4h3l1 4-2 1a12 12 0 0 0 5 5l1-2 4 1v3c-6-1-11-6-12-12z" fill="currentColor"/></svg>';
 
       function isJoinableCallStatus(status) {
         return status === "ready" || status === "live";
@@ -90,10 +94,27 @@
           .slice(0, 4);
       }
 
-      function buildUpcomingSteps(invItems, cat, callItems) {
+      function buildUpcomingSteps(invItems, cat, callItems, extras = {}) {
         const statusByInv = callStatusByInvitation(callItems);
         const steps = [];
         const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
+        const retakeDate = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
+        if (extras.profileIncomplete) {
+          steps.push({
+            tone: "clay",
+            title: "Заполните профиль",
+            meta: "Стек и контакты помогают работодателю отправить приглашение",
+            cta: '<a class="btn-primary btn-sm" href="/candidate/profile">Профиль</a>',
+          });
+        }
+        if (extras.needsIntegration) {
+          steps.push({
+            tone: "forest",
+            title: "Подключите ИИ-клиент",
+            meta: "MCP-токен для Cursor или Claude Code — по желанию, но удобно для заданий",
+            cta: '<a class="btn-ghost btn-sm" href="/candidate/integrations">Интеграции</a>',
+          });
+        }
         if (!cat.label && !onCooldown) {
           steps.push({
             tone: "clay",
@@ -107,6 +128,13 @@
             title: "Пересдача теста",
             meta: "Срок ожидания ещё не истёк",
             cta: '<button class="btn-improve-locked btn-sm" type="button" disabled><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача недоступна</button>',
+          });
+        } else if (onCooldown) {
+          steps.push({
+            tone: "muted",
+            title: "Пересдача теста",
+            meta: retakeDate ? `Следующая попытка с ${retakeDate} (Москва)` : "Срок ожидания ещё не истёк",
+            cta: `<button class="btn-improve-locked btn-sm" type="button" disabled><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача с ${retakeDate || "…"}</button>`,
           });
         } else if (!onCooldown) {
           steps.push({
@@ -152,13 +180,23 @@
         return steps;
       }
 
+      function profileIncomplete(profile, background) {
+        const stack = profile?.stack || [];
+        const episodes = background?.items || [];
+        const hasContact = Boolean((profile?.phone || "").trim() || (profile?.contactEmail || "").trim());
+        return !stack.length || !episodes.length || !hasContact;
+      }
+
       async function render() {
         const seq = HandCheck.nextCabinetPageLoad();
         dash.innerHTML = HandCheck.skeletonBlocks(3);
-        const [cat, inv, calls] = await Promise.all([
+        const [cat, inv, calls, profile, background, tokensRes] = await Promise.all([
           HandCheck.api("/api/candidate/category"),
           HandCheck.api("/api/candidate/invitations"),
           HandCheck.api("/api/candidate/calls"),
+          HandCheck.api("/api/candidate/profile"),
+          HandCheck.api("/api/candidate/background"),
+          HandCheck.api("/api/integrations/tokens").catch(() => ({ items: [] })),
         ]);
         if (HandCheck.isStaleCabinetPageLoad(seq)) return;
         const items = inv.items || [];
@@ -166,7 +204,11 @@
         const pending = items.filter((i) => i.status === "sent" || i.status === "viewed").length;
         const joinableCount = callItems.filter((r) => isJoinableCallStatus(r.callStatus)).length;
         const callsHint =
-          joinableCount > 0 ? "принято — можно в комнату" : "нет активных комнат";
+          joinableCount > 0 ? "принято — можно в комнату" : "Пока нет комнат — примите приглашение";
+        const stepExtras = {
+          profileIncomplete: profileIncomplete(profile, background),
+          needsIntegration: !(tokensRes.items || []).length,
+        };
         const catStatus = cat.status || (cat.label ? "confirmed" : "unconfirmed");
         if (!cat.label) {
           const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
@@ -178,7 +220,8 @@
             ? `<div class="panel"><h2 class="h2">Категория не подтверждена</h2><p class="invite-meta">${body}</p></div>`
             : HandCheck.emptyState("Категория ещё не подтверждена", body, "/candidate/tasks", "Пройти тест");
           dash.innerHTML =
-            empty + HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat, callItems));
+            empty +
+            HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat, callItems, stepExtras));
           return;
         }
         const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
@@ -190,29 +233,34 @@
               ${improveBtn}`;
         const timeline = HandCheck.timelineSection(
           "Ближайшие шаги",
-          buildUpcomingSteps(items, cat, callItems)
+          buildUpcomingSteps(items, cat, callItems, stepExtras)
         );
+        const invitesValue = pending
+          ? `<div class="stat-tile-value">${pending}</div><p class="invite-meta">ожидают ответа</p>`
+          : HandCheck.renderStatZeroState(ZERO_MAIL, "Новых приглашений нет — держите профиль открытым");
+        const callsValue = joinableCount
+          ? `<div class="stat-tile-value">${joinableCount}</div><p class="invite-meta">${callsHint}</p>`
+          : HandCheck.renderStatZeroState(ZERO_CALL, callsHint);
         dash.innerHTML = `
           <div class="stat-tile-grid stat-tile-grid-today">
             <article class="stat-tile stat-tile-forest">
               <div class="stat-tile-label">${ICON_CAT} Категория</div>
-              <div class="stat-tile-value">${HandCheck.renderCategoryPill(cat.label, catStatus)}</div>
+              <div class="stat-tile-value stat-tile-value-category">${HandCheck.renderCategoryPill(cat.label, catStatus)}</div>
               ${categoryHint}
             </article>
             <article class="stat-tile stat-tile-clay">
               <div class="stat-tile-label">${ICON_MAIL} Приглашения</div>
-              <div class="stat-tile-value">${pending}</div>
-              <p class="invite-meta">ожидают ответа</p>
-              <a class="btn-ghost btn-sm" href="/candidate/invitations">Открыть</a>
+              ${invitesValue}
+              <a class="btn-secondary-soft btn-sm" href="/candidate/invitations">Открыть</a>
             </article>
             <article class="stat-tile stat-tile-ink">
               <div class="stat-tile-label">${ICON_CALL} Звонки</div>
-              <div class="stat-tile-value">${joinableCount}</div>
-              <p class="invite-meta">${callsHint}</p>
-              <a class="btn-ghost btn-sm" href="/candidate/calls">Звонки</a>
+              ${callsValue}
+              <a class="btn-secondary-soft btn-sm" href="/candidate/calls">Звонки</a>
             </article>
           </div>
           ${timeline}`;
+        HandCheck.animateStatCounters(dash);
       }
 
       HandCheck.bootCabinetPage("candidate", () => render());

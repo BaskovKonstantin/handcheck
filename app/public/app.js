@@ -455,7 +455,7 @@ function formatAuditLogTime(iso) {
 function renderPasteInputMark(pasteInputMark) {
   if (!pasteInputMark?.label) return "";
   const label = escapeHtml(pasteInputMark.label);
-  return `<span class="integrity-chip paste-input paste-input-chip" title="${label}">${label}</span>`;
+  return `<span class="status-pill paste-input" title="${label}">${label}</span>`;
 }
 
 const GRADE_RELATION_HINT = {

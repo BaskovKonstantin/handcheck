@@ -128,7 +128,9 @@ const DEMO_TOPUP_CANDIDATES = [
   { email: "demo8@demo.local", displayName: "Мария", stack: ["node", "kafka"], role: "кассир" },
 ];
 
-function insertDemoCandidate(db, { email, displayName, stack, role }, hash, now, domainText) {
+const DEMO_TOPUP_SCORES = [0.56, 0.64, 0.72, 0.68, 0.76, 0.84];
+
+function insertDemoCandidate(db, { email, displayName, stack, role }, hash, now, domainText, scoreIndex) {
   const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
   if (existing) return existing.id;
 
@@ -142,8 +144,8 @@ function insertDemoCandidate(db, { email, displayName, stack, role }, hash, now,
     `INSERT INTO candidate_profiles (user_id, display_name, stack_json, phone, contact_email, consent_at, availability)
      VALUES (?, ?, ?, ?, ?, ?, 'open')`
   ).run(userId, displayName, JSON.stringify(stack), phone, email, now);
-  const sharedScore = 0.72;
-  const sharedMotivation = 0.82;
+  const sharedScore = DEMO_TOPUP_SCORES[scoreIndex] ?? 0.72;
+  const sharedMotivation = 0.78 + (scoreIndex % 3) * 0.04;
   db.prepare(
     `INSERT INTO candidate_categories
      (candidate_user_id, category_id, specialization, grade, test_score, knowledge, breadth, motivation, assigned_at)
@@ -156,6 +158,35 @@ function insertDemoCandidate(db, { email, displayName, stack, role }, hash, now,
     `INSERT INTO background_episodes (id, candidate_user_id, role_title, domain, industry, note)
      VALUES (?, ?, ?, ?, 'HoReCa', '')`
   ).run(newId(), userId, role, domainText);
+  return userId;
+}
+
+function insertDemoUnconfirmedCandidate(db, hash, now, domainText) {
+  const email = "demo-unconf@demo.local";
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  if (existing) return existing.id;
+  const userId = newId();
+  db.prepare(
+    `INSERT INTO users (id, email, password_hash, role, email_confirmed_at) VALUES (?, ?, ?, 'candidate', ?)`
+  ).run(userId, email, hash, now);
+  db.prepare(
+    `INSERT INTO candidate_profiles (user_id, display_name, stack_json, phone, contact_email, consent_at, availability)
+     VALUES (?, ?, ?, ?, ?, ?, 'open')`
+  ).run(
+    userId,
+    "Олег (без теста)",
+    JSON.stringify(["node", "typescript"]),
+    "+79003999999",
+    email,
+    now
+  );
+  db.prepare(
+    `INSERT INTO candidate_private (candidate_user_id, integrity, trust_ok) VALUES (?, 0, 1)`
+  ).run(userId);
+  db.prepare(
+    `INSERT INTO background_episodes (id, candidate_user_id, role_title, domain, industry, note)
+     VALUES (?, ?, ?, ?, 'HoReCa', 'ещё не проходил тест')`
+  ).run(newId(), userId, "стажёр зала", domainText);
   return userId;
 }
 
@@ -178,11 +209,14 @@ function topUpDemoCandidates(db) {
   const domainText = need.domain_text || "автоматизация работы официанта в ресторане";
   let inserted = 0;
 
-  for (const spec of DEMO_TOPUP_CANDIDATES) {
+  for (let i = 0; i < DEMO_TOPUP_CANDIDATES.length; i += 1) {
+    const spec = DEMO_TOPUP_CANDIDATES[i];
     const before = db.prepare("SELECT id FROM users WHERE email = ?").get(spec.email);
-    insertDemoCandidate(db, spec, hash, now, domainText);
+    insertDemoCandidate(db, spec, hash, now, domainText, i);
     if (!before) inserted += 1;
   }
+
+  insertDemoUnconfirmedCandidate(db, hash, now, domainText);
 
   return { inserted };
 }
@@ -201,6 +235,7 @@ module.exports = {
   seed,
   topUpDemoCandidates,
   DEMO_TOPUP_CANDIDATES,
+  DEMO_TOPUP_SCORES,
   QUICK_RUBRIC,
   WORK_RUBRIC,
 };

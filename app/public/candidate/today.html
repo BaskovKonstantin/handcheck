@@ -167,6 +167,7 @@
         const joinableCount = callItems.filter((r) => isJoinableCallStatus(r.callStatus)).length;
         const callsHint =
           joinableCount > 0 ? "принято — можно в комнату" : "нет активных комнат";
+        const catStatus = cat.status || (cat.label ? "confirmed" : "unconfirmed");
         if (!cat.label) {
           const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
           const retakeDate = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
@@ -195,7 +196,7 @@
           <div class="stat-tile-grid stat-tile-grid-today">
             <article class="stat-tile stat-tile-forest">
               <div class="stat-tile-label">${ICON_CAT} Категория</div>
-              <div class="stat-tile-value"><span class="category-pill">${cat.label}</span></div>
+              <div class="stat-tile-value">${HandCheck.renderCategoryPill(cat.label, catStatus)}</div>
               ${categoryHint}
             </article>
             <article class="stat-tile stat-tile-clay">

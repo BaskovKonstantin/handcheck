@@ -56,19 +56,10 @@ function createApp() {
   app.use("/api/calls", require("./modules/calls/router"));
   app.use("/api/integrations", require("./modules/integrations/router"));
   app.get("/api/privacy-notice", (_req, res) => {
-    const {
-      privacyNoticeShort,
-      operatorName,
-      operatorInn,
-      operatorEmail,
-      PRIVACY_POLICY_VERSION,
-    } = require("./lib/privacy-policy");
+    const { privacyNoticeShort, privacyNoticeDocument } = require("./lib/privacy-policy");
     res.json({
-      version: PRIVACY_POLICY_VERSION,
       short: privacyNoticeShort(),
-      operatorName: operatorName(),
-      operatorInn: operatorInn(),
-      operatorEmail: operatorEmail(),
+      ...privacyNoticeDocument(),
     });
   });
   app.use("/mcp", require("./modules/mcp/router"));

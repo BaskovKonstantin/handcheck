@@ -14,29 +14,38 @@ const {
 const { httpError } = require("../../middleware/errors");
 const { validateRegisterBody } = require("../../lib/validation");
 const { shouldMarkUserAsTest } = require("../../lib/is-test-user");
+const { recordDataConsent } = require("../../lib/privacy-policy");
 
 const router = express.Router();
 
 router.post("/register", (req, res, next) => {
   try {
-    const { email, password, role } = validateRegisterBody(req.body);
+    const { email, password, role, birthDate, needsParentalConsent } = validateRegisterBody(req.body);
     const db = getDb();
     const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
     if (existing) throw httpError(409, "email_taken");
     const id = newId();
     const hash = bcrypt.hashSync(password, 10);
     const isTest = shouldMarkUserAsTest(email, email.split("@")[0]) ? 1 : 0;
+    const now = new Date().toISOString();
     db.prepare(
-      "INSERT INTO users (id, email, password_hash, role, is_test) VALUES (?, ?, ?, ?, ?)"
-    ).run(id, email, hash, role, isTest);
+      "INSERT INTO users (id, email, password_hash, role, is_test, birth_date) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(id, email, hash, role, isTest, birthDate);
     if (role === "candidate") {
       db.prepare(
-        "INSERT INTO candidate_profiles (user_id, display_name, contact_email) VALUES (?, ?, ?)"
-      ).run(id, "", email);
+        "INSERT INTO candidate_profiles (user_id, display_name, contact_email, consent_at) VALUES (?, ?, ?, ?)"
+      ).run(id, "", email, now);
+      db.prepare(
+        "INSERT INTO candidate_private (candidate_user_id, integrity, trust_ok) VALUES (?, 0, 1)"
+      ).run(id);
     } else {
       db.prepare(
         "INSERT INTO employer_profiles (user_id, company_name, contact_email) VALUES (?, ?, ?)"
       ).run(id, "", email);
+    }
+    recordDataConsent(db, id, "registration", { birthDate });
+    if (needsParentalConsent) {
+      recordDataConsent(db, id, "parental_registration", { birthDate });
     }
     const code = randomSixDigit();
     db.prepare(

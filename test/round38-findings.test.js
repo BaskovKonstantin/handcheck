@@ -70,7 +70,8 @@ describe("round38 findings (unit)", () => {
     delete process.env.PRIVACY_OPERATOR_EMAIL;
     const text = privacyNoticeShort();
     assert.ok(!text.includes("[УКАЖИТЕ"));
-    assert.match(text, /HandCheck|оператор платформы/i);
+    assert.match(text, /Басков Константин Дмитриевич/);
+    assert.ok(!text.includes("не указан"));
   });
 
   it("minutes plural helper uses genitive after «Около»", () => {

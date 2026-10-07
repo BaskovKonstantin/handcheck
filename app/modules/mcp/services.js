@@ -121,7 +121,7 @@ function getCandidateCategory(userId) {
   let retakeAt = null;
   if (last?.t) {
     const d = new Date(last.t);
-    d.setDate(d.getDate() + Number(process.env.GRADE_COOLDOWN_DAYS || 90));
+    d.setDate(d.getDate() + Number(process.env.GRADE_COOLDOWN_DAYS || 30));
     retakeAt = d.toISOString();
   }
   return { label: cat.label, specialization: cat.specialization, grade: cat.grade, retakeAt };

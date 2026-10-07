@@ -32,6 +32,7 @@ describe("demo seed top-up", () => {
       const row = db.prepare("SELECT id FROM users WHERE email = ?").get(spec.email);
       assert.ok(row, `missing ${spec.email}`);
     }
+    assert.ok(db.prepare("SELECT id FROM users WHERE email = 'demo-unconf@demo.local'").get());
     const second = topUpDemoCandidates(db);
     assert.equal(second.inserted, 0);
   });

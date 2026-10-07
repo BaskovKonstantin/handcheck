@@ -13,6 +13,7 @@ function ensureColumn(db, table, column, definition) {
 
 function applyPatches(db) {
   ensureColumn(db, "users", "is_test", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "users", "birth_date", "TEXT");
   ensureColumn(db, "api_tokens", "client_where", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "api_tokens", "logging_consent_at", "TEXT");
   ensureColumn(

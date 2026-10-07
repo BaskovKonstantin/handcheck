@@ -11,6 +11,7 @@ const ROOT = path.join(__dirname, "..");
 let PORT = process.env.HC_TEST_PORT || "";
 let BASE = "";
 const PASS = "demo-demo-demo";
+const { registerPayload } = require("./register-payload");
 const API_DELAY_MS = 900;
 
 let serverProc;
@@ -1124,7 +1125,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const email = `r34-paste-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     const loginRes = await context.request.post(`${BASE}/api/auth/login`, {
@@ -1175,7 +1176,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const email = `r41-step-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     await context.request.post(`${BASE}/api/auth/login`, {
@@ -1223,7 +1224,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const email = `r41-stuck-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     await context.request.post(`${BASE}/api/auth/login`, {
@@ -1270,7 +1271,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const email = `r38-layout-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     const loginRes = await context.request.post(`${BASE}/api/auth/login`, {
@@ -1317,7 +1318,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const email = `r45-mobile-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     await context.request.post(`${BASE}/api/auth/login`, { data: { email, password: PASS } });

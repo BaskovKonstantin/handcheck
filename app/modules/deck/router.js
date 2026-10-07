@@ -32,6 +32,7 @@ router.get("/needs/:id/deck/next", (req, res, next) => {
     id: c.id,
     displayName: c.displayName,
     categoryLabel: c.categoryLabel,
+    categoryStatus: c.categoryStatus,
     stack: c.stack,
     backgroundDomains: c.backgroundDomains,
     explanation: c.explanation.slice(0, 2),

@@ -80,6 +80,17 @@
                 <option value="employer">Работодатель</option>
               </select>
             </label>
+            <label id="birth-wrap" hidden>Дата рождения
+              <input type="date" id="birth-date" autocomplete="bday" />
+            </label>
+            <label class="consent-option" id="privacy-wrap" hidden>
+              <input type="checkbox" id="privacy-consent" />
+              <span>Регистрируясь, я даю согласие на обработку персональных данных в соответствии с <a href="/privacy" target="_blank" rel="noopener">Уведомлением по 152-ФЗ</a>.</span>
+            </label>
+            <label class="consent-option" id="parental-wrap" hidden>
+              <input type="checkbox" id="parental-consent" />
+              <span>Я подтверждаю, что являюсь законным представителем несовершеннолетнего (15–17 лет) и даю согласие на обработку его персональных данных в соответствии с <a href="/privacy" target="_blank" rel="noopener">Уведомлением по 152-ФЗ</a>.</span>
+            </label>
             <p class="field-error" id="err" hidden></p>
             <div class="form-actions">
               <button class="btn-primary btn-lg auth-submit" type="button" id="primary-action">Войти</button>
@@ -109,8 +120,37 @@
       const tabLogin = document.getElementById("tab-login");
       const tabRegister = document.getElementById("tab-register");
       const roleWrap = document.getElementById("role-wrap");
+      const birthWrap = document.getElementById("birth-wrap");
+      const privacyWrap = document.getElementById("privacy-wrap");
+      const parentalWrap = document.getElementById("parental-wrap");
+      const birthInput = document.getElementById("birth-date");
       const confirmBlock = document.getElementById("confirm-block");
       const primaryBtn = document.getElementById("primary-action");
+
+      function ageFromBirthDate(iso) {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || "").trim());
+        if (!m) return null;
+        const y = Number(m[1]);
+        const mo = Number(m[2]);
+        const d = Number(m[3]);
+        const now = new Date();
+        let age = now.getFullYear() - y;
+        const hadBirthday =
+          now.getMonth() + 1 > mo || (now.getMonth() + 1 === mo && now.getDate() >= d);
+        if (!hadBirthday) age -= 1;
+        return age;
+      }
+
+      function refreshParentalVisibility() {
+        if (mode === "login") {
+          parentalWrap.hidden = true;
+          return;
+        }
+        const role = document.getElementById("role").value;
+        const age = ageFromBirthDate(birthInput.value);
+        parentalWrap.hidden = role !== "candidate" || age === null || age < 15 || age >= 18;
+        if (parentalWrap.hidden) document.getElementById("parental-consent").checked = false;
+      }
 
       const showErr = (m, asInfo) => {
         err.hidden = false;
@@ -126,14 +166,20 @@
         tabLogin.setAttribute("aria-selected", isLogin ? "true" : "false");
         tabRegister.setAttribute("aria-selected", !isLogin ? "true" : "false");
         roleWrap.hidden = isLogin;
+        birthWrap.hidden = isLogin;
+        privacyWrap.hidden = isLogin;
+        parentalWrap.hidden = isLogin;
         primaryBtn.textContent = isLogin ? "Войти" : "Зарегистрироваться";
         confirmBlock.hidden = true;
         err.hidden = true;
+        if (!isLogin) refreshParentalVisibility();
         document.getElementById("password").autocomplete = isLogin ? "current-password" : "new-password";
       }
 
       tabLogin.onclick = () => setMode("login");
       tabRegister.onclick = () => setMode("register");
+      document.getElementById("role").addEventListener("change", refreshParentalVisibility);
+      birthInput.addEventListener("change", refreshParentalVisibility);
       setMode(q.get("mode") === "register" ? "register" : "login");
 
       function cacheEmail(email, role) {
@@ -161,12 +207,19 @@
             location.href = j.user.role === "employer" ? "/employer/deck" : "/candidate/today";
             return;
           }
+          const role = document.getElementById("role").value;
+          const birthDate = birthInput.value;
+          const privacyConsent = document.getElementById("privacy-consent").checked;
+          const parentalConsent = document.getElementById("parental-consent").checked;
           await HandCheck.api("/api/auth/register", {
             method: "POST",
             body: JSON.stringify({
               email,
               password: document.getElementById("password").value,
-              role: document.getElementById("role").value,
+              role,
+              birthDate,
+              privacyConsent,
+              parentalConsent: parentalConsent || undefined,
             }),
           });
           cacheEmail(email);

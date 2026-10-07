@@ -18,7 +18,7 @@
 - Композиция UI — референс Mercor (шапка, герой, метрики, row-link, три шага), копирайт **русский**.
 - Категория только после теста; UI **не показывает** score, integrity, test_score, rank, числовой рейтинг.
 - Батарея: 8× QuickProbe + 1× WorkSim (мини-проект), форма A или B случайно из **published** tasks.
-- Повтор той же specialization — cooldown `GRADE_COOLDOWN_DAYS=90`. Смена грейда — отдельная попытка, **без** принудительного даунгрейда текущей категории при fail.
+- Повтор той же specialization — cooldown `GRADE_COOLDOWN_DAYS=30`. Смена грейда — отдельная попытка, **без** принудительного даунгрейда текущей категории при fail.
 - Rank внутри категории: `0.60*test_score + 0.15*motivation + 0.10*fsp_boost + 0.15*domain_boost`.
 - Контакты и комната звонка — только после `invitation.status=accepted`.
 - `candidate_private.integrity` / `trust_ok` — **никогда** в API кандидата и работодателя.
@@ -821,7 +821,7 @@ Validators работают по `DB_PATH=./data/handcheck-dev.sqlite`: migrate 
 PORT=8810
 DB_PATH=/data/handcheck.sqlite
 SESSION_SECRET=
-GRADE_COOLDOWN_DAYS=90
+GRADE_COOLDOWN_DAYS=30
 APP_BASE_URL=http://127.0.0.1:8810
 DEMO_MODE=1
 DEMO_PASSWORD=demo-demo-demo

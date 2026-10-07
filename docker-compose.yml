@@ -1,3 +1,4 @@
+# Evaluation / jury hardware (no GPU): ~32–64 GB RAM, 4–16 CPU, 0 GPUs.
 services:
   web:
     build:

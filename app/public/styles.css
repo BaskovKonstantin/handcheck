@@ -508,6 +508,12 @@ textarea:focus {
   background: var(--card);
 }
 
+.category-pill-unconfirmed {
+  background: color-mix(in srgb, var(--line) 55%, var(--card));
+  color: var(--ink-muted);
+  border: 1px dashed color-mix(in srgb, var(--ink-muted) 35%, var(--line));
+}
+
 .category-pill {
   display: inline-block;
   padding: 0.2rem 0.65rem;

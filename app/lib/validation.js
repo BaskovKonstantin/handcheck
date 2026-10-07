@@ -3,12 +3,17 @@
 const { httpError } = require("../middleware/errors");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const { classifyRegistrationAge } = require("./registration-age");
+const { registrationConsentPhrase, parentalConsentPhrase } = require("./privacy-policy");
 
 function validateRegisterBody(body) {
   const fields = {};
   const email = String(body?.email || "").trim().toLowerCase();
   const password = String(body?.password || "");
   const role = String(body?.role || "").trim();
+  const birthDate = String(body?.birthDate || "").trim();
+  const privacyConsent = body?.privacyConsent === true;
+  const parentalConsent = body?.parentalConsent === true;
   if (!email || !EMAIL_RE.test(email)) {
     fields.email = "Укажите корректный email";
   }
@@ -18,10 +23,35 @@ function validateRegisterBody(body) {
   if (!["candidate", "employer"].includes(role)) {
     fields.role = "Выберите роль";
   }
+  if (!birthDate) {
+    fields.birthDate = "Укажите дату рождения";
+  }
+  if (!privacyConsent) {
+    fields.privacyConsent = registrationConsentPhrase();
+  }
+  const ageGate = birthDate ? classifyRegistrationAge(role, birthDate) : null;
+  if (birthDate && ageGate && !ageGate.ok) {
+    if (ageGate.field === "birthDate") {
+      fields.birthDate = "Укажите дату рождения в формате ГГГГ-ММ-ДД";
+    } else if (ageGate.code === "age_too_young" || ageGate.code === "employer_age_minimum") {
+      fields.birthDate = ageGate.message;
+    }
+  }
+  if (ageGate?.ok && ageGate.needsParentalConsent && !parentalConsent) {
+    fields.parentalConsent = parentalConsentPhrase();
+  }
   if (Object.keys(fields).length) {
     throw httpError(400, "invalid_body", { fields });
   }
-  return { email, password, role };
+  return {
+    email,
+    password,
+    role,
+    birthDate,
+    privacyConsent,
+    parentalConsent,
+    needsParentalConsent: Boolean(ageGate?.needsParentalConsent),
+  };
 }
 
 function validateDisplayName(name) {

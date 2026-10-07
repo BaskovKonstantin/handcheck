@@ -14,7 +14,7 @@
         <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
         <div class="cabinet-page-hero-inner">
           <h1>Обработка персональных данных</h1>
-          <p class="lede">Уведомление в соответствии с 152-ФЗ (редакция от 6 октября 2026).</p>
+          <p class="lede">Уведомление в соответствии с 152-ФЗ (ст. 9 — согласие субъекта; редакция от 7 октября 2026).</p>
         </div>
       </header>
       <article class="panel privacy-doc">
@@ -22,23 +22,28 @@
         <p><strong>ИНН:</strong> <span id="privacy-operator-inn">…</span></p>
         <p><strong>Контакт для обращений:</strong> <span id="privacy-operator-email">…</span></p>
         <h2 class="h2">Цели обработки</h2>
-        <ul>
+        <ul id="privacy-purposes">
+          <li>Регистрация и ведение учётной записи на платформе HandCheck.</li>
           <li>Проведение навыкового теста и формирование категории кандидата.</li>
           <li>Организация видеозвонков с работодателем и сохранение записи разговора.</li>
+          <li>Подбор и обмен приглашениями между кандидатом и работодателем.</li>
           <li>Учёт использования ИИ-клиентов (MCP): имя клиента, вызовы инструментов, краткое описание запроса.</li>
         </ul>
-        <h2 class="h2">Состав данных</h2>
-        <ul>
-          <li>Учётная запись, контакты, ответы на задания, черновики, события ввода (фокус, ввод с клавиатуры, вставка).</li>
+        <h2 class="h2">Состав персональных данных</h2>
+        <ul id="privacy-data">
+          <li>ФИО или псевдоним, email, телефон, дата рождения, роль на платформе.</li>
+          <li>Ответы на задания, черновики, события ввода (фокус, ввод, вставка).</li>
           <li>Запись звонка: видео, аудио, расшифровка речи, метаданные сессии.</li>
           <li>Для MCP: хэш IP, user-agent, аргументы вызовов инструментов (без секретов), намерение запроса.</li>
         </ul>
+        <h2 class="h2">Действия с данными</h2>
+        <p id="privacy-actions">Сбор, запись, систематизация, накопление, хранение, уточнение (обновление), использование, передача работодателю в рамках подбора, обезличивание, удаление.</p>
         <h2 class="h2">Кому доступны данные</h2>
         <p>Работодатель, пригласивший кандидата, видит категорию, материалы теста и записи звонков в рамках подбора. Контакты кандидата раскрываются только после принятия приглашения.</p>
         <h2 class="h2">Срок хранения</h2>
-        <p>До отзыва согласия или удаления аккаунта, если иной срок не предусмотрен договором с работодателем. Записи звонков хранятся в рамках срока действия аккаунта и договора с работодателем.</p>
-        <h2 class="h2">Права субъекта</h2>
-        <p>Вы можете запросить уточнение, блокирование или удаление данных, отозвать согласие — направьте обращение на контакт оператора выше.</p>
+        <p id="privacy-term">До отзыва согласия или удаления аккаунта, если иной срок не предусмотрен договором с работодателем. Записи звонков хранятся в рамках срока действия аккаунта и договора с работодателем.</p>
+        <h2 class="h2">Отзыв согласия</h2>
+        <p id="privacy-withdrawal">Вы можете отозвать согласие или запросить уточнение, блокирование или удаление данных — направьте обращение на контакт оператора выше.</p>
       </article>
     </main>
     <script src="/app.js"></script>
@@ -52,7 +57,31 @@
           const email = document.getElementById("privacy-operator-email");
           if (name) name.textContent = data.operatorName || "";
           if (inn) inn.textContent = data.operatorInn || "";
-          if (email) email.textContent = data.operatorEmail || "";
+          if (email) {
+            const addr = data.operatorEmail || "";
+            email.textContent = addr;
+            if (addr.includes("@")) {
+              email.innerHTML = `<a href="mailto:${HandCheck.escapeHtml(addr)}">${HandCheck.escapeHtml(addr)}</a>`;
+            }
+          }
+          const purposes = document.getElementById("privacy-purposes");
+          if (purposes && Array.isArray(data.purposes)) {
+            purposes.innerHTML = data.purposes.map((p) => `<li>${HandCheck.escapeHtml(p)}</li>`).join("");
+          }
+          const dataList = document.getElementById("privacy-data");
+          if (dataList && Array.isArray(data.personalDataCategories)) {
+            dataList.innerHTML = data.personalDataCategories
+              .map((p) => `<li>${HandCheck.escapeHtml(p)}</li>`)
+              .join("");
+          }
+          const actions = document.getElementById("privacy-actions");
+          if (actions && data.processingActions?.length) {
+            actions.textContent = data.processingActions.join(" ");
+          }
+          const term = document.getElementById("privacy-term");
+          if (term && data.storageTerm) term.textContent = data.storageTerm;
+          const withdrawal = document.getElementById("privacy-withdrawal");
+          if (withdrawal && data.withdrawal) withdrawal.textContent = data.withdrawal;
         })
         .catch(() => {});
     </script>

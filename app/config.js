@@ -57,7 +57,7 @@ module.exports = {
   DB_PATH,
   DATA_DIR,
   SESSION_SECRET: resolveSessionSecret(),
-  GRADE_COOLDOWN_DAYS: Number(process.env.GRADE_COOLDOWN_DAYS || 90),
+  GRADE_COOLDOWN_DAYS: Number(process.env.GRADE_COOLDOWN_DAYS || 30),
   APP_BASE_URL,
   COOKIE_SECURE: cookieSecureFromAppUrl(APP_BASE_URL),
   DEMO_MODE: envBool("DEMO_MODE", false),

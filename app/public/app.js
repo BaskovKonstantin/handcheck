@@ -929,6 +929,13 @@ window.HandCheck = {
   formatRetakeDateMoscow,
   needInactiveBannerHtml,
   formatSpecGradeLabel,
+  renderCategoryPill(label, categoryStatus) {
+    const cls =
+      categoryStatus === "unconfirmed"
+        ? "category-pill category-pill-unconfirmed"
+        : "category-pill";
+    return `<span class="${cls}">${escapeHtml(label || "")}</span>`;
+  },
   escapeHtml,
   resolveEmployerNeedId,
   persistEmployerNeedId,

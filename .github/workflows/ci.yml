@@ -6,10 +6,15 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-validate:
     name: npm test + validate
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,22 +38,13 @@ jobs:
         run: npm test
 
       - name: Cabinet browser regression
-        run: npm run test:browser
+        run: timeout --signal=TERM --kill-after=30s 20m npm run test:browser
         env:
           DEMO_MODE: "1"
           DEMO_PASSWORD: demo-demo-demo
 
       - name: API validators
         run: npm run validate
-        env:
-          DEMO_MODE: "1"
-          DEMO_PASSWORD: demo-demo-demo
-
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium
-
-      - name: Browser smoke
-        run: npm run test:browser
         env:
           DEMO_MODE: "1"
           DEMO_PASSWORD: demo-demo-demo

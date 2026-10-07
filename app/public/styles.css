@@ -1935,10 +1935,6 @@ body.has-cabinet-chrome main {
   border-color: transparent;
 }
 
-.status-pill.ended:not(.status-pill-asis) {
-  text-transform: lowercase;
-}
-
 .status-pill.ended {
   background: var(--forest-soft);
   color: var(--forest);

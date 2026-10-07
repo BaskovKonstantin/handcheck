@@ -44,6 +44,25 @@ fail_low_space() {
   exit 42
 }
 
+# Compare docker image ids whether compose returns 64-char or `docker images` returns 12-char.
+normalize_image_id() {
+  local raw="${1#sha256:}"
+  echo "${raw:0:12}"
+}
+
+ids_match() {
+  [[ "$(normalize_image_id "$1")" == "$(normalize_image_id "$2")" ]]
+}
+
+tag_rollback_image() {
+  if docker image inspect handcheck-web:latest >/dev/null 2>&1; then
+    echo "Tagging current handcheck-web:latest as handcheck-web:previous for rollback…"
+    docker tag handcheck-web:latest handcheck-web:previous
+  else
+    echo "No handcheck-web:latest yet — skip rollback tag."
+  fi
+}
+
 precheck() {
   print_disk_report
   local root_kb docker_kb
@@ -62,41 +81,51 @@ precheck() {
 
 post_prune() {
   print_disk_report
-  echo "Pruning dangling images and build cache older than 24h (keeping running containers and volumes)…"
-  docker image prune -f || true
-  docker builder prune -af --filter "until=24h" || true
   local keep=()
   if [[ -d "$COMPOSE_DIR" ]]; then
     local current_id prev_id
     current_id="$(cd "$COMPOSE_DIR" && docker compose images -q web 2>/dev/null | head -1 || true)"
+    prev_id="$(docker images handcheck-web:previous -q 2>/dev/null | head -1 || true)"
     if [[ -n "$current_id" ]]; then
       keep+=("$current_id")
-      prev_id="$(docker images --format '{{.ID}} {{.Repository}}' | awk -v cur="$current_id" '$2 ~ /handcheck/ && $1 != cur { print $1; exit }')"
-      if [[ -n "$prev_id" ]]; then
-        keep+=("$prev_id")
-      fi
+    fi
+    if [[ -n "$prev_id" ]] && [[ -n "$current_id" ]] && ! ids_match "$prev_id" "$current_id"; then
+      keep+=("$prev_id")
+    elif [[ -n "$prev_id" ]] && [[ -z "$current_id" ]]; then
+      keep+=("$prev_id")
     fi
   fi
   if [[ "${#keep[@]}" -gt 0 ]]; then
     echo "Keeping HandCheck images for rollback: ${keep[*]}"
-    docker images --format '{{.ID}} {{.Repository}}:{{.Tag}}' | awk '/handcheck/ { print $1 }' | while read -r img; do
-      local skip=0
+    while read -r img; do
+      [[ -z "$img" ]] && continue
+      local skip=0 k
       for k in "${keep[@]}"; do
-        if [[ "$img" == "$k" ]]; then skip=1; break; fi
+        if ids_match "$img" "$k"; then
+          skip=1
+          break
+        fi
       done
       if [[ "$skip" -eq 0 ]]; then
         docker rmi "$img" 2>/dev/null || true
       fi
-    done
+    done < <(docker images --format '{{.ID}} {{.Repository}}:{{.Tag}}' | awk '/handcheck/ { print $1 }')
+  fi
+  echo "Pruning dangling images and build cache older than 24h (keeping running containers and volumes)…"
+  docker image prune -f || true
+  docker builder prune -af --filter "until=24h" || true
+  if docker image inspect handcheck-web:previous >/dev/null 2>&1; then
+    echo "Rollback hint: docker tag handcheck-web:previous handcheck-web:latest && cd ${COMPOSE_DIR} && docker compose up -d web"
   fi
   echo "Post-deploy prune finished."
 }
 
 case "$MODE" in
   precheck) precheck ;;
+  tag-rollback) tag_rollback_image ;;
   post-prune) post_prune ;;
   *)
-    echo "Usage: $0 {precheck|post-prune}"
+    echo "Usage: $0 {precheck|tag-rollback|post-prune}"
     exit 2
     ;;
 esac

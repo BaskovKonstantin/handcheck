@@ -30,6 +30,7 @@ jobs:
           git reset --hard origin/main
 
           bash bin/handcheck-deploy-disk.sh precheck
+          bash bin/handcheck-deploy-disk.sh tag-rollback
 
           # Named volume handcheck-data must survive rebuilds (declared in docker-compose.yml).
           if ! docker volume inspect handcheck_handcheck-data >/dev/null 2>&1; then

@@ -82,6 +82,7 @@
     let remoteStream = null;
     let recorder = null;
     let uploadedChunkCount = 0;
+    let keepaliveBytesInFlight = 0;
     let chunkUploadFailed = false;
     let chunkUploadTimer = null;
     let chunkQueue = null;
@@ -433,12 +434,27 @@
     function uploadKeepaliveBatch(parts) {
       const mime = pickRecorderMime() || "video/webm";
       const blob = new Blob(parts, { type: mime });
-      if (!blob.size || blob.size > KEEPALIVE_BODY_LIMIT) return;
+      if (!blob.size || blob.size > KEEPALIVE_BODY_LIMIT) {
+        chunkQueue?.requeueParts?.(parts);
+        return;
+      }
+      if (keepaliveBytesInFlight + blob.size > KEEPALIVE_BODY_LIMIT) {
+        chunkQueue?.requeueParts?.(parts);
+        return;
+      }
+      keepaliveBytesInFlight += blob.size;
       const form = new FormData();
       form.append("file", blob, `chunk-emergency-${uploadedChunkCount}.webm`);
-      void postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size).then((res) => {
-        if (res?.ok) uploadedChunkCount += 1;
-      });
+      void postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size)
+        .then((res) => {
+          keepaliveBytesInFlight -= blob.size;
+          if (res?.ok) uploadedChunkCount += 1;
+          else chunkQueue?.requeueParts?.(parts);
+        })
+        .catch(() => {
+          keepaliveBytesInFlight -= blob.size;
+          chunkQueue?.requeueParts?.(parts);
+        });
     }
 
     function emergencyUploadPendingRecording() {

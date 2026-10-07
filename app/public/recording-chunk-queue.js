@@ -80,6 +80,17 @@
       }
     }
 
+    function collectQueuedPartsOnly() {
+      const parts = chunks.slice();
+      chunks = [];
+      return parts;
+    }
+
+    function requeueParts(parts) {
+      if (!parts?.length) return;
+      chunks.unshift(...parts);
+    }
+
     function collectAllPendingParts() {
       const parts = [];
       if (inFlight?.pending?.length) parts.push(...inFlight.pending);
@@ -121,7 +132,7 @@
 
     function emergencyFlushKeepalive(uploadBatch) {
       flushGeneration += 1;
-      const parts = collectAllPendingParts();
+      const parts = collectQueuedPartsOnly();
       if (!parts.length) return [];
       const batches = splitPartsIntoUploadBatches(parts, maxUploadBytes);
       for (const batch of batches) {
@@ -152,6 +163,7 @@
       flush,
       waitForIdle: () => flushChain,
       emergencyFlushKeepalive,
+      requeueParts,
       drainRemainingBlobs,
       pendingCount,
       pendingBlobBytes,

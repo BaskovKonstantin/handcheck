@@ -3,6 +3,10 @@ set -euo pipefail
 
 LOG_RMI="${FAKE_DOCKER_RMI_LOG:-}"
 COMPOSE_DIR="${HANDCHECK_COMPOSE_DIR:-}"
+CURRENT_FULL="${FAKE_DOCKER_CURRENT_ID:-sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc}"
+PREV_SHORT="${FAKE_DOCKER_PREV_ID:-bbbbbbbbbbbb}"
+CURRENT_SHORT="${FAKE_DOCKER_CURRENT_SHORT:-${CURRENT_FULL:7:12}}"
+OLD_SHORT="${FAKE_DOCKER_OLD_ID:-aaaaaaaaaaaa}"
 
 case "${1:-}" in
   info)
@@ -18,7 +22,16 @@ case "${1:-}" in
     fi
     ;;
   image)
+    if [[ "${2:-}" == "inspect" ]]; then
+      if [[ "${3:-}" == "handcheck-web:latest" || "${3:-}" == "handcheck-web:previous" ]]; then
+        exit 0
+      fi
+      exit 1
+    fi
     if [[ "${2:-}" == "prune" ]]; then
+      if [[ -n "${FAKE_DOCKER_PRUNE_LOG:-}" ]]; then
+        echo "image-prune" >>"${FAKE_DOCKER_PRUNE_LOG}"
+      fi
       exit 0
     fi
     ;;
@@ -27,17 +40,24 @@ case "${1:-}" in
       exit 0
     fi
     ;;
+  tag)
+    exit 0
+    ;;
   compose)
     if [[ "${2:-}" == "images" && "${3:-}" == "-q" && "${4:-}" == "web" ]]; then
-      echo "${FAKE_DOCKER_CURRENT_ID:-sha256:current}"
+      echo "$CURRENT_FULL"
       exit 0
     fi
     ;;
   images)
+    if [[ "${2:-}" == "handcheck-web:previous" && "${3:-}" == "-q" ]]; then
+      echo "$PREV_SHORT"
+      exit 0
+    fi
     if [[ "${2:-}" == "--format" ]]; then
-      echo "${FAKE_DOCKER_PREV_ID:-sha256:previous} handcheck-web"
-      echo "${FAKE_DOCKER_CURRENT_ID:-sha256:current} handcheck-web"
-      echo "${FAKE_DOCKER_OLD_ID:-sha256:old} handcheck-web"
+      echo "${PREV_SHORT} handcheck-web:previous"
+      echo "${CURRENT_SHORT} handcheck-web:latest"
+      echo "${OLD_SHORT} handcheck-web"
       exit 0
     fi
     if [[ "${2:-}" == "rmi" ]]; then

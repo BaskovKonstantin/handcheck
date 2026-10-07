@@ -56,6 +56,7 @@ describe("round45 findings (unit)", () => {
   it("deploy workflow runs disk guard before build and after health", () => {
     const wf = fs.readFileSync(path.join(__dirname, "../.github/workflows/deploy.yml"), "utf8");
     assert.match(wf, /handcheck-deploy-disk\.sh precheck/);
+    assert.match(wf, /handcheck-deploy-disk\.sh tag-rollback/);
     assert.match(wf, /handcheck-deploy-disk\.sh post-prune/);
     const script = fs.readFileSync(path.join(__dirname, "../bin/handcheck-deploy-disk.sh"), "utf8");
     assert.match(script, /Недостаточно места на konBas/);

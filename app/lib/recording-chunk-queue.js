@@ -40,6 +40,17 @@ function createRecordingChunkQueue({
     if (count > 0) chunks.splice(0, count);
   }
 
+  function collectQueuedPartsOnly() {
+    const parts = chunks.slice();
+    chunks = [];
+    return parts;
+  }
+
+  function requeueParts(parts) {
+    if (!parts?.length) return;
+    chunks.unshift(...parts);
+  }
+
   function collectAllPendingParts() {
     const parts = [];
     if (inFlight?.pending?.length) parts.push(...inFlight.pending);
@@ -84,7 +95,7 @@ function createRecordingChunkQueue({
    */
   function emergencyFlushKeepalive(uploadBatch) {
     flushGeneration += 1;
-    const parts = collectAllPendingParts();
+    const parts = collectQueuedPartsOnly();
     if (!parts.length) return [];
     const batches = splitPartsIntoUploadBatches(parts, maxUploadBytes);
     for (const batch of batches) {
@@ -115,6 +126,7 @@ function createRecordingChunkQueue({
     flush,
     waitForIdle: () => flushChain,
     emergencyFlushKeepalive,
+    requeueParts,
     drainRemainingBlobs,
     pendingCount,
     pendingBlobBytes,

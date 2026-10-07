@@ -1452,6 +1452,168 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
     );
   }
 
+  it("round53: candidate calls status pills use sentence case", async () => {
+    const Database = require("better-sqlite3");
+    const db = new Database(browserDbPath());
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+    const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+    const { newId } = require("../app/lib/ids");
+    const specs = [
+      { status: "ready", label: "ready" },
+      { status: "live", label: "live" },
+      { status: "ended", label: "ended" },
+    ];
+    for (const spec of specs) {
+      const invId = newId();
+      const callId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, ?, 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, anna.id, `r53 pill ${spec.label}`);
+      if (spec.status === "ended") {
+        db.prepare(
+          `INSERT INTO calls (id, invitation_id, status, ended_at) VALUES (?, ?, 'ended', datetime('now'))`
+        ).run(callId, invId);
+      } else {
+        db.prepare(`INSERT INTO calls (id, invitation_id, status) VALUES (?, ?, ?)`).run(
+          callId,
+          invId,
+          spec.status
+        );
+      }
+    }
+    db.close();
+
+    const page = await browser.newPage();
+    await login(page, "anna@demo.local");
+    await page.goto(`${BASE}/candidate/calls`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".status-pill", { timeout: 20000 });
+    const pills = await page.$$eval(".status-pill", (els) =>
+      els.map((el) => ({
+        text: (el.innerText || el.textContent || "").trim(),
+        transform: getComputedStyle(el).textTransform,
+      }))
+    );
+    assert.ok(pills.length >= 3, `expected call pills, got ${pills.length}`);
+    for (const p of pills) {
+      assert.match(p.text, /^[А-ЯЁA-Z]/, `pill "${p.text}"`);
+      assert.notEqual(p.transform, "lowercase", `pill "${p.text}" has lowercase transform`);
+    }
+    await page.close();
+  });
+
+  it("round53: visibility hide during uploads has no page errors or duplicate chunks", async () => {
+    const { ffmpegAvailable, readDurationSecondsFromBuffer } = require("../app/lib/webm-ffmpeg");
+    if (!ffmpegAvailable()) return;
+
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const Database = require("better-sqlite3");
+      const db = new Database(browserDbPath());
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round53 visibility', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+
+      const hooks = () => {
+        window.__hcPcs = [];
+        const Orig = window.RTCPeerConnection;
+        window.RTCPeerConnection = class extends Orig {
+          constructor(...args) {
+            super(...args);
+            window.__hcPcs.push(this);
+          }
+        };
+      };
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      await empCtx.addInitScript(hooks);
+      await candCtx.addInitScript(hooks);
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      const pageErrors = [];
+      cand.on("pageerror", (err) => pageErrors.push(String(err)));
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await joinLiveCall(emp, cand, invId);
+      await emp.waitForFunction(
+        () => (document.getElementById("panel-title")?.textContent || "").includes("В эфире"),
+        { timeout: 60000 }
+      );
+      const liveStarted = Date.now();
+      await cand.waitForResponse(
+        (res) => res.url().includes("/recording-chunk") && res.request().method() === "POST",
+        { timeout: 45000 }
+      );
+      for (let i = 0; i < 3; i += 1) {
+        await cand.waitForResponse(
+          (res) => res.url().includes("/recording-chunk") && res.request().method() === "POST",
+          { timeout: 45000 }
+        );
+        await cand.evaluate(() => {
+          Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+          document.dispatchEvent(new Event("visibilitychange"));
+        });
+        await new Promise((r) => setTimeout(r, 1500));
+        await cand.evaluate(() => {
+          Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+          document.dispatchEvent(new Event("visibilitychange"));
+        });
+      }
+      await emp.click("#end", { force: true });
+      await emp.waitForSelector(".call-result-card", { timeout: 120000 });
+      const liveSec = (Date.now() - liveStarted) / 1000;
+      assert.equal(pageErrors.length, 0, pageErrors.join("; "));
+      let info = null;
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        info = await emp.evaluate(async (id) => {
+          const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+          return r.json();
+        }, invId);
+        if (info.status === "ended" && (info.recordingSides || []).includes("candidate")) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      const db2 = new Database(browserDbPath());
+      const callRow = db2
+        .prepare(`SELECT recording_path FROM calls WHERE invitation_id = ? LIMIT 1`)
+        .get(invId);
+      db2.close();
+      const chunkDir = path.join(callRow.recording_path, "chunks", "candidate");
+      const chunkFiles = fs
+        .readdirSync(chunkDir)
+        .filter((f) => /^\d+\.webm$/.test(f))
+        .sort();
+      const chunkSizes = chunkFiles.map((f) => fs.statSync(path.join(chunkDir, f)).size);
+      const dupPairs = chunkSizes.filter((sz, idx) => idx > 0 && chunkSizes[idx - 1] === sz);
+      assert.equal(dupPairs.length, 0, `duplicate consecutive chunk sizes: ${chunkSizes.join(",")}`);
+      const buf = await emp.evaluate(async ({ callId, side }) => {
+        const res = await fetch(`/api/calls/${callId}/recording?side=${side}`, { credentials: "include" });
+        const ab = await res.arrayBuffer();
+        return Array.from(new Uint8Array(ab));
+      }, { callId: info.callId, side: "candidate" });
+      const dur = readDurationSecondsFromBuffer(Buffer.from(buf));
+      assert.ok(dur && dur > 0, `duration ${dur}`);
+      assert.ok(
+        Math.abs(dur - liveSec) <= liveSec * 0.25 + 4,
+        `candidate duration ${dur}s vs live ~${liveSec}s`
+      );
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
+  });
+
   it("round49: invitation status pills use sentence case on both sides", async () => {
     const Database = require("better-sqlite3");
     const db = new Database(browserDbPath());

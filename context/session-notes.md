@@ -1,5 +1,11 @@
 # Session notes
 
+## 2026-10-07 — post-PR48 layout fixes
+
+- Branch: `cursor/ui-layout-fixes-post-48-a5bc`
+- Today summary cards stack ≤600px; deck need stats rows; timeline CTAs aligned; mobile hero flush to header.
+- Artifacts: `handcheck-ui/post48-layout-fix/{before,after}/`.
+
 ## 2026-10-07 — round 66 (cabinet UI polish)
 
 - Branch: `cursor/round66-design-polish-ec59`

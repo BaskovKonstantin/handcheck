@@ -189,6 +189,72 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
+  it("round65: employer list undecided cards keep width at 390px", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
+    const page = await context.newPage();
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+    const longName = "Тест Р65 Вставка список мобильный";
+    db.prepare("UPDATE candidate_profiles SET display_name = ? WHERE user_id = ?").run(longName, anna.id);
+    db.prepare("DELETE FROM need_reviews WHERE need_id = ? AND candidate_user_id = ?", need.id, anna.id);
+    const { newId } = require("../app/lib/ids");
+    db.prepare("DELETE FROM attempt_events WHERE attempt_id IN (SELECT id FROM attempts WHERE candidate_user_id = ?)").run(
+      anna.id
+    );
+    db.prepare("DELETE FROM attempts WHERE candidate_user_id = ?").run(anna.id);
+    db.prepare("DELETE FROM batteries WHERE candidate_user_id = ?").run(anna.id);
+    const batId = newId();
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at, completed_at)
+       VALUES (?, ?, 'backend', 'middle', 'A', ?, ?)`
+    ).run(batId, anna.id, now, now);
+    const quickTask = db.prepare("SELECT id FROM tasks WHERE type = 'quick' LIMIT 1").get();
+    const attemptId = newId();
+    db.prepare(
+      `INSERT INTO attempts (id, candidate_user_id, task_id, battery_id, form_key, answer_text, submitted_at, action_source, integrity_metrics_json)
+       VALUES (?, ?, ?, ?, 'A', ?, ?, 'web', ?)`
+    ).run(
+      attemptId,
+      anna.id,
+      quickTask.id,
+      batId,
+      "x".repeat(100),
+      now,
+      JSON.stringify({ pastedChars: 80, answerLength: 100 })
+    );
+    db.close();
+
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/list?need=${need.id}`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector('.list-row-card-rich button[data-decision="later"]', { timeout: 20000 });
+    const card = page.locator(".list-row-card-rich", { hasText: longName });
+    await card.waitFor({ state: "visible", timeout: 20000 });
+    await card.locator(".status-pill.paste-input").waitFor({ state: "visible", timeout: 5000 });
+    const layout = await card.evaluate((el) => {
+      const main = el.querySelector(".list-row-main");
+      const name = el.querySelector(".list-row-main strong");
+      const mainBox = main?.getBoundingClientRect();
+      const nameBox = name?.getBoundingClientRect();
+      const cardBox = el.getBoundingClientRect();
+      return {
+        mainW: mainBox?.width ?? 0,
+        nameW: nameBox?.width ?? 0,
+        nameH: nameBox?.height ?? 0,
+        cardH: cardBox.height,
+      };
+    });
+    assert.ok(layout.mainW >= 200, `list-row-main width ${layout.mainW}`);
+    assert.ok(layout.nameW >= 200, `name width ${layout.nameW}`);
+    assert.ok(layout.nameH < 120, `name height ${layout.nameH} (vertical ribbon)`);
+    assert.ok(layout.cardH < 700, `card height ${layout.cardH}`);
+    await context.close();
+  });
+
   it("mobile Ещё menu reaches every employer nav item at 390", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
     const page = await context.newPage();

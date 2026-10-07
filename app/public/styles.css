@@ -2606,6 +2606,10 @@ body.deck-page main.column {
     display: none;
   }
 
+  .invite-card-top {
+    flex-wrap: wrap;
+  }
+
   .deck-actions:not(.deck-actions-round) {
     display: none;
   }
@@ -3516,7 +3520,7 @@ body.has-cabinet-chrome {
   align-self: flex-start;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 899px) {
   .list-match-group-body .list-row-card-rich {
     width: 100%;
     box-sizing: border-box;
@@ -3525,6 +3529,7 @@ body.has-cabinet-chrome {
   .list-row-card-rich {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
+    gap: 0.75rem;
   }
 
   .list-row-card-rich .list-row-main {
@@ -3533,6 +3538,7 @@ body.has-cabinet-chrome {
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    overflow-wrap: break-word;
   }
 
   .list-row-card-rich .list-row-actions {

@@ -96,7 +96,8 @@ CREATE TABLE IF NOT EXISTS attempts (
   opened_at TEXT,
   started_at TEXT,
   submitted_at TEXT,
-  action_source TEXT NOT NULL DEFAULT 'web' CHECK (action_source IN ('web', 'mcp'))
+  action_source TEXT NOT NULL DEFAULT 'web' CHECK (action_source IN ('web', 'mcp')),
+  integrity_metrics_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS attempt_events (

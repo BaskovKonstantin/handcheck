@@ -15,6 +15,7 @@ const {
 const { validateOptionalPhone, validateBackgroundEpisode } = require("../app/lib/validation");
 const { parseSalaryRange } = require("../app/lib/salary-range");
 const answers = require("../scripts/fixtures/distinct-quick-answers");
+const { postTypedAnswerTelemetry } = require("./helpers/assessment-telemetry");
 
 function bootServer() {
   const tmpDb = path.join(os.tmpdir(), `hc-r24-${process.pid}-${Date.now()}.sqlite`);
@@ -81,6 +82,7 @@ async function passTest(agent) {
     const text =
       task.body.type === "work" ? answers.workAnswer : answers.quickAnswerForIndex(quickIdx++);
     await agent.post(`/api/assessment/tasks/${a.id}/open`);
+    await postTypedAnswerTelemetry(agent, a.id, text);
     await agent.post(`/api/assessment/tasks/${a.id}/submit`).send({ answerText: text });
   }
 }

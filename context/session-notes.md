@@ -1,5 +1,10 @@
 # HandCheck session notes
 
+## Round 54 (branch cursor/integrity-input-telemetry-23b5)
+
+- **P1-1:** `computeAttemptIntegrity` — учёт typed/paste/other_insert по символам, unattributed, open→submit и chars/sec; MCP без unattributed; метрики в `attempts.integrity_metrics_json`; агрегация батареи через `Math.max`.
+- **P1-2:** `assessment-input-classify.js` + `tasks.html` — `InputEvent.inputType`, `other_insert`, `drop`; сервер принимает новые типы событий.
+
 ## Round 41 CI fix (PR #31, branch cursor/round41-prod-findings-01e9)
 
 - **round34 browser:** после «Завершить» убран `location.href` reload — `renderEndedView` in-place (гонка `page.evaluate` с навигацией); тест ждёт `.call-result-card`.

@@ -6,6 +6,8 @@ const ALLOWED_EVENT_TYPES = new Set([
   "first_input",
   "typing",
   "paste",
+  "other_insert",
+  "drop",
   "draft",
 ]);
 

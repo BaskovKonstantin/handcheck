@@ -35,6 +35,7 @@ function applyPatches(db) {
   );
   ensureColumn(db, "attempts", "late_answer_text", "TEXT");
   ensureColumn(db, "attempts", "timed_out", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "attempts", "integrity_metrics_json", "TEXT");
   ensureColumn(db, "api_tokens", "privacy_policy_version", "TEXT");
   ensureColumn(db, "calls", "recording_consent_policy_version", "TEXT");
   ensureColumn(db, "batteries", "assessment_consent_at", "TEXT");

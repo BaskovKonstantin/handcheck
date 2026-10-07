@@ -9,6 +9,9 @@ const { formatSpecGradeLabel } = require("../app/lib/category-labels");
 function classifyEmployerMatchGroup(item, need) {
   const status = item.categoryStatus || "confirmed";
   if (status === "unconfirmed") return "unconfirmed";
+  if (item.gradeRelation === "lower" || item.gradeRelation === "higher") {
+    return "other_grade";
+  }
   if (status === "other_grade" || status === "off_grade" || status === "grade_mismatch") {
     return "other_grade";
   }
@@ -54,6 +57,13 @@ describe("round-66 design helpers", () => {
       "other_grade"
     );
     assert.equal(classifyEmployerMatchGroup({ categoryStatus: "other_grade" }, need), "other_grade");
+    assert.equal(
+      classifyEmployerMatchGroup(
+        { categoryStatus: "confirmed", categoryLabel: "Backend × Middle", gradeRelation: "higher" },
+        need
+      ),
+      "other_grade"
+    );
   });
 
   it("deckStatsFromMatches counts deck left and review buckets", () => {

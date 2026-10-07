@@ -1,47 +1,33 @@
-@font-face {
-  font-family: "DM Sans";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("/fonts/dm-sans-latin-400-normal.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "DM Sans";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("/fonts/dm-sans-latin-600-normal.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "DM Sans";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("/fonts/dm-sans-latin-700-normal.woff2") format("woff2");
-}
+@import url("/fonts.css");
 
 [hidden] {
   display: none !important;
 }
 
 :root {
-  --paper: #f4f0e8;
-  --card: #fffcf7;
-  --ink: #141c28;
-  --muted: #5a6575;
-  --line: #e0d8cc;
-  --clay: #c2410c;
-  --clay-hover: #9a3412;
-  --clay-glow: rgba(194, 65, 12, 0.22);
-  --forest: #1a4d38;
-  --forest-soft: #dceee4;
-  --forest-glow: rgba(26, 77, 56, 0.18);
-  --danger: #9f2d2d;
+  /* Ocean slate palette (replaces forest/orange/beige) */
+  --paper: #f3f6fc;
+  --card: #ffffff;
+  --ink: #0f172a;
+  --ink-muted: #475569;
+  --muted: #5c677a;
+  --line: #dde4ef;
+  --forest: #0a6b7c;
+  --forest-soft: #e4f4f8;
+  --forest-glow: rgba(10, 107, 124, 0.14);
+  --accent-secondary: #5b6fd6;
+  --accent-secondary-soft: #eef1fc;
+  --clay: #c42d52;
+  --clay-hover: #a32345;
+  --clay-glow: rgba(196, 45, 82, 0.2);
+  --danger: #b42318;
   --on-clay: #ffffff;
-  --display: "DM Sans", "Segoe UI", system-ui, sans-serif;
-  --font: var(--display);
+  --signal-warn-bg: #fff8eb;
+  --signal-warn-ink: #7a4d08;
+  --signal-warn-line: #e7c35a;
+  --display: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --font: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-tabular: "Golos Text", ui-sans-serif, system-ui, sans-serif;
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -52,11 +38,13 @@
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 16px;
-  --shadow-sm: 0 1px 2px rgba(26, 35, 50, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dur-fast: 160ms;
-  --dur: 240ms;
-  --dur-deck: 320ms;
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-fast: 180ms;
+  --dur: 260ms;
+  --dur-deck: 340ms;
+  --press-scale: 0.97;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -64,6 +52,7 @@
     --dur-fast: 1ms;
     --dur: 1ms;
     --dur-deck: 1ms;
+    --press-scale: 1;
   }
 }
 
@@ -363,7 +352,7 @@ a {
 }
 
 .cabinet-content {
-  animation: section-in 200ms var(--ease-out) both;
+  animation: content-rise var(--dur) var(--ease-spring) both;
   overflow-x: clip;
 }
 
@@ -458,9 +447,9 @@ body.call-room-page {
   font-weight: 600;
   line-height: 1.3;
   max-width: 100%;
-  background: #fff4e0;
-  color: #8a4b00;
-  border: 1px solid #e8b84a;
+  background: var(--signal-warn-bg);
+  color: var(--signal-warn-ink);
+  border: 1px solid var(--signal-warn-line);
   white-space: normal;
   text-align: left;
 }
@@ -565,9 +554,9 @@ textarea:focus {
 }
 
 .category-pill-grade-mismatch {
-  background: color-mix(in srgb, #c9a227 18%, var(--card));
-  color: color-mix(in srgb, #6b5a12 75%, var(--ink));
-  border: 1px solid color-mix(in srgb, #c9a227 35%, var(--line));
+  background: color-mix(in srgb, var(--signal-warn-line) 22%, var(--card));
+  color: var(--signal-warn-ink);
+  border: 1px solid color-mix(in srgb, var(--signal-warn-line) 55%, var(--line));
 }
 
 .category-pill {
@@ -690,19 +679,27 @@ textarea:focus {
   transition: transform var(--dur-deck) var(--ease-out), opacity var(--dur-deck) var(--ease-out);
 }
 
-.deck-card.enter {
-  animation: deck-enter var(--dur) var(--ease-out) both;
-}
-
 @keyframes deck-enter {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(18px) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
+}
+
+.deck-card.enter {
+  animation: deck-enter var(--dur-deck) var(--ease-spring) both;
+}
+
+.deck-card.exit-left,
+.deck-card.exit-right,
+.deck-card.exit-down {
+  transition:
+    transform var(--dur-deck) var(--ease-spring),
+    opacity var(--dur-deck) var(--ease-out);
 }
 
 .deck-card.exit-left {
@@ -731,11 +728,12 @@ textarea:focus {
 .invite-sheet {
   position: fixed;
   inset: 0;
-  background: rgba(26, 35, 50, 0.35);
+  background: rgba(15, 23, 42, 0.42);
   display: flex;
   align-items: flex-end;
   justify-content: center;
   z-index: 20;
+  animation: backdrop-in var(--dur-fast) var(--ease-out) both;
 }
 
 .invite-sheet.hidden {
@@ -748,13 +746,22 @@ textarea:focus {
   background: var(--card);
   border-radius: 16px 16px 0 0;
   padding: 1.25rem;
-  animation: sheet-in var(--dur) var(--ease-out) both;
+  animation: sheet-in var(--dur) var(--ease-spring) both;
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes sheet-in {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(28px);
   }
   to {
     opacity: 1;
@@ -1759,11 +1766,11 @@ body.has-cabinet-chrome main {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -3599,4 +3606,172 @@ body.has-cabinet-chrome {
   padding: 1rem;
   border-radius: 12px;
   margin-bottom: 1rem;
+}
+
+/* —— Typography & motion (round 66 palette refresh) —— */
+.stat-tile-value,
+.deck-need-stats dd,
+.salary-hero,
+.display-title,
+.cabinet-page-hero h1,
+.page-header h1 {
+  font-family: var(--display);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.battery-timer,
+.stat-tile-value,
+.deck-need-stats dd {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+@keyframes content-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-tile-grid .stat-tile,
+.list-row-card-rich,
+.deck-card,
+.panel {
+  animation: content-rise var(--dur) var(--ease-spring) both;
+}
+
+.stat-tile-grid .stat-tile:nth-child(2) {
+  animation-delay: 55ms;
+}
+
+.stat-tile-grid .stat-tile:nth-child(3) {
+  animation-delay: 110ms;
+}
+
+.stat-tile-grid .stat-tile:nth-child(4) {
+  animation-delay: 165ms;
+}
+
+.btn-primary,
+.btn-ghost,
+.btn-quiet,
+.btn-secondary-soft,
+.deck-act,
+.cabinet-nav-link,
+.chip,
+.category-pill,
+.status-pill,
+select,
+input,
+textarea {
+  transition:
+    transform var(--dur-fast) var(--ease-spring),
+    background var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.btn-primary:active:not(:disabled),
+.btn-ghost:active:not(:disabled),
+.btn-quiet:active:not(:disabled),
+.btn-secondary-soft:active,
+.deck-act:active {
+  transform: scale(var(--press-scale));
+}
+
+.cabinet-aside-inner {
+  position: relative;
+}
+
+.cabinet-nav-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 10px;
+  background: var(--forest-soft);
+  z-index: 0;
+  pointer-events: none;
+  transition:
+    transform var(--dur) var(--ease-spring),
+    height var(--dur) var(--ease-spring),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.cabinet-aside .cabinet-nav-link {
+  position: relative;
+  z-index: 1;
+}
+
+.cabinet-tabs {
+  position: relative;
+}
+
+.cabinet-tabs-indicator {
+  position: absolute;
+  bottom: 0.35rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--forest);
+  transition:
+    transform var(--dur) var(--ease-spring),
+    width var(--dur) var(--ease-spring),
+    opacity var(--dur-fast);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.cabinet-tabs .tab-link {
+  position: relative;
+  z-index: 1;
+}
+
+.skeleton-card,
+.deck-skeleton-card,
+.cabinet-email-skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--line) 55%, var(--card)) 0%,
+    color-mix(in srgb, var(--line) 25%, var(--paper)) 50%,
+    color-mix(in srgb, var(--line) 55%, var(--card)) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.15s var(--ease-out) infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cabinet-content,
+  .stat-tile-grid .stat-tile,
+  .list-row-card-rich,
+  .deck-card,
+  .panel,
+  .invite-sheet,
+  .invite-panel,
+  .toast {
+    animation: none !important;
+  }
+
+  .skeleton-card,
+  .deck-skeleton-card,
+  .cabinet-email-skeleton {
+    animation: none !important;
+  }
+
+  .cabinet-nav-indicator,
+  .cabinet-tabs-indicator {
+    transition: none !important;
+  }
 }

@@ -9,6 +9,7 @@
 - Tests: `npm test`, `test/round66-design.test.js`.
 - Mobile list: stack actions under `.list-row-main` ≤640px; Playwright asserts `.list-row-main` width >200px at 360–430.
 - Merged `origin/main` (P2-1 grade mismatch labels): `gradeRelation` on pills + grouping.
+- Palette refresh: ocean slate + teal brand + rose CTA (`--forest`/`--clay` tokens); Golos Text body + Unbounded display (self-hosted woff2); iOS-like motion + `prefers-reduced-motion`.
 
 ## 2026-10-07 — round 66 P2-1 (off-grade confirmed pool labels)
 

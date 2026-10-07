@@ -135,6 +135,24 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
+  it("round66: prefers-reduced-motion keeps cabinet usable at 390", async () => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 900 },
+      reducedMotion: "reduce",
+    });
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/list`, { waitUntil: "networkidle", timeout: 60000 });
+    const h = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+    );
+    assert.equal(h, false);
+    assert.equal(errors.length, 0, errors.join("; "));
+    await context.close();
+  });
+
   it("round66: employer list row main stays readable at 360–430px", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
     const page = await context.newPage();

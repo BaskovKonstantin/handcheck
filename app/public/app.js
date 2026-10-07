@@ -47,6 +47,81 @@ function formatSpecGradeLabel(specialization, grade) {
 const API_TIMEOUT_MS = 14000;
 const API_RETRIES = 2;
 
+(function preloadAppFonts() {
+  const hrefs = [
+    "/fonts/golos/golos-cyrillic-400.woff2",
+    "/fonts/golos/golos-latin-400.woff2",
+    "/fonts/unbounded/unbounded-cyrillic-700.woff2",
+  ];
+  for (const href of hrefs) {
+    if (document.querySelector(`link[data-hc-preload="${href}"]`)) continue;
+    const link = document.createElement("link");
+    link.rel = "preload";
+    link.as = "font";
+    link.type = "font/woff2";
+    link.crossOrigin = "anonymous";
+    link.href = href;
+    link.dataset.hcPreload = href;
+    document.head.appendChild(link);
+  }
+})();
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+}
+
+function updateCabinetNavIndicators() {
+  const asideIndicator = document.getElementById("cabinet-nav-indicator");
+  const asideActive = document.querySelector(".cabinet-aside .cabinet-nav-link.active");
+  if (asideIndicator && asideActive) {
+    asideIndicator.style.height = `${asideActive.offsetHeight}px`;
+    asideIndicator.style.transform = `translateY(${asideActive.offsetTop}px)`;
+    asideIndicator.hidden = false;
+  }
+  const tabsIndicator = document.getElementById("cabinet-tabs-indicator");
+  const tabActive = document.querySelector(".cabinet-tabs .tab-link.active");
+  if (tabsIndicator && tabActive) {
+    tabsIndicator.style.width = `${tabActive.offsetWidth}px`;
+    tabsIndicator.style.transform = `translateX(${tabActive.offsetLeft}px)`;
+    tabsIndicator.hidden = false;
+  }
+}
+
+function animateStatCounters(root, { duration = 680 } = {}) {
+  if (!root || prefersReducedMotion()) return;
+  root.querySelectorAll(".stat-tile-value").forEach((el) => {
+    if (el.querySelector(".category-pill, .stat-zero")) return;
+    const raw = (el.textContent || "").trim();
+    if (!/^\d+$/.test(raw)) return;
+    const target = Number(raw);
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - t) ** 3;
+      el.textContent = String(Math.round(target * eased));
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    el.textContent = "0";
+    requestAnimationFrame(tick);
+  });
+}
+
+function initUiMotion() {
+  updateCabinetNavIndicators();
+  window.addEventListener("resize", updateCabinetNavIndicators, { passive: true });
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".cabinet-nav-link, .tab-link")) {
+      requestAnimationFrame(updateCabinetNavIndicators);
+    }
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initUiMotion);
+} else {
+  initUiMotion();
+}
+
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -616,7 +691,10 @@ function ensureCabinetChrome(links, role, meEmail) {
     <div class="cabinet-aside-brand">
       <a class="logo cabinet-aside-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
     </div>
-    <div class="cabinet-aside-inner">${navLinks}</div>
+    <div class="cabinet-aside-inner">
+      <span class="cabinet-nav-indicator" id="cabinet-nav-indicator" hidden></span>
+      ${navLinks}
+    </div>
     <div class="cabinet-user-card">
       ${formatCabinetEmailMarkup(meEmail)}
       <button type="button" class="btn-ghost btn-sm" id="logout-btn-aside">Выход</button>
@@ -635,8 +713,9 @@ function ensureCabinetChrome(links, role, meEmail) {
   const tabLinks = tabHrefs
     .map((href) => links.find((l) => l.href === href))
     .filter(Boolean);
-  tabs.innerHTML = tabLinks.map((l) => navLinkHtml(l, true)).join("");
+  tabs.innerHTML = `<span class="cabinet-tabs-indicator" id="cabinet-tabs-indicator" hidden></span>${tabLinks.map((l) => navLinkHtml(l, true)).join("")}`;
   bindCabinetMoreMenu(role, links);
+  requestAnimationFrame(updateCabinetNavIndicators);
 }
 
 function mountCabinetChromeSync(links, role) {
@@ -1020,5 +1099,7 @@ window.HandCheck = {
   renderStatZeroState,
   renderDeckNeedPanel,
   deckStatsFromMatches,
+  animateStatCounters,
+  updateCabinetNavIndicators,
   LOGO_MARK,
 };

@@ -1,5 +1,13 @@
 # Session notes
 
+## 2026-10-07 — round 66 (cabinet UI polish)
+
+- Branch: `cursor/round66-design-polish-ec59`
+- Mobile deck: safe padding under floating actions + tab bar; deck-wrap overflow visible.
+- Desktop: full-width cabinet heroes; deck need stats panel; employer list grouped by match tier with collapse + «Показать ещё»; quieter list secondary actions; amber paste chip; candidate today zero-states + profile/integration steps + cooldown copy.
+- Sidebar tagline removed; screenshots in `handcheck-ui/round66/{before,after}/`.
+- Tests: `npm test` (304 pass), `test/round66-design.test.js`.
+
 ## 2026-10-07 — CI ffmpeg install (PR apt stall)
 
 - Branch: `cursor/ci-ffmpeg-robust-2ebc`

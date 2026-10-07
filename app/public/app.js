@@ -380,7 +380,69 @@ function formatAuditLogTime(iso) {
 
 function renderPasteInputMark(pasteInputMark) {
   if (!pasteInputMark?.label) return "";
-  return `<span class="status-pill paste-input" title="${escapeHtml(pasteInputMark.label)}">${escapeHtml(pasteInputMark.label)}</span>`;
+  const label = escapeHtml(pasteInputMark.label);
+  return `<span class="integrity-chip paste-input" title="${label}">${label}</span>`;
+}
+
+const EMPLOYER_MATCH_GROUPS = [
+  { id: "exact", title: "Точное совпадение грейда", defaultOpen: true, initialVisible: 10 },
+  { id: "other_grade", title: "Другой грейд, та же специализация", defaultOpen: false, initialVisible: 10 },
+  { id: "unconfirmed", title: "Категория не подтверждена", defaultOpen: false, initialVisible: 10 },
+];
+
+function classifyEmployerMatchGroup(item, need) {
+  const status = item.categoryStatus || "confirmed";
+  if (status === "unconfirmed") return "unconfirmed";
+  if (status === "other_grade" || status === "off_grade" || status === "grade_mismatch") {
+    return "other_grade";
+  }
+  if (need && status === "confirmed") {
+    const needLabel = formatSpecGradeLabel(need.specialization, need.grade);
+    const raw = String(item.categoryLabel || "").replace(/\s*—\s*неподтверждён\s*$/i, "").trim();
+    if (needLabel && raw && raw !== needLabel) return "other_grade";
+  }
+  return "exact";
+}
+
+function renderStatZeroState(iconSvg, hint) {
+  return `<div class="stat-zero" role="status">
+    <span class="stat-zero-icon" aria-hidden="true">${iconSvg}</span>
+    <p class="stat-zero-hint">${escapeHtml(hint)}</p>
+  </div>`;
+}
+
+function renderDeckNeedPanel(need, stats) {
+  if (!need) return "";
+  const esc = escapeHtml;
+  const specGrade = formatSpecGradeLabel(need.specialization, need.grade);
+  const title = need.title || "Потребность";
+  const inactive = need.active
+    ? ""
+    : `<p class="deck-need-panel-note">Потребность неактивна — приглашения недоступны.</p>`;
+  return `<div class="deck-need-panel-inner">
+    <h2 class="deck-need-panel-title">${esc(title)}</h2>
+    ${specGrade ? `<p class="deck-need-panel-spec">${esc(specGrade)}</p>` : ""}
+    ${inactive}
+    <dl class="deck-need-stats">
+      <div><dt>В колоде</dt><dd>${esc(String(stats.deckLeft ?? "—"))}</dd></div>
+      <div><dt>Приглашено</dt><dd>${esc(String(stats.invited ?? 0))}</dd></div>
+      <div><dt>Отложено</dt><dd>${esc(String(stats.deferred ?? 0))}</dd></div>
+    </dl>
+  </div>`;
+}
+
+function deckStatsFromMatches(items) {
+  const skip = new Set(["rejected", "later", "invited", "declined"]);
+  let deckLeft = 0;
+  let invited = 0;
+  let deferred = 0;
+  for (const item of items || []) {
+    const st = item.reviewStatus;
+    if (st === "invited") invited += 1;
+    else if (st === "later") deferred += 1;
+    if (!skip.has(st)) deckLeft += 1;
+  }
+  return { deckLeft, invited, deferred };
 }
 
 function renderAiUsageSection(aiUsage, { compact = false } = {}) {
@@ -550,7 +612,6 @@ function ensureCabinetChrome(links, role, meEmail) {
   aside.innerHTML = `
     <div class="cabinet-aside-brand">
       <a class="logo cabinet-aside-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
-      <p class="cabinet-aside-tagline">Категория по навыку</p>
     </div>
     <div class="cabinet-aside-inner">${navLinks}</div>
     <div class="cabinet-user-card">
@@ -949,5 +1010,10 @@ window.HandCheck = {
   joinMetaParts,
   renderAiUsageSection,
   renderPasteInputMark,
+  EMPLOYER_MATCH_GROUPS,
+  classifyEmployerMatchGroup,
+  renderStatZeroState,
+  renderDeckNeedPanel,
+  deckStatsFromMatches,
   LOGO_MARK,
 };

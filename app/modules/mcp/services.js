@@ -20,6 +20,7 @@ const {
 } = require("../../lib/assessment-timing");
 const { createInvitation, respondToInvitation } = require("../invitations/actions");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
+const { getEmployerPasteInputMark } = require("../../lib/employer-paste-indicator");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
 const {
   validateDisplayName,
@@ -464,6 +465,7 @@ function getDeckNext(userId, needId, filters = {}) {
   items = applyFilters(items, filters);
   if (!items.length) return { card: null, candidateId: null };
   const c = items[0];
+  const db = getDb();
   const card = employerCandidateView(
     userId,
     {
@@ -478,6 +480,7 @@ function getDeckNext(userId, needId, filters = {}) {
       taskPhrases: c.taskPhrases,
       integrationNote: c.integrationNote,
       aiUsage: summarizeAiUsageForEmployer(userId, c.id),
+      pasteInputMark: getEmployerPasteInputMark(db, c.id),
       phone: c.phone,
       contact_email: c.contact_email,
     },
@@ -546,7 +549,13 @@ function listShortlist(userId, needId, filters = {}) {
   if (!need) throw mcpError("Потребность не найдена", "not_found");
   let items = loadCandidatesForNeed(need, userId);
   items = applyFilters(items, filters);
-  return items.map(publicMatchShape);
+  const db = getDb();
+  return items.map((c) => {
+    const row = publicMatchShape(c);
+    const pasteInputMark = getEmployerPasteInputMark(db, c.id);
+    if (pasteInputMark) row.pasteInputMark = pasteInputMark;
+    return row;
+  });
 }
 
 function listEmployerInvitations(userId) {

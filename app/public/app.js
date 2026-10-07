@@ -378,6 +378,11 @@ function formatAuditLogTime(iso) {
   return `${datePart}, ${time}`;
 }
 
+function renderPasteInputMark(pasteInputMark) {
+  if (!pasteInputMark?.label) return "";
+  return `<span class="status-pill paste-input" title="${escapeHtml(pasteInputMark.label)}">${escapeHtml(pasteInputMark.label)}</span>`;
+}
+
 function renderAiUsageSection(aiUsage, { compact = false } = {}) {
   if (!aiUsage || aiUsage.empty) return "";
   const esc = escapeHtml;
@@ -945,5 +950,6 @@ window.HandCheck = {
   bindEmployerNeedSwitcher,
   joinMetaParts,
   renderAiUsageSection,
+  renderPasteInputMark,
   LOGO_MARK,
 };

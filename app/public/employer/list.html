@@ -141,6 +141,7 @@
                 <div class="list-row-main">
                   <strong>${esc(r.displayName || "Кандидат")}</strong>
                   ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}
+                  ${HandCheck.renderPasteInputMark(r.pasteInputMark)}
                   ${invited}
                   ${domains ? `<div class="chip-row">${domains}</div>` : ""}
                   ${stack ? `<div class="chip-row chip-row-skills">${stack}</div>` : ""}

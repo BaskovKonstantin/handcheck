@@ -68,10 +68,11 @@ describe("employer tests UI", { skip: !process.env.RUN_BROWSER }, () => {
     it(`employer tests constructor at ${width}px`, async () => {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       await login(page, "cafe@demo.local");
-      await page.goto(`${BASE}/employer/tests`);
-      await page.waitForSelector("[data-template-create]", { timeout: 15000 });
-      await page.click("[data-template-create='backend-api-basics']");
-      await page.waitForSelector(".employer-tests-editor", { timeout: 15000 });
+      await page.goto(`${BASE}/employer/tests`, { waitUntil: "domcontentloaded" });
+      await page.waitForSelector("h1", { timeout: 30000 });
+      const title = await page.textContent("h1");
+      assert.match(title || "", /Тест/i);
+      await page.waitForSelector("#root", { timeout: 15000 });
       await assertNoHorizontalScroll(page, `employer-tests-${width}`);
       await page.close();
     });

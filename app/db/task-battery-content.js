@@ -1,123 +1,122 @@
 "use strict";
 
 const { newId } = require("../lib/ids");
+const {
+  SPECS,
+  GRADES,
+  getBatteryDefinition,
+  listPlatformCategories,
+  quickRubricFromItem,
+  ensureCategories,
+} = require("./battery-catalog");
 
-/** Published backend × middle battery copy (forms A and B). */
-const QUICK_PROMPTS = [
-  "Как вы спроектируете HTTP API для мобильного клиента: версии, ошибки, пагинация?",
-  "Как обрабатываете ошибки и валидацию входных данных на сервере?",
-  "Что такое идемпотентность и как обеспечить её для повторных запросов оплаты?",
-  "Как кэшируете ответы и когда инвалидируете кэш при изменении данных?",
-  "Как организуете аутентификацию и авторизацию в сервисном API (токены, роли, срок жизни)?",
-  "Как проектируете фоновые задачи и очереди для тяжёлых операций?",
-  "Какие подходы к миграциям схемы БД и обратной совместимости API вы применяете?",
-  "Как мониторите продакшен: метрики, логи, алерты и расследование инцидентов?",
-];
-
-/** Parallel form B — same rubric, different wording. */
-const QUICK_PROMPTS_FORM_B = [
-  "Опишите дизайн REST API для мобильного приложения: версионирование, коды ошибок, постраничная выдача.",
-  "Расскажите, как на бэкенде валидируете вход и возвращаете понятные ошибки клиенту.",
-  "Объясните идемпотентность на примере повторного запроса оплаты — что храните и как отвечаете.",
-  "Как устроите кэш ответов и сброс кэша, когда данные в источнике меняются?",
-  "Как выдаёте и проверяете токены доступа, разграничиваете роли в сервисном API?",
-  "Как вынесете долгие операции в фон: очередь, воркеры, повтор при сбоях?",
-  "Как безопасно меняете схему БД и не ломаете старых клиентов API?",
-  "Какие метрики и логи смотрите в проде и как реагируете на инцидент?",
-];
-
-const WORK_PROMPT =
-  "Спроектируйте сервис бронирования столиков: API, хранение, конкурентные брони, уведомления и безопасность.";
-
-const WORK_PROMPT_FORM_B =
-  "Опишите архитектуру сервиса бронирования столиков: контракт API, хранение, гонки за слот, уведомления и защита.";
-
+const backendMiddleDef = getBatteryDefinition("backend", "middle");
+const QUICK_PROMPTS = backendMiddleDef.quick.map((q) => q.promptA);
+const QUICK_PROMPTS_FORM_B = backendMiddleDef.quick.map((q) => q.promptB);
+const WORK_PROMPT = backendMiddleDef.work.promptA;
+const WORK_PROMPT_FORM_B = backendMiddleDef.work.promptB;
 const QUICK_RUBRIC = {
-  keys: [
-    ["api", "http", "rest", "endpoint", "запрос"],
-    ["ошиб", "валидац", "400", "422", "статус", "код"],
-    ["идемпот", "повтор", "ключ", "dedup"],
-    ["кэш", "redis", "инвалида", "ttl"],
-    ["jwt", "токен", "авторизац", "oauth", "рол"],
-    ["очеред", "worker", "фон", "retry", "kafka", "rabbit"],
-    ["миграц", "схем", "верси", "совместим"],
-    ["метрик", "лог", "алерт", "монитор", "sentry", "prometheus"],
-  ],
-  breadthKeys: [["транзак", "блокиров", "очеред", "postgres", "sql"]],
+  keys: backendMiddleDef.quick.map((q) => q.keys[0]),
+  breadthKeys: backendMiddleDef.quick[0]?.breadthKeys || [],
   minLength: 80,
 };
+const WORK_RUBRIC = backendMiddleDef.work.rubric;
 
-function quickRubricForIndex(index) {
-  const group = QUICK_RUBRIC.keys[index];
-  const keys = Array.isArray(group) ? group : group ? [group] : [];
-  return {
-    keys,
-    breadthKeys: QUICK_RUBRIC.breadthKeys,
-    minLength: QUICK_RUBRIC.minLength,
-    questionIndex: index,
-  };
+function quickPromptsForForm(def, form) {
+  return def.quick.map((q) => (form === "B" ? q.promptB : q.promptA));
 }
 
-const WORK_RUBRIC = {
-  keys: [
-    ["api", "http", "rest", "endpoint"],
-    ["авторизац", "токен", "jwt", "безопас"],
-  ],
-  breadthKeys: [["брон", "слот", "конкур", "транзак", "очеред", "уведом"]],
-  workItems: [
-    { id: "storage", phrases: ["postgres", "sql", "баз", "хран"] },
-    { id: "concurrency", phrases: ["блокиров", "транзак", "race", "конкур"] },
-  ],
-  minLength: 200,
-};
-
-function quickPromptsForForm(form) {
-  return form === "B" ? QUICK_PROMPTS_FORM_B : QUICK_PROMPTS;
+function workPromptForForm(def, form) {
+  return form === "B" ? def.work.promptB : def.work.promptA;
 }
 
-function workPromptForForm(form) {
-  return form === "B" ? WORK_PROMPT_FORM_B : WORK_PROMPT;
+function quickRubricForIndex(def, grade, index) {
+  const item = def.quick[index];
+  if (!item) {
+    return { keys: [], breadthKeys: [], minLength: 80, questionIndex: index };
+  }
+  return quickRubricFromItem(item, grade, index);
 }
 
-function ensureEightQuickTasksForForm(db, form) {
-  const prompts = quickPromptsForForm(form);
+function countPublishedQuick(db, specialization, grade, form) {
+  return db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM tasks WHERE type = 'quick' AND specialization = ? AND grade = ? AND form_key = ? AND status = 'published'`
+    )
+    .get(specialization, grade, form).c;
+}
+
+function ensureEightQuickTasksForForm(db, specialization, grade, form, def) {
+  const prompts = quickPromptsForForm(def, form);
   const ins = db.prepare(
     `INSERT INTO tasks (id, type, specialization, grade, form_key, prompt, rubric_json, status, origin)
-     VALUES (?, 'quick', 'backend', 'middle', ?, ?, ?, 'published', 'manual')`
+     VALUES (?, 'quick', ?, ?, ?, ?, ?, 'published', 'manual')`
   );
-  const count = db
-    .prepare(
-      `SELECT COUNT(*) AS c FROM tasks WHERE type = 'quick' AND specialization = 'backend' AND grade = 'middle' AND form_key = ? AND status = 'published'`
-    )
-    .get(form).c;
+  const count = countPublishedQuick(db, specialization, grade, form);
   for (let i = count; i < prompts.length; i += 1) {
-    ins.run(newId(), form, prompts[i], JSON.stringify(quickRubricForIndex(i)));
+    ins.run(
+      newId(),
+      specialization,
+      grade,
+      form,
+      prompts[i],
+      JSON.stringify(quickRubricForIndex(def, grade, i))
+    );
   }
 }
 
-function formsHaveIdenticalPrompts(db) {
+function ensureWorkTaskForForm(db, specialization, grade, form, def) {
+  const existing = db
+    .prepare(
+      `SELECT id FROM tasks WHERE type = 'work' AND specialization = ? AND grade = ? AND form_key = ? AND status = 'published'`
+    )
+    .get(specialization, grade, form);
+  if (existing) return;
+  db.prepare(
+    `INSERT INTO tasks (id, type, specialization, grade, form_key, prompt, rubric_json, status, origin)
+     VALUES (?, 'work', ?, ?, ?, ?, ?, 'published', 'manual')`
+  ).run(
+    newId(),
+    specialization,
+    grade,
+    form,
+    workPromptForForm(def, form),
+    JSON.stringify(def.work.rubric)
+  );
+}
+
+function ensureBatteryForCategory(db, specialization, grade) {
+  const def = getBatteryDefinition(specialization, grade);
+  if (!def) return;
+  for (const form of ["A", "B"]) {
+    ensureEightQuickTasksForForm(db, specialization, grade, form, def);
+    ensureWorkTaskForForm(db, specialization, grade, form, def);
+  }
+}
+
+function formsHaveIdenticalPrompts(db, specialization, grade) {
   const rowsA = db
     .prepare(
-      `SELECT prompt FROM tasks WHERE type IN ('quick','work') AND specialization = 'backend' AND grade = 'middle' AND form_key = 'A' AND status = 'published' ORDER BY type, rowid`
+      `SELECT prompt FROM tasks WHERE type IN ('quick','work') AND specialization = ? AND grade = ? AND form_key = 'A' AND status = 'published' ORDER BY type, rowid`
     )
-    .all()
+    .all(specialization, grade)
     .map((r) => r.prompt);
   const rowsB = db
     .prepare(
-      `SELECT prompt FROM tasks WHERE type IN ('quick','work') AND specialization = 'backend' AND grade = 'middle' AND form_key = 'B' AND status = 'published' ORDER BY type, rowid`
+      `SELECT prompt FROM tasks WHERE type IN ('quick','work') AND specialization = ? AND grade = ? AND form_key = 'B' AND status = 'published' ORDER BY type, rowid`
     )
-    .all()
+    .all(specialization, grade)
     .map((r) => r.prompt);
   if (rowsA.length === 0 || rowsA.length !== rowsB.length) return false;
   return rowsA.every((p, i) => p === rowsB[i]);
 }
 
-function needsPerQuestionRubricPatch(db) {
+function needsPerQuestionRubricPatch(db, specialization, grade) {
   const row = db
     .prepare(
-      `SELECT rubric_json FROM tasks WHERE type = 'quick' AND specialization = 'backend' AND grade = 'middle' AND status = 'published' LIMIT 1`
+      `SELECT rubric_json FROM tasks WHERE type = 'quick' AND specialization = ? AND grade = ? AND status = 'published' LIMIT 1`
     )
-    .get();
+    .get(specialization, grade);
   if (!row?.rubric_json) return false;
   try {
     const rubric = JSON.parse(row.rubric_json);
@@ -128,12 +127,17 @@ function needsPerQuestionRubricPatch(db) {
   }
 }
 
-function applyBatteryContentPatch(db) {
+function patchBackendMiddleContentIfNeeded(db) {
+  const specialization = "backend";
+  const grade = "middle";
+  const def = getBatteryDefinition(specialization, grade);
+  if (!def) return;
+
   const totalQuick = db
     .prepare(
-      `SELECT COUNT(*) AS c FROM tasks WHERE type = 'quick' AND specialization = 'backend' AND grade = 'middle' AND status = 'published'`
+      `SELECT COUNT(*) AS c FROM tasks WHERE type = 'quick' AND specialization = ? AND grade = ? AND status = 'published'`
     )
-    .get().c;
+    .get(specialization, grade).c;
   if (totalQuick === 0) return;
 
   const legacy = db
@@ -143,42 +147,105 @@ function applyBatteryContentPatch(db) {
     .get().c;
   const needsContent =
     legacy > 0 ||
-    totalQuick < QUICK_PROMPTS.length * 2 ||
-    needsPerQuestionRubricPatch(db) ||
-    formsHaveIdenticalPrompts(db);
+    totalQuick < def.quick.length * 2 ||
+    needsPerQuestionRubricPatch(db, specialization, grade) ||
+    formsHaveIdenticalPrompts(db, specialization, grade);
   if (!needsContent) return;
 
   const upd = db.prepare(`UPDATE tasks SET prompt = ?, rubric_json = ? WHERE id = ?`);
   for (const form of ["A", "B"]) {
-    const prompts = quickPromptsForForm(form);
-    ensureEightQuickTasksForForm(db, form);
+    const prompts = quickPromptsForForm(def, form);
+    ensureEightQuickTasksForForm(db, specialization, grade, form, def);
     const quickRows = db
       .prepare(
-        `SELECT id FROM tasks WHERE type = 'quick' AND specialization = 'backend' AND grade = 'middle' AND form_key = ? AND status = 'published' ORDER BY rowid`
+        `SELECT id FROM tasks WHERE type = 'quick' AND specialization = ? AND grade = ? AND form_key = ? AND status = 'published' ORDER BY rowid`
       )
-      .all(form);
+      .all(specialization, grade, form);
     quickRows.forEach((row, idx) => {
       if (idx < prompts.length) {
-        upd.run(prompts[idx], JSON.stringify(quickRubricForIndex(idx)), row.id);
+        upd.run(prompts[idx], JSON.stringify(quickRubricForIndex(def, grade, idx)), row.id);
       }
     });
     const work = db
       .prepare(
-        `SELECT id FROM tasks WHERE type = 'work' AND specialization = 'backend' AND grade = 'middle' AND form_key = ? AND status = 'published'`
+        `SELECT id FROM tasks WHERE type = 'work' AND specialization = ? AND grade = ? AND form_key = ? AND status = 'published'`
       )
-      .get(form);
+      .get(specialization, grade, form);
     if (work) {
-      upd.run(workPromptForForm(form), JSON.stringify(WORK_RUBRIC), work.id);
+      upd.run(workPromptForForm(def, form), JSON.stringify(def.work.rubric), work.id);
+    } else {
+      ensureWorkTaskForForm(db, specialization, grade, form, def);
     }
   }
 }
 
-function seedBatteryTasks(db, ins) {
+function flattenNestedQuickRubrics(db) {
+  const rows = db
+    .prepare(`SELECT id, rubric_json FROM tasks WHERE type = 'quick' AND status = 'published'`)
+    .all();
+  const upd = db.prepare(`UPDATE tasks SET rubric_json = ? WHERE id = ?`);
+  for (const row of rows) {
+    try {
+      const rubric = JSON.parse(row.rubric_json);
+      if (
+        Array.isArray(rubric.keys) &&
+        rubric.keys.length > 0 &&
+        Array.isArray(rubric.keys[0])
+      ) {
+        rubric.keys = rubric.keys.length === 1 ? rubric.keys[0] : rubric.keys.flat();
+        upd.run(JSON.stringify(rubric), row.id);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function applyBatteryContentPatch(db) {
+  ensureCategories(db);
+  for (const { specialization, grade } of listPlatformCategories()) {
+    ensureBatteryForCategory(db, specialization, grade);
+  }
+  patchBackendMiddleContentIfNeeded(db);
+  flattenNestedQuickRubrics(db);
+}
+
+function seedBatteryTasks(db, ins, specialization, grade) {
+  const def = getBatteryDefinition(specialization, grade);
+  if (!def) return;
   for (const form of ["A", "B"]) {
-    quickPromptsForForm(form).forEach((prompt, idx) => {
-      ins.run(newId(), "quick", form, prompt, JSON.stringify(quickRubricForIndex(idx)));
+    quickPromptsForForm(def, form).forEach((prompt, idx) => {
+      ins.run(
+        newId(),
+        "quick",
+        specialization,
+        grade,
+        form,
+        prompt,
+        JSON.stringify(quickRubricForIndex(def, grade, idx))
+      );
     });
-    ins.run(newId(), "work", form, workPromptForForm(form), JSON.stringify(WORK_RUBRIC));
+    ins.run(
+      newId(),
+      "work",
+      specialization,
+      grade,
+      form,
+      workPromptForForm(def, form),
+      JSON.stringify(def.work.rubric)
+    );
+  }
+}
+
+function seedAllPlatformBatteries(db) {
+  const ins = db.prepare(
+    `INSERT INTO tasks (id, type, specialization, grade, form_key, prompt, rubric_json, status, origin)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'published', 'manual')`
+  );
+  for (const specialization of SPECS) {
+    for (const grade of GRADES) {
+      seedBatteryTasks(db, ins, specialization, grade);
+    }
   }
 }
 
@@ -189,7 +256,11 @@ module.exports = {
   WORK_PROMPT_FORM_B,
   QUICK_RUBRIC,
   WORK_RUBRIC,
-  quickRubricForIndex,
+  quickRubricForIndex: (index) => quickRubricForIndex(backendMiddleDef, "middle", index),
   applyBatteryContentPatch,
   seedBatteryTasks,
+  seedAllPlatformBatteries,
+  ensureBatteryForCategory,
+  SPECS,
+  GRADES,
 };

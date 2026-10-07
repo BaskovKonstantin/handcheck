@@ -202,7 +202,7 @@ describe("task battery content", () => {
       .prepare(`SELECT prompt FROM tasks WHERE type = 'quick' AND status = 'published'`)
       .all()
       .map((r) => r.prompt);
-    assert.ok(prompts.length >= 16);
+    assert.ok(prompts.length >= 9 * 8 * 2);
     assert.equal(new Set(prompts).size, prompts.length);
     assert.doesNotMatch(prompts.join("\n"), /QuickProbe|WorkSim/);
     if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb);

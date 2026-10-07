@@ -106,22 +106,12 @@
         }
       }
 
-      function isChoiceAvailable(field, value) {
-        if (field === "spec" || field === "specialization") return value === "backend";
-        if (field === "grade") return value === "middle";
-        return false;
-      }
-
       function choiceChips(name, options, selected) {
         return `<div class="choice-chip-row" role="radiogroup" aria-label="${name}">
           ${options
             .map((o) => {
-              const available = isChoiceAvailable(name, o.value);
-              const cls = `choice-chip${o.value === selected ? " active" : ""}${available ? "" : " disabled"}`;
-              const hint = available ? "" : ' <span class="invite-meta">скоро</span>';
-              return `<button type="button" class="${cls}" data-choice="${o.value}" data-field="${name}"${
-                available ? "" : " disabled"
-              }>${o.label}${hint}</button>`;
+              const cls = `choice-chip${o.value === selected ? " active" : ""}`;
+              return `<button type="button" class="${cls}" data-choice="${o.value}" data-field="${name}">${o.label}</button>`;
             })
             .join("")}
           <input type="hidden" id="${name}" value="${selected}" />
@@ -129,7 +119,7 @@
       }
 
       function bindChoiceChips(root) {
-        root.querySelectorAll(".choice-chip:not(.disabled)").forEach((btn) => {
+        root.querySelectorAll(".choice-chip").forEach((btn) => {
           btn.addEventListener("click", () => {
             const field = btn.dataset.field;
             root.querySelectorAll(`.choice-chip[data-field="${field}"]`).forEach((b) => b.classList.remove("active"));
@@ -155,7 +145,7 @@
           : `<p class="invite-meta">${onCooldown ? "Категория не подтверждена." : "Категория появится после первого завершённого теста."}</p>${retakeWhen ? retakeExplain : ""}`;
         panel.innerHTML = `
           ${catBlock}
-          <p class="invite-meta">Выберите специализацию и грейд. Сейчас доступна только категория Backend × Middle — другие тесты готовятся.</p>
+          <p class="invite-meta">Выберите специализацию и грейд — тест подтвердит категорию вида «Frontend × Junior».</p>
           <div class="form-field">
             <span class="form-label">Специализация</span>
             ${choiceChips("spec", SPECS, "backend")}
@@ -184,11 +174,6 @@
           }
           const spec = document.getElementById("spec").value;
           const grade = document.getElementById("grade").value;
-          if (spec !== "backend" || grade !== "middle") {
-            err.hidden = false;
-            err.textContent = "Тест для выбранной категории пока не готов.";
-            return;
-          }
           try {
             await HandCheck.api("/api/assessment/battery/start", {
               method: "POST",

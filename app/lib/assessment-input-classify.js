@@ -8,8 +8,8 @@ const OTHER_INPUT_TYPES = new Set([
   "insertFromYank",
 ]);
 
-/** One-shot insert without a keyboard inputType above this size → other_insert. */
-const BULK_INSERT_CHAR_THRESHOLD = 8;
+/** insertText above this size (per event) → other_insert; IME composition commits excluded. */
+const BULK_INSERT_CHAR_THRESHOLD = 3;
 
 /**
  * @param {number} delta chars added since last length snapshot
@@ -37,8 +37,17 @@ function classifyLengthIncrease(delta, inputType, pendingPasteChars = 0) {
   if (it && PASTE_INPUT_TYPES.has(it)) {
     return { paste: paste + remaining, typing: 0, other: 0 };
   }
-  if (it && KEYBOARD_INPUT_TYPES.has(it)) {
+  if (it === "insertCompositionText") {
     return { paste, typing: remaining, other: 0 };
+  }
+  if (it === "insertText" && remaining > BULK_INSERT_CHAR_THRESHOLD) {
+    return { paste, typing: 0, other: remaining };
+  }
+  if (it === "insertText") {
+    return { paste, typing: remaining, other: 0 };
+  }
+  if (it === "unknown") {
+    return { paste, typing: 0, other: remaining };
   }
   if (it && OTHER_INPUT_TYPES.has(it)) {
     return { paste, typing: 0, other: remaining };

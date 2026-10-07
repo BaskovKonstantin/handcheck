@@ -376,6 +376,21 @@
               const blob = new Blob(parts, { type: mime });
               await uploadRecordingChunk(blob);
             },
+            onUploadFailure: () => {
+              if (!chunkUploadFailed) {
+                chunkUploadFailed = true;
+                emit({ recordingUploadDegraded: true });
+                if (typeof onUploadError === "function") {
+                  onUploadError("Не удалось сохранить фрагмент записи — повторим при завершении звонка");
+                }
+              }
+            },
+            onUploadSuccess: () => {
+              if (chunkUploadFailed) {
+                chunkUploadFailed = false;
+                emit({ recordingUploadDegraded: false });
+              }
+            },
           })
         : null;
       recorder = new MediaRecorder(stream, {
@@ -410,7 +425,10 @@
       const res = await postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size);
       if (!res.ok) throw new Error("chunk_upload_failed");
       uploadedChunkCount += 1;
-      chunkUploadFailed = false;
+      if (chunkUploadFailed) {
+        chunkUploadFailed = false;
+        emit({ recordingUploadDegraded: false });
+      }
       return true;
     }
 

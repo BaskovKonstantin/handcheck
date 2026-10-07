@@ -343,10 +343,6 @@
           pendingPasteChars += chars;
           enqueueEvent("paste", { length: chars, chars });
         });
-        ta.addEventListener("drop", (ev) => {
-          const text = ev.dataTransfer?.getData("text") || "";
-          enqueueEvent("drop", { chars: text.length });
-        });
         let draftTimer = null;
         let typedChars = restored.length;
         let typingPending = 0;
@@ -358,6 +354,7 @@
           const batch = typingPending;
           typingPending = 0;
           enqueueEvent("typing", { chars: batch });
+          flushTelemetry();
         };
         const flushOther = () => {
           if (otherPending <= 0) return;
@@ -365,20 +362,54 @@
           const inputType = otherPendingInputType;
           otherPending = 0;
           otherPendingInputType = "";
-          enqueueEvent("other_insert", { chars: batch, inputType: inputType || undefined });
+          enqueueEvent("other_insert", {
+            chars: batch,
+            inputType: inputType || "unknown",
+          });
+          flushTelemetry();
         };
         let otherPendingInputType = "";
+        let suppressNextInputClassify = false;
         const classifyDelta = HandCheckInputClassify.classifyLengthIncrease;
+        ta.addEventListener("dragover", (ev) => {
+          ev.preventDefault();
+        });
+        ta.addEventListener("drop", (ev) => {
+          ev.preventDefault();
+          const text = ev.dataTransfer?.getData("text") || "";
+          const chars = text.length;
+          enqueueEvent("drop", { chars });
+          if (chars > 0) {
+            const start = ta.selectionStart ?? ta.value.length;
+            const end = ta.selectionEnd ?? start;
+            ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+            typedChars = ta.value.length;
+            syncLen();
+            enqueueEvent("other_insert", { chars, inputType: "insertFromDrop" });
+            suppressNextInputClassify = true;
+          }
+          flushTelemetry();
+        });
         ta.addEventListener("input", (ev) => {
           const len = ta.value.length;
           if (!firstInputSent && len > 0) {
             firstInputSent = true;
             enqueueEvent("first_input", { length: len });
           }
+          if (suppressNextInputClassify) {
+            suppressNextInputClassify = false;
+            typedChars = len;
+            return;
+          }
           if (len > typedChars) {
             const delta = len - typedChars;
             typedChars = len;
-            const inputType = ev && typeof ev.inputType === "string" ? ev.inputType : "";
+            let inputType = "";
+            if (typeof InputEvent !== "undefined" && ev instanceof InputEvent) {
+              inputType = typeof ev.inputType === "string" ? ev.inputType : "";
+            } else if (delta > 0) {
+              inputType = "unknown";
+            }
             const parts = classifyDelta(delta, inputType, pendingPasteChars);
             pendingPasteChars = Math.max(0, pendingPasteChars - parts.paste);
             if (parts.typing > 0) {
@@ -503,6 +534,7 @@
         });
         const onPageLifecycleFlush = () => {
           flushTyping();
+          flushOther();
           flushTelemetryBeacon();
         };
         window.addEventListener("pagehide", onPageLifecycleFlush);

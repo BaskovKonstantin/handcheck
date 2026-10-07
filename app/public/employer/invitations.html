@@ -24,6 +24,7 @@
     <script>
       const list = document.getElementById("list");
       const statsEl = document.getElementById("stats");
+      const esc = HandCheck.escapeHtml;
 
       function cardStatusClass(status) {
         if (status === "accepted") return "invite-card-status-accepted";
@@ -40,7 +41,6 @@
 
       async function loadInvitations() {
         const seq = HandCheck.nextCabinetPageLoad();
-        const esc = HandCheck.escapeHtml;
         statsEl.innerHTML = HandCheck.skeletonBlocks(3);
         list.innerHTML = HandCheck.skeletonBlocks(2);
         const d = await HandCheck.api("/api/employer/invitations");

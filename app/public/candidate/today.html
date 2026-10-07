@@ -105,8 +105,8 @@
           const retakeDate = HandCheck.formatRetakeDateMoscow(cat.retakeAt);
           steps.push({
             tone: "muted",
-            title: "Категория не подтверждена",
-            meta: `Пересдача с ${retakeDate} (Москва)`,
+            title: "Пересдача теста",
+            meta: `С ${retakeDate} (Москва)`,
             cta: `<button class="btn-improve-locked btn-sm" type="button" disabled title="Пересдача с ${retakeDate}"><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача с ${retakeDate}</button>`,
           });
         } else if (!onCooldown) {
@@ -172,10 +172,10 @@
           const onCooldown = Boolean(cat.cooldownActive && cat.retakeAt);
           const retakeDate = onCooldown ? HandCheck.formatRetakeDateMoscow(cat.retakeAt) : "";
           const body = onCooldown
-            ? `Категория не подтверждена. Пересдача возможна после ${retakeDate} (Москва).`
+            ? `Пересдача возможна после ${retakeDate} (Москва).`
             : "Пройдите тест — специализация и грейд появятся здесь.";
           const empty = onCooldown
-            ? `<div class="panel"><h2 class="h2">Категория ещё не подтверждена</h2><p class="invite-meta">${body}</p></div>`
+            ? `<div class="panel"><h2 class="h2">Категория не подтверждена</h2><p class="invite-meta">${body}</p></div>`
             : HandCheck.emptyState("Категория ещё не подтверждена", body, "/candidate/tasks", "Пройти тест");
           dash.innerHTML =
             empty + HandCheck.timelineSection("Ближайшие шаги", buildUpcomingSteps(items, cat, callItems));

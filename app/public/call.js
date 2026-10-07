@@ -185,6 +185,10 @@ function updatePeerUi(state) {
     remote.hidden = false;
     if (roomPhase === "live" && panelTitle) panelTitle.textContent = "В эфире";
     setBanner("Эфир — соединение с собеседником", true);
+  } else if (state.peerLeft) {
+    peerState.textContent = "Собеседник вышел из комнаты";
+    if (roomPhase === "live" && panelTitle) panelTitle.textContent = "Собеседник вышел";
+    setBanner("Собеседник вышел из комнаты", false);
   } else if (state.connectionState === "disconnected" || state.connectionState === "failed") {
     peerState.textContent = "Соединение потеряно — переподключаемся…";
     if (roomPhase === "live" && panelTitle) panelTitle.textContent = "Переподключение";

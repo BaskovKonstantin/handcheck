@@ -52,7 +52,9 @@ async function main() {
       .all();
     const quick = tasks.filter((t) => t.type === "quick");
     const work = tasks.find((t) => t.type === "work");
-    const qs = quick.map((t) => scoreQuick(strong.quickAnswer, JSON.parse(t.rubric_json)));
+    const qs = quick.map((t, i) =>
+      scoreQuick(strong.quickAnswerForIndex(i), JSON.parse(t.rubric_json))
+    );
     const ws = scoreWork(strong.workAnswer, JSON.parse(work.rubric_json));
     return aggregateBattery(qs, ws).test_score;
   })();

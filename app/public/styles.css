@@ -2612,21 +2612,28 @@ body.deck-page main.column {
 }
 
 @media (max-width: 480px) {
+  .cabinet-page-hero-inner .lede {
+    font-size: 0.92rem;
+    line-height: 1.35;
+  }
+
   .battery-steps {
     display: flex;
     flex-wrap: nowrap;
-    gap: 0.25rem;
+    gap: 0.2rem;
     overflow-x: auto;
-    padding-bottom: 0.1rem;
-    margin-bottom: 0.65rem;
+    padding-bottom: 0.05rem;
+    margin-bottom: 0.45rem;
     scroll-snap-type: x proximity;
+    max-height: 2.4rem;
   }
 
   .battery-step {
     flex: 0 0 auto;
-    min-width: 1.85rem;
-    padding: 0.2rem 0.3rem;
+    min-width: 1.55rem;
+    padding: 0.15rem 0.25rem;
     scroll-snap-align: center;
+    border-radius: 8px;
   }
 
   .battery-step-label {
@@ -2638,16 +2645,25 @@ body.deck-page main.column {
   }
 
   .cabinet-content #panel textarea#answer {
-    min-height: 5.5rem;
-    max-height: 8rem;
+    min-height: 4.75rem;
+    max-height: 7rem;
   }
 
   .cabinet-content #panel .battery-timer {
-    margin-bottom: 0.35rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .cabinet-content #panel .task-prompt {
+    margin-bottom: 0.45rem;
   }
 
   body.has-cabinet-chrome .cabinet-content #panel {
-    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  body.has-cabinet-chrome .cabinet-content #panel #submit {
+    margin-bottom: 0.25rem;
   }
 }
 

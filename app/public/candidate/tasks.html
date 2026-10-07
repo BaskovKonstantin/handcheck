@@ -279,6 +279,24 @@
           telemetryChain = telemetryChain.then(() => postTelemetry(batch));
           return telemetryChain;
         };
+        const flushTelemetryBeacon = () => {
+          if (!telemetryQueue.length) return;
+          const batch = telemetryQueue.splice(0, telemetryQueue.length);
+          const body = JSON.stringify({ events: batch });
+          const url = "/api/assessment/events";
+          if (navigator.sendBeacon) {
+            const blob = new Blob([body], { type: "application/json" });
+            navigator.sendBeacon(url, blob);
+            return;
+          }
+          void fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body,
+            keepalive: true,
+          });
+        };
         const enqueueEvent = (event_type, payload) => {
           telemetryQueue.push({ attemptId, event_type, payload });
         };
@@ -417,7 +435,17 @@
           }
         };
         ta.addEventListener("blur", () => {
+          flushTyping();
+          flushTelemetry();
           persistDraft();
+        });
+        const onPageLifecycleFlush = () => {
+          flushTyping();
+          flushTelemetryBeacon();
+        };
+        window.addEventListener("pagehide", onPageLifecycleFlush);
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "hidden") onPageLifecycleFlush();
         });
         let draftTimer = null;
         if (t.type === "work") {

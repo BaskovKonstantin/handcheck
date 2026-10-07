@@ -5,11 +5,26 @@ const PRIVACY_POLICY_VERSION = "2026-10-06";
 
 const PRIVACY_POLICY_PATH = "/privacy";
 
+function operatorName() {
+  const v = String(process.env.PRIVACY_OPERATOR_NAME || "").trim();
+  return v || "оператор платформы HandCheck";
+}
+
+function operatorInn() {
+  const v = String(process.env.PRIVACY_OPERATOR_INN || "").trim();
+  return v || "не указан";
+}
+
+function operatorEmail() {
+  const v = String(process.env.PRIVACY_OPERATOR_EMAIL || "").trim();
+  return v || "support@handcheck.local";
+}
+
 function privacyNoticeShort() {
   return (
     "Обработка персональных данных — по 152-ФЗ. " +
     `Подробности и ваши права: ${PRIVACY_POLICY_PATH}. ` +
-    "Оператор: [УКАЖИТЕ НАИМЕНОВАНИЕ ОПЕРАТОРА]. ИНН: [УКАЖИТЕ ИНН]. Контакт: [УКАЖИТЕ EMAIL ДЛЯ ОБРАЩЕНИЙ]."
+    `Оператор: ${operatorName()}. ИНН: ${operatorInn()}. Контакт: ${operatorEmail()}.`
   );
 }
 
@@ -28,5 +43,8 @@ module.exports = {
   PRIVACY_POLICY_VERSION,
   PRIVACY_POLICY_PATH,
   privacyNoticeShort,
+  operatorName,
+  operatorInn,
+  operatorEmail,
   recordDataConsent,
 };

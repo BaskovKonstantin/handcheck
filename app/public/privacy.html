@@ -18,9 +18,9 @@
         </div>
       </header>
       <article class="panel privacy-doc">
-        <p><strong>Оператор:</strong> [УКАЖИТЕ НАИМЕНОВАНИЕ ОПЕРАТОРА]</p>
-        <p><strong>ИНН:</strong> [УКАЖИТЕ ИНН]</p>
-        <p><strong>Контакт для обращений:</strong> [УКАЖИТЕ EMAIL ДЛЯ ОБРАЩЕНИЙ ПО ПДн]</p>
+        <p><strong>Оператор:</strong> <span id="privacy-operator-name">…</span></p>
+        <p><strong>ИНН:</strong> <span id="privacy-operator-inn">…</span></p>
+        <p><strong>Контакт для обращений:</strong> <span id="privacy-operator-email">…</span></p>
         <h2 class="h2">Цели обработки</h2>
         <ul>
           <li>Проведение навыкового теста и формирование категории кандидата.</li>
@@ -36,7 +36,7 @@
         <h2 class="h2">Кому доступны данные</h2>
         <p>Работодатель, пригласивший кандидата, видит категорию, материалы теста и записи звонков в рамках подбора. Контакты кандидата раскрываются только после принятия приглашения.</p>
         <h2 class="h2">Срок хранения</h2>
-        <p>До отзыва согласия или удаления аккаунта, если иной срок не предусмотрен договором с работодателем. [УКАЖИТЕ СРОКИ ХРАНЕНИЯ ЗАПИСЕЙ, ЕСЛИ ОТЛИЧАЮТСЯ]</p>
+        <p>До отзыва согласия или удаления аккаунта, если иной срок не предусмотрен договором с работодателем. Записи звонков хранятся в рамках срока действия аккаунта и договора с работодателем.</p>
         <h2 class="h2">Права субъекта</h2>
         <p>Вы можете запросить уточнение, блокирование или удаление данных, отозвать согласие — направьте обращение на контакт оператора выше.</p>
       </article>
@@ -44,6 +44,17 @@
     <script src="/app.js"></script>
     <script>
       HandCheck.bootPublicPage();
+      fetch("/api/privacy-notice")
+        .then((r) => r.json())
+        .then((data) => {
+          const name = document.getElementById("privacy-operator-name");
+          const inn = document.getElementById("privacy-operator-inn");
+          const email = document.getElementById("privacy-operator-email");
+          if (name) name.textContent = data.operatorName || "";
+          if (inn) inn.textContent = data.operatorInn || "";
+          if (email) email.textContent = data.operatorEmail || "";
+        })
+        .catch(() => {});
     </script>
   </body>
 </html>

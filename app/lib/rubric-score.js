@@ -88,6 +88,92 @@ function cutoffForGrade(grade) {
   return CUTOFFS[grade] ?? CUTOFFS.middle;
 }
 
+function stripQuickLead(text) {
+  return String(text || "")
+    .replace(/^\s*пункт\s*\d+\s*[.:]\s*/i, "")
+    .trim();
+}
+
+function shingleSet(text, size = 3) {
+  const words = normalizeText(text).split(" ").filter((w) => w.length > 1);
+  const set = new Set();
+  for (let i = 0; i <= words.length - size; i += 1) {
+    set.add(words.slice(i, i + size).join(" "));
+  }
+  return set;
+}
+
+function jaccardSimilarity(a, b) {
+  const sa = shingleSet(a);
+  const sb = shingleSet(b);
+  if (!sa.size || !sb.size) return 0;
+  let inter = 0;
+  for (const x of sa) if (sb.has(x)) inter += 1;
+  const union = sa.size + sb.size - inter;
+  return union ? inter / union : 0;
+}
+
+function looksLikeKeywordListAnswer(answerText, rubric) {
+  const raw = String(answerText || "");
+  const norm = normalizeText(raw);
+  if (norm.length < 40) return false;
+  const keys = rubric?.keys || [];
+  if (!keys.length) return false;
+  const hits = keys.filter((k) => keyHit(norm, k)).length;
+  const keyRatio = hits / keys.length;
+  const tokens = norm.split(" ").filter(Boolean);
+  const sentenceMarkers = /[.!?]/.test(raw);
+  const proseHints =
+    /\b(я|мы|нужно|использую|делаю|потому|чтобы|если|когда|через|версионирую|отдаю|логирую|хранятся|масштабиру)\w*/i.test(
+      raw
+    );
+  const avgTokenLen =
+    tokens.length > 0 ? tokens.reduce((sum, w) => sum + w.length, 0) / tokens.length : 0;
+  const commaCount = (raw.match(/,/g) || []).length;
+  if (
+    keyRatio >= 0.48 &&
+    tokens.length >= 12 &&
+    avgTokenLen < 5.6 &&
+    commaCount < 2 &&
+    !sentenceMarkers &&
+    !proseHints
+  ) {
+    return true;
+  }
+  if (keyRatio >= 0.62 && tokens.length >= 14 && avgTokenLen < 5.8 && !proseHints && commaCount < 2) {
+    return true;
+  }
+  return false;
+}
+
+function nearDuplicateQuickBodiesMultiplier(quickAttempts) {
+  const norms = quickAttempts
+    .map((a) => normalizeText(stripQuickLead(a.answer_text || "")))
+    .filter((t) => t.replace(/\s/g, "").length > 30);
+  if (norms.length < 4) return 1;
+  const freq = new Map();
+  for (const t of norms) freq.set(t, (freq.get(t) || 0) + 1);
+  let maxSame = 0;
+  for (const n of freq.values()) maxSame = Math.max(maxSame, n);
+  if (maxSame >= 5) return 0.2;
+  if (maxSame >= 4) return 0.35;
+  if (maxSame >= 3) return 0.55;
+  return 1;
+}
+
+function keywordTrapMultiplier(quickAttempts, rubricsByAttemptId) {
+  let keywordHits = 0;
+  for (const a of quickAttempts) {
+    const rubric = rubricsByAttemptId?.get?.(a.id) || a.rubric || {};
+    if (looksLikeKeywordListAnswer(a.answer_text, rubric)) keywordHits += 1;
+  }
+  const dupMult = nearDuplicateQuickBodiesMultiplier(quickAttempts);
+  if (keywordHits >= 6) return Math.min(dupMult, 0.15);
+  if (keywordHits >= 4) return Math.min(dupMult, 0.25);
+  if (keywordHits >= 3) return Math.min(dupMult, 0.45);
+  return dupMult;
+}
+
 /** Penalize identical or copy-pasted answers across quick questions. */
 function duplicateQuickAnswerMultiplier(quickAttempts) {
   const texts = quickAttempts
@@ -105,9 +191,12 @@ function duplicateQuickAnswerMultiplier(quickAttempts) {
   return 1;
 }
 
-function applyBatteryScoreGuards(agg, attempts) {
+function applyBatteryScoreGuards(agg, attempts, options = {}) {
   const quickAttempts = attempts.filter((a) => a.type === "quick");
-  const mult = duplicateQuickAnswerMultiplier(quickAttempts);
+  const rubricsByAttemptId = options.rubricsByAttemptId;
+  const dupMult = duplicateQuickAnswerMultiplier(quickAttempts);
+  const trapMult = keywordTrapMultiplier(quickAttempts, rubricsByAttemptId);
+  const mult = Math.min(dupMult, trapMult);
   if (mult >= 1) return agg;
   return {
     knowledge: agg.knowledge * mult,
@@ -124,6 +213,10 @@ module.exports = {
   aggregateBattery,
   cutoffForGrade,
   duplicateQuickAnswerMultiplier,
+  looksLikeKeywordListAnswer,
+  stripQuickLead,
+  jaccardSimilarity,
+  keywordTrapMultiplier,
   applyBatteryScoreGuards,
   CUTOFFS,
 };

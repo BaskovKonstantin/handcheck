@@ -1,5 +1,11 @@
 # Session notes
 
+## 2026-10-07 — employer paste indicator
+
+- Branch: `cursor/employer-paste-indicator-fa54`
+- Threshold: sum(paste chars) / sum(quick answer chars) > 0.5, min 24 chars total on latest completed battery.
+- Employer API field `pasteInputMark.label`; deck + list UI; not on candidate APIs.
+
 ## 2026-10-07 — round 63 (MCP JSON-RPC errors + WS upgrade HTTP status)
 
 - Branch: `cursor/round63-p3-mcp-ws-1bd3`

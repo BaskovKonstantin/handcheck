@@ -446,6 +446,16 @@ body.call-room-page {
   border-color: transparent;
 }
 
+.status-pill.paste-input {
+  background: color-mix(in srgb, var(--clay) 12%, var(--card));
+  color: var(--clay);
+  border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.25;
+}
+
 label {
   display: grid;
   gap: 0.35rem;

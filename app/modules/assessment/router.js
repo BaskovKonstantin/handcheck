@@ -14,7 +14,8 @@ const {
   cooldownActive,
 } = require("./service");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
-const { validateAnswerText, answerMaxForType, WORK_ANSWER_MIN } = require("../../lib/assessment-answer");
+const { WORK_ANSWER_MIN, answerMaxForType } = require("../../lib/assessment-answer");
+const { resolveDraftAnswerText } = require("../../lib/draft-body");
 const {
   openAttemptTimer,
   assertCurrentAttempt,
@@ -276,12 +277,13 @@ function saveTaskDraft(req, res, next) {
       })
     );
   }
-  const parsed = validateAnswerText(req.body?.answerText, a.type);
-  if (!parsed.ok && parsed.fields.answerText?.includes("длинный")) {
-    return next(httpError(400, "invalid_body", { fields: parsed.fields }));
+  let text;
+  try {
+    text = resolveDraftAnswerText(req, a.type);
+  } catch (e) {
+    return next(e);
   }
   const prev = db.prepare("SELECT answer_text FROM attempts WHERE id = ?").get(a.id)?.answer_text || "";
-  const text = parsed.ok ? parsed.value : String(req.body?.answerText || "").slice(0, answerMaxForType(a.type));
   recordDraftTelemetry(db, a.id, prev, text);
   db.prepare("UPDATE attempts SET answer_text = ? WHERE id = ?").run(text, a.id);
   db.prepare(
@@ -292,7 +294,11 @@ function saveTaskDraft(req, res, next) {
 
 router.patch("/tasks/:attemptId/draft", saveTaskDraft);
 /** navigator.sendBeacon only supports POST — same handler as PATCH for pagehide flush */
-router.post("/tasks/:attemptId/draft", saveTaskDraft);
+router.post(
+  "/tasks/:attemptId/draft",
+  express.text({ type: "text/plain", limit: "256kb" }),
+  saveTaskDraft
+);
 
 router.post("/tasks/:attemptId/submit", (req, res, next) => {
   try {

@@ -227,6 +227,7 @@ describe("round59 P3 work task draft persistence", () => {
     });
     assert.equal(ok, true);
     assert.equal(beacons.length, 1);
+    assert.equal(beacons[0].type, "application/json");
   });
 
   it("tasks.html loads draft helper and wires lifecycle hide + input debounce", () => {

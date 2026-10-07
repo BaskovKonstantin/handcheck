@@ -7,6 +7,7 @@ const { getDb } = require("./db");
 const { seed } = require("./db/seed");
 const config = require("./config");
 const { attachUser, requireAuth, rejectApiTokenOnRest } = require("./middleware/auth");
+const { requireSessionSameOrigin } = require("./middleware/session-same-origin");
 const { errorHandler } = require("./middleware/errors");
 const { attachSignaling } = require("./modules/calls/signaling");
 
@@ -32,6 +33,7 @@ function createApp() {
     });
   });
 
+  app.use("/api", requireSessionSameOrigin);
   app.use("/api", rejectApiTokenOnRest);
 
   app.get("/api/me", requireAuth, (req, res) => {

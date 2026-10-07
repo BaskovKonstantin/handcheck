@@ -49,6 +49,8 @@ paths:
   /api/assessment/tasks/{attemptId}/draft:
     patch:
       summary: Save draft
+    post:
+      summary: Save draft (sendBeacon pagehide flush)
   /api/assessment/tasks/{attemptId}/submit:
     post:
       summary: Submit answer

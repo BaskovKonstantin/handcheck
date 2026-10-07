@@ -8,7 +8,7 @@ const { seed } = require("./db/seed");
 const config = require("./config");
 const { attachUser, requireAuth, rejectApiTokenOnRest } = require("./middleware/auth");
 const { requireSessionSameOrigin } = require("./middleware/session-same-origin");
-const { errorHandler } = require("./middleware/errors");
+const { errorHandler, INVALID_JSON_BODY_MSG } = require("./middleware/errors");
 const { attachSignaling } = require("./modules/calls/signaling");
 
 const STARTED_AT = new Date().toISOString();
@@ -102,6 +102,16 @@ function createApp() {
 
   app.get("*", (_req, res) => {
     res.status(404).sendFile(path.join(publicDir, "404.html"));
+  });
+
+  app.use((err, req, res, next) => {
+    if (err && err.type === "entity.parse.failed") {
+      return res.status(400).json({
+        error: "invalid_body",
+        details: { message: INVALID_JSON_BODY_MSG },
+      });
+    }
+    next(err);
   });
 
   app.use((err, req, res, next) => {

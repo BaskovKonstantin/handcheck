@@ -3,6 +3,7 @@
 const { WebSocketServer } = require("ws");
 const { loadSession } = require("../../middleware/auth");
 const { getDb } = require("../../db");
+const { isForbiddenBrowserOrigin } = require("../../lib/browser-same-origin");
 
 const rooms = new Map();
 
@@ -26,6 +27,10 @@ function attachSignaling(server) {
     const fakeReq = { headers: { cookie: req.headers.cookie } };
     const session = loadSession(fakeReq);
     if (!session) {
+      socket.destroy();
+      return;
+    }
+    if (isForbiddenBrowserOrigin(req)) {
       socket.destroy();
       return;
     }

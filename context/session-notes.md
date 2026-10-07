@@ -1,5 +1,12 @@
 # Session notes
 
+## 2026-10-07 — round 62 (WS origin + JSON parse)
+
+- Branch: `cursor/ws-origin-json-body-84eb`
+- P3: `isForbiddenBrowserOrigin` shared by session middleware and call signaling upgrade.
+- P3: `entity.parse.failed` → `400 invalid_body` with Russian `INVALID_JSON_BODY_MSG`.
+- Tests: `test/round62-findings.test.js`.
+
 ## 2026-10-07 — P2-1 / P2-2 (round 61)
 
 - Branch: `cursor/draft-origin-security-2c91`

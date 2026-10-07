@@ -636,6 +636,7 @@ const LINK_ICON = {
   "/candidate/past": "past",
   "/employer/need": "need",
   "/employer/deck": "deck",
+  "/employer/candidates": "list",
   "/employer/list": "list",
   "/employer/deferred": "deferred",
   "/employer/profile": "profile",
@@ -914,7 +915,7 @@ const CANDIDATE_LINKS = [
 const EMPLOYER_LINKS = [
   { href: "/employer/need", label: "Потребность" },
   { href: "/employer/deck", label: "Колода" },
-  { href: "/employer/list", label: "Список" },
+  { href: "/employer/candidates", label: "Кандидаты" },
   { href: "/employer/deferred", label: "Отложенные" },
   { href: "/employer/profile", label: "Профиль" },
   { href: "/employer/invitations", label: "Приглашения" },
@@ -1019,7 +1020,7 @@ function getDeckEmptyState({ invitedInMatches }) {
         "Все подходящие кандидаты уже получили приглашение по этой потребности. Откройте приглашения или посмотрите полный список.",
       actions: [
         { href: "/employer/invitations", label: "Приглашения", primary: true },
-        { href: "/employer/list", label: "Список", primary: false },
+        { href: "/employer/candidates", label: "Кандидаты", primary: false },
         { href: "/employer/need", label: "Изменить потребность", primary: false },
       ],
     };
@@ -1029,7 +1030,7 @@ function getDeckEmptyState({ invitedInMatches }) {
     help:
       "Нет кандидатов для свайпа по текущим фильтрам. Проверьте потребность, снимите фильтры в списке или загляните в отложенные.",
     actions: [
-      { href: "/employer/list", label: "Список", primary: true },
+      { href: "/employer/candidates", label: "Кандидаты", primary: true },
       { href: "/employer/deferred", label: "Отложенные", primary: false },
       { href: "/employer/need", label: "Изменить потребность", primary: false },
     ],

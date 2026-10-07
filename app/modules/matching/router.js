@@ -8,9 +8,16 @@ const { httpError } = require("../../middleware/errors");
 const { loadCandidatesForNeed, applyFilters, publicMatchShape } = require("./pool");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 const { getEmployerPasteInputMark } = require("../../lib/employer-paste-indicator");
+const { listEmployerCandidates } = require("./candidates-list");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
+
+router.get("/candidates", (req, res, next) => {
+  const result = listEmployerCandidates(req.user.id, req.query);
+  if (result.error === "not_found") return next(httpError(404, "not_found"));
+  res.json(result);
+});
 
 router.get("/needs/:id/matches", (req, res, next) => {
   const db = getDb();

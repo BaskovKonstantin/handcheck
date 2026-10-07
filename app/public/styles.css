@@ -2649,6 +2649,16 @@ body.deck-page main.column {
   background: linear-gradient(90deg, var(--forest), var(--clay));
 }
 
+.cabinet-content #panel textarea#answer.work-answer {
+  min-height: 12rem;
+  resize: vertical;
+  field-sizing: content;
+}
+
+.cabinet-content #panel #draft-note {
+  margin: 0.35rem 0 0.85rem;
+}
+
 @media (max-width: 480px) {
   .cabinet-page-hero-inner .lede {
     font-size: 0.92rem;
@@ -2680,6 +2690,11 @@ body.deck-page main.column {
   .cabinet-content #panel textarea#answer {
     min-height: 4.75rem;
     max-height: 7rem;
+  }
+
+  .cabinet-content #panel textarea#answer.work-answer {
+    min-height: 12.5rem;
+    max-height: none;
   }
 
   .cabinet-content #panel .battery-timer {

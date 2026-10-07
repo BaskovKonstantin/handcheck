@@ -136,9 +136,10 @@
       tabRegister.onclick = () => setMode("register");
       setMode(q.get("mode") === "register" ? "register" : "login");
 
-      function cacheEmail(email) {
+      function cacheEmail(email, role) {
         try {
           if (email) sessionStorage.setItem("hc_me_email", email);
+          if (role) sessionStorage.setItem("hc_me_role", role);
         } catch {
           /* ignore */
         }
@@ -156,7 +157,7 @@
                 password: document.getElementById("password").value,
               }),
             });
-            cacheEmail(j.user?.email || email);
+            cacheEmail(j.user?.email || email, j.user?.role);
             location.href = j.user.role === "employer" ? "/employer/deck" : "/candidate/today";
             return;
           }
@@ -194,7 +195,7 @@
               password: document.getElementById("password").value,
             }),
           });
-          cacheEmail(loginRes.user?.email || email);
+          cacheEmail(loginRes.user?.email || email, loginRes.user?.role);
           location.href =
             loginRes.user?.role === "employer" ? "/employer/deck" : "/candidate/today";
         } catch (e) {

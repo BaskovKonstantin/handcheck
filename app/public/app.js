@@ -211,6 +211,7 @@ const LOGO_MARK = `<span class="logo-mark" aria-hidden="true"><svg width="32" he
 let cabinetMeEmail = "";
 
 const ME_EMAIL_KEY = "hc_me_email";
+const ME_ROLE_KEY = "hc_me_role";
 /** @type {Map<string, Promise<unknown>>} */
 const inflightGetJson = new Map();
 
@@ -219,6 +220,23 @@ function getCachedMeEmail() {
     return sessionStorage.getItem(ME_EMAIL_KEY) || "";
   } catch {
     return "";
+  }
+}
+
+function getCachedMeRole() {
+  try {
+    return sessionStorage.getItem(ME_ROLE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setCachedMeRole(role) {
+  try {
+    if (role) sessionStorage.setItem(ME_ROLE_KEY, role);
+    else sessionStorage.removeItem(ME_ROLE_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -483,6 +501,7 @@ function navLinkHtml(l, compact) {
 function bindLogout(btn) {
   btn?.addEventListener("click", async () => {
     setCachedMeEmail("");
+    setCachedMeRole("");
     await api("/api/auth/logout", { method: "POST" });
     window.location.href = "/auth";
   });
@@ -562,17 +581,20 @@ function mountCabinetChromeSync(links, role) {
 async function refreshCabinetMeEmail(expectedRole) {
   try {
     const me = await api("/api/me");
+    setCachedMeRole(me.role || "");
     if (expectedRole && me.role !== expectedRole) {
       window.location.replace(me.role === "employer" ? "/employer/deck" : "/candidate/today");
-      return;
+      return false;
     }
     cabinetMeEmail = me.email || "";
     setCachedMeEmail(cabinetMeEmail);
     updateCabinetEmails(cabinetMeEmail);
+    return true;
   } catch {
     if (expectedRole) {
       window.location.href = "/auth";
     }
+    return false;
   }
 }
 
@@ -607,14 +629,23 @@ async function mountCabinetShell(links, role) {
 function bootCabinetPage(role, loadFn) {
   const links = role === "employer" ? EMPLOYER_LINKS : CANDIDATE_LINKS;
   mountCabinetChromeSync(links, role);
-  void refreshCabinetMeEmail(role);
-  try {
-    const result = loadFn();
-    if (result && typeof result.then === "function") {
-      result.catch(() => {});
+  const runLoad = () => {
+    try {
+      const result = loadFn();
+      if (result && typeof result.then === "function") {
+        result.catch(() => {});
+      }
+    } catch (_e) {
+      /* page-specific catch handlers */
     }
-  } catch (_e) {
-    /* page-specific catch handlers */
+  };
+  if (getCachedMeRole() === role) {
+    runLoad();
+    void refreshCabinetMeEmail(role);
+  } else {
+    void refreshCabinetMeEmail(role).then((ok) => {
+      if (ok) runLoad();
+    });
   }
 }
 

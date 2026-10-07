@@ -29,6 +29,8 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
+          bash bin/handcheck-deploy-disk.sh precheck
+
           # Named volume handcheck-data must survive rebuilds (declared in docker-compose.yml).
           if ! docker volume inspect handcheck_handcheck-data >/dev/null 2>&1; then
             if ! docker volume inspect handcheck-data >/dev/null 2>&1; then
@@ -48,5 +50,7 @@ jobs:
             docker compose ps
             exit 1
           fi
+
+          bash bin/handcheck-deploy-disk.sh post-prune
 
           echo "Deploy OK: $(git rev-parse --short HEAD)"

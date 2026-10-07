@@ -89,44 +89,41 @@ function remuxWebmBuffer(buffer) {
   }
 }
 
-function concatSessionWebmBuffers(sessionBuffers) {
-  if (!sessionBuffers.length) return Buffer.alloc(0);
-  if (sessionBuffers.length === 1) return remuxWebmBuffer(sessionBuffers[0]);
-  if (!ffmpegAvailable()) {
-    return remuxWebmBuffer(Buffer.concat(sessionBuffers));
-  }
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hc-sess-"));
+function concatTwoSessionWebmBuffers(leftBuffer, rightBuffer) {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hc-sess2-"));
   try {
-    const shiftedPaths = [];
-    let offsetSec = 0;
-    for (let i = 0; i < sessionBuffers.length; i += 1) {
-      const inPath = path.join(tmpRoot, `raw-${i}.webm`);
-      fs.writeFileSync(inPath, sessionBuffers[i]);
-      const outPath = path.join(tmpRoot, `part-${i}.webm`);
-      if (i === 0) {
-        remuxWebmFile(inPath, outPath);
-      } else {
-        runFfmpeg([
-          "-y",
-          "-i",
-          inPath,
-          "-map",
-          "0:v:0?",
-          "-map",
-          "0:a:0?",
-          "-c",
-          "copy",
-          "-output_ts_offset",
-          String(offsetSec),
-          outPath,
-        ]);
-      }
-      const dur = ffprobeDurationSeconds(outPath);
-      if (dur) offsetSec += dur;
-      shiftedPaths.push(outPath);
+    const leftRaw = path.join(tmpRoot, "left.webm");
+    const leftRemux = path.join(tmpRoot, "left-r.webm");
+    fs.writeFileSync(leftRaw, leftBuffer);
+    remuxWebmFile(leftRaw, leftRemux);
+    const offsetSec = ffprobeDurationSeconds(leftRemux) || 0;
+
+    const rightRaw = path.join(tmpRoot, "right.webm");
+    const rightRemux = path.join(tmpRoot, "right-r.webm");
+    fs.writeFileSync(rightRaw, rightBuffer);
+    remuxWebmFile(rightRaw, rightRemux);
+    const rightShift = path.join(tmpRoot, "right-s.webm");
+    if (offsetSec > 0) {
+      runFfmpeg([
+        "-y",
+        "-i",
+        rightRemux,
+        "-c",
+        "copy",
+        "-map",
+        "0",
+        "-output_ts_offset",
+        String(offsetSec),
+        rightShift,
+      ]);
+    } else {
+      fs.copyFileSync(rightRemux, rightShift);
     }
+
     const listPath = path.join(tmpRoot, "list.txt");
-    const listBody = shiftedPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n");
+    const listBody = [leftRemux, rightShift]
+      .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
+      .join("\n");
     fs.writeFileSync(listPath, listBody);
     const finalPath = path.join(tmpRoot, "final.webm");
     runFfmpeg(["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", finalPath]);
@@ -138,6 +135,19 @@ function concatSessionWebmBuffers(sessionBuffers) {
       /* ignore */
     }
   }
+}
+
+function concatSessionWebmBuffers(sessionBuffers) {
+  if (!sessionBuffers.length) return Buffer.alloc(0);
+  if (sessionBuffers.length === 1) return remuxWebmBuffer(sessionBuffers[0]);
+  if (!ffmpegAvailable()) {
+    return remuxWebmBuffer(Buffer.concat(sessionBuffers));
+  }
+  let acc = remuxWebmBuffer(sessionBuffers[0]);
+  for (let i = 1; i < sessionBuffers.length; i += 1) {
+    acc = concatTwoSessionWebmBuffers(acc, sessionBuffers[i]);
+  }
+  return acc;
 }
 
 function patchWebmDurationHint(buffer, durationMs) {
@@ -157,6 +167,48 @@ function patchWebmDurationHint(buffer, durationMs) {
       /* ignore */
     }
   }
+}
+
+function maxPacketGapSeconds(filePath, maxGap = 0.5) {
+  const streams = ["v:0", "a:0"];
+  let worst = 0;
+  for (const stream of streams) {
+    const r = spawnSync(
+      "ffprobe",
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        stream,
+        "-show_packets",
+        "-show_entries",
+        "packet=pts_time",
+        "-of",
+        "csv=p=0",
+        filePath,
+      ],
+      { encoding: "utf8", timeout: 60_000, maxBuffer: 80 * 1024 * 1024 }
+    );
+    if (r.status !== 0) continue;
+    const times = String(r.stdout || "")
+      .split("\n")
+      .map((line) => Number(line.trim()))
+      .filter((n) => Number.isFinite(n));
+    for (let i = 1; i < times.length; i += 1) {
+      const gap = times[i] - times[i - 1];
+      if (gap > worst) worst = gap;
+    }
+  }
+  return worst;
+}
+
+function decodeWebmClean(filePath) {
+  const r = spawnSync(
+    "ffmpeg",
+    ["-v", "error", "-i", filePath, "-f", "null", "-"],
+    { encoding: "utf8", timeout: 120_000, maxBuffer: 8 * 1024 * 1024 }
+  );
+  return r.status === 0;
 }
 
 function readDurationSecondsFromBuffer(buffer) {
@@ -182,4 +234,7 @@ module.exports = {
   concatSessionWebmBuffers,
   readDurationSecondsFromBuffer,
   patchWebmDurationHint,
+  maxPacketGapSeconds,
+  decodeWebmClean,
+  concatTwoSessionWebmBuffers,
 };

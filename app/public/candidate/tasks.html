@@ -73,13 +73,17 @@
         return `${compact}<ol class="battery-steps battery-steps-full" aria-label="Шаги теста">${steps.join("")}</ol>`;
       }
 
-      function formatCountdown(ms) {
+      function formatCountdown(ms, opts = {}) {
         if (ms <= 0) return "0:00";
         const totalSec = Math.ceil(ms / 1000);
         const d = Math.floor(totalSec / 86400);
         const h = Math.floor((totalSec % 86400) / 3600);
         const m = Math.floor((totalSec % 3600) / 60);
         const s = totalSec % 60;
+        if (opts.workWeek && d >= 0) {
+          const daysLeft = Math.max(0, Math.ceil(totalSec / 86400));
+          if (daysLeft >= 1) return `${daysLeft} д 0 ч`;
+        }
         if (d > 0) return `${d} д ${h} ч`;
         if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
         return `${m}:${String(s).padStart(2, "0")}`;
@@ -268,16 +272,20 @@
           cur.battery.claimedGrade
         );
         const answerMax = t.answerMax || 4000;
+        const workDeadlineHint =
+          t.type === "work" && t.deadlineAt
+            ? ` (до ${HandCheck.formatDateTimeMoscow(t.deadlineAt)})`
+            : "";
         const timerLabel =
           t.type === "quick"
             ? "Минута на ответ"
-            : "Неделя на мини-проект";
+            : `Неделя на мини-проект${workDeadlineHint}`;
         panel.innerHTML = `
           ${batteryStepIndicator(stepIndex)}
           <p class="invite-meta">${HandCheck.escapeHtml(metaLine)}</p>
           <p class="battery-timer" id="timer-line" aria-live="polite"><span class="battery-timer-label">${timerLabel}:</span> <strong id="timer-val">—</strong></p>
           <p class="task-prompt">${HandCheck.escapeHtml(t.prompt)}</p>
-          <textarea id="answer" rows="5" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
+          <textarea id="answer" class="${t.type === "work" ? "work-answer" : ""}" rows="${t.type === "work" ? 10 : 5}" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
           <p class="invite-meta" id="answer-len">0 / ${answerMax} символов</p>
           <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
           <button class="btn-primary" id="submit">Отправить ответ</button>
@@ -298,14 +306,15 @@
         let firstInputSent = false;
         const telemetryQueue = [];
         let telemetryChain = Promise.resolve();
+        let telemetryOpen = true;
         const flushTelemetry = () => {
-          if (!telemetryQueue.length) return telemetryChain;
+          if (!telemetryOpen || !telemetryQueue.length) return telemetryChain;
           const batch = telemetryQueue.splice(0, telemetryQueue.length);
           telemetryChain = telemetryChain.then(() => postTelemetry(batch));
           return telemetryChain;
         };
         const flushTelemetryBeacon = () => {
-          if (!telemetryQueue.length) return;
+          if (!telemetryOpen || !telemetryQueue.length) return;
           const batch = telemetryQueue.splice(0, telemetryQueue.length);
           const body = JSON.stringify({ events: batch });
           const url = "/api/assessment/events";
@@ -323,6 +332,7 @@
           });
         };
         const enqueueEvent = (event_type, payload) => {
+          if (!telemetryOpen) return;
           telemetryQueue.push({ attemptId, event_type, payload });
         };
         let pendingPasteChars = 0;
@@ -384,6 +394,7 @@
             if (!ok) return;
           }
           submitting = true;
+          telemetryOpen = false;
           if (draftTimer) clearInterval(draftTimer);
           if (tickTimer) clearInterval(tickTimer);
           clearTimeout(typingFlushTimer);
@@ -434,7 +445,7 @@
         const syncDeadlineUi = () => {
           if (!deadlineMs) return;
           const left = deadlineMs - Date.now();
-          timerVal.textContent = formatCountdown(left);
+          timerVal.textContent = formatCountdown(left, { workWeek: t.type === "work" });
           if (t.type === "quick" && left <= 0 && !submitting) {
             void submitAnswer(true);
           }

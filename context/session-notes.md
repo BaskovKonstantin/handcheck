@@ -1,3 +1,17 @@
+# Session notes (round 58 fixes)
+
+## P1 pool gate
+- `employer-pool-eligibility.js`: `email_confirmed_at` + display name (sanitized) or non-empty stack.
+- `matching/pool.js`: SQL `email_confirmed_at IS NOT NULL` + JS gate on confirmed/unconfirmed rows.
+
+## P3 birth dates
+- `registration-age.js`: fix `birth.d` in age calc; reject future DOB and age > 100.
+
+## P3 today copy
+- Untested: visible as «неподтверждён», ranked lower — not «не появится в подборе».
+
+---
+
 # Session notes (round 57 fixes)
 
 ## P2 keepalive

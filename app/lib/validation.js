@@ -33,7 +33,12 @@ function validateRegisterBody(body) {
   if (birthDate && ageGate && !ageGate.ok) {
     if (ageGate.field === "birthDate") {
       fields.birthDate = "Укажите дату рождения в формате ГГГГ-ММ-ДД";
-    } else if (ageGate.code === "age_too_young" || ageGate.code === "employer_age_minimum") {
+    } else if (
+      ageGate.code === "age_too_young" ||
+      ageGate.code === "employer_age_minimum" ||
+      ageGate.code === "birth_date_in_future" ||
+      ageGate.code === "birth_date_too_old"
+    ) {
       fields.birthDate = ageGate.message;
     }
   }

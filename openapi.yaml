@@ -57,6 +57,9 @@ paths:
   /api/assessment/events:
     post:
       summary: Telemetry batch
+  /api/employer/dashboard:
+    get:
+      summary: Employer hiring dashboard aggregates
   /api/employer/candidates:
     get:
       summary: Employer candidate bank with smart search and filters

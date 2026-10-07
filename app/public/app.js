@@ -30,6 +30,9 @@ const ERROR_MESSAGES = {
   invalid_availability: "Выберите доступность",
   candidate_not_in_pool: "Кандидат не подходит под эту потребность",
   need_inactive: "Потребность неактивна — новые приглашения отправить нельзя",
+  candidate_unconfirmed: "Сначала нужен подтверждённый грейд-тест платформы",
+  test_not_published: "Опубликуйте тест перед назначением",
+  quick_time_expired: "Время на этот вопрос истекло",
 };
 
 const SPEC_LABELS = { backend: "Backend", frontend: "Frontend", qa: "QA" };

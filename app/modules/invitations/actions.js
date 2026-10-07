@@ -24,6 +24,7 @@ function createInvitation(employerUserId, body, actionSource = "web") {
     salaryTo,
     offerText,
     contactChannel,
+    employerTestId,
   } = body || {};
   if (!needId || !candidateId) {
     throw httpError(400, "invalid_body");
@@ -83,6 +84,13 @@ function createInvitation(employerUserId, body, actionSource = "web") {
      ON CONFLICT(employer_user_id, need_id, candidate_user_id)
      DO UPDATE SET decision = 'invited', updated_at = excluded.updated_at`
   ).run(newId(), employerUserId, needId, candidateId, now);
+  if (employerTestId) {
+    const { assignCompanyTest } = require("../../lib/company-test-flow");
+    assignCompanyTest(db, employerUserId, String(employerTestId), {
+      candidateId,
+      invitationId: id,
+    });
+  }
   return { id };
 }
 

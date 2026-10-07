@@ -22,6 +22,11 @@ const {
   mapTestRow,
 } = require("./service");
 const { generateEmployerTestItems } = require("../../lib/employer-test-llm");
+const {
+  assignCompanyTest,
+  loadAssignmentForEmployer,
+  buildEmployerReview,
+} = require("../../lib/company-test-flow");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -35,15 +40,23 @@ router.get("/tests/config", (_req, res) => {
 
 router.get("/tests", (req, res) => {
   const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT t.*, n.title AS need_title
+  const needFilter = req.query.needId ? String(req.query.needId) : "";
+  const statusFilter = req.query.status ? String(req.query.status) : "";
+  let sql = `SELECT t.*, n.title AS need_title
        FROM employer_tests t
        JOIN employer_needs n ON n.id = t.need_id
-       WHERE t.employer_user_id = ? AND t.status != 'archived'
-       ORDER BY n.title, t.updated_at DESC`
-    )
-    .all(req.user.id);
+       WHERE t.employer_user_id = ? AND t.status != 'archived'`;
+  const params = [req.user.id];
+  if (needFilter) {
+    sql += " AND t.need_id = ?";
+    params.push(needFilter);
+  }
+  if (statusFilter) {
+    sql += " AND t.status = ?";
+    params.push(statusFilter);
+  }
+  sql += " ORDER BY n.title, t.updated_at DESC";
+  const rows = db.prepare(sql).all(...params);
   const byNeed = new Map();
   for (const r of rows) {
     if (!byNeed.has(r.need_id)) {
@@ -294,6 +307,30 @@ router.delete("/tests/:id/items/:itemId", (req, res, next) => {
     rest.forEach((r, i) => upd.run(i, r.id));
     touchTest(db, test.id);
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post("/tests/:id/assign", (req, res, next) => {
+  try {
+    const db = getDb();
+    const result = assignCompanyTest(db, req.user.id, req.params.id, {
+      candidateId: req.body?.candidateId,
+      invitationId: req.body?.invitationId,
+      dueAt: req.body?.dueAt,
+    });
+    res.status(201).json(result);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/test-assignments/:assignmentId", (req, res, next) => {
+  try {
+    const db = getDb();
+    const assignment = loadAssignmentForEmployer(db, req.params.assignmentId, req.user.id);
+    res.json(buildEmployerReview(db, assignment));
   } catch (e) {
     next(e);
   }

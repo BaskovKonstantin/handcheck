@@ -75,6 +75,62 @@ describe("employer vacancy tests (constructor)", () => {
     assert.equal(archived.status, 200);
   });
 
+  it("blocks assign for unconfirmed candidate", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const need = db
+      .prepare(
+        "SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')"
+      )
+      .get();
+    const created = await agent.post("/api/employer/tests").send({
+      needId: need.id,
+      templateKey: "qa-test-design",
+    });
+    const testId = created.body.id;
+    await agent.post(`/api/employer/tests/${testId}/publish`);
+    const unconf = db.prepare("SELECT id FROM users WHERE email = 'demo-unconf@demo.local'").get();
+    const res = await agent.post(`/api/employer/tests/${testId}/assign`).send({ candidateId: unconf.id });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.error, "candidate_unconfirmed");
+  });
+
+  it("enforces per-question time limit", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const need = db
+      .prepare(
+        "SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')"
+      )
+      .get();
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const created = await agent.post("/api/employer/tests").send({
+      needId: need.id,
+      title: "Timed",
+      intro: "",
+    });
+    const testId = created.body.id;
+    const item = await agent.post(`/api/employer/tests/${testId}/items`).send({
+      kind: "text",
+      prompt: "Fast",
+      rubricKeys: { keywords: ["x"] },
+      timeLimitSec: 30,
+    });
+    await agent.post(`/api/employer/tests/${testId}/publish`);
+    const assign = await agent.post(`/api/employer/tests/${testId}/assign`).send({ candidateId: anna.id });
+    const annaAgent = request.agent(app);
+    await annaAgent.post("/api/auth/login").send({ email: "anna@demo.local", password: "demo-demo-demo" });
+    await annaAgent.post(`/api/candidate/company-tests/${assign.body.id}/start`).send({});
+    db.prepare(
+      `UPDATE employer_test_answers SET opened_at = datetime('now', '-2 minutes') WHERE assignment_id = ? AND item_id = ?`
+    ).run(assign.body.id, item.body.id);
+    const late = await annaAgent
+      .post(`/api/candidate/company-tests/${assign.body.id}/answers`)
+      .send({ itemId: item.body.id, answerText: "x" });
+    assert.equal(late.status, 409);
+    assert.equal(late.body.error, "quick_time_expired");
+  });
+
   it("reorders items on draft", async () => {
     const { getDb } = require("../app/db");
     const db = getDb();

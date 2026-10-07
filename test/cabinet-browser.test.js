@@ -135,11 +135,68 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
+  async function waitForCabinetTabIndicatorSettled(page, { maxDelta = 1.5, timeoutMs = 2500 } = {}) {
+    await page.evaluate(
+      async ({ maxDelta, timeoutMs }) => {
+        await (document.fonts?.ready ?? Promise.resolve());
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        const indicator = document.getElementById("cabinet-tabs-indicator");
+        if (!indicator || indicator.hidden) return;
+
+        const activeTab = () =>
+          document.querySelector(
+            ".cabinet-tabs .tab-link.active:not(.cabinet-more-btn), #cabinet-more.active"
+          );
+
+        const delta = () => {
+          const active = activeTab();
+          if (!active) return 0;
+          const ir = indicator.getBoundingClientRect();
+          const ar = active.getBoundingClientRect();
+          return Math.abs(ir.left - ar.left);
+        };
+
+        if (delta() <= maxDelta) return;
+
+        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!reduced) {
+          await new Promise((resolve) => {
+            let settled = false;
+            const finish = () => {
+              if (settled) return;
+              settled = true;
+              indicator.removeEventListener("transitionend", onTransitionEnd);
+              resolve();
+            };
+            const onTransitionEnd = (event) => {
+              if (
+                event.target === indicator &&
+                (event.propertyName === "transform" || event.propertyName === "width")
+              ) {
+                finish();
+              }
+            };
+            indicator.addEventListener("transitionend", onTransitionEnd);
+            setTimeout(finish, 900);
+          });
+        }
+
+        const started = performance.now();
+        while (performance.now() - started < timeoutMs) {
+          if (delta() <= maxDelta) return;
+          await new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+      },
+      { maxDelta, timeoutMs }
+    );
+  }
+
   async function assertNoMobileCabinetOverflow(page, urlPath, { width }) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(`${BASE}${urlPath}`, { waitUntil: "networkidle", timeout: 60000 });
     await page.waitForSelector("#cabinet-tabs", { timeout: 20000 });
-    await page.waitForTimeout(100);
+    await waitForCabinetTabIndicatorSettled(page);
     const metrics = await page.evaluate(() => {
       const vw = document.documentElement.clientWidth;
       const sw = document.documentElement.scrollWidth;
@@ -172,7 +229,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       `${urlPath}@${width}px chrome maxRight ${metrics.maxRight} > viewport ${metrics.vw}`
     );
     assert.ok(
-      metrics.indDelta <= 2,
+      metrics.indDelta <= 1.5,
       `${urlPath}@${width}px tab indicator delta ${metrics.indDelta}px`
     );
   }

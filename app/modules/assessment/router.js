@@ -243,7 +243,7 @@ router.post("/tasks/:attemptId/open", (req, res, next) => {
   }
 });
 
-router.patch("/tasks/:attemptId/draft", (req, res, next) => {
+function saveTaskDraft(req, res, next) {
   const db = getDb();
   const a = loadAttemptForSubmit(req.params.attemptId, req.user.id);
   assertAttemptMutable(a);
@@ -288,7 +288,11 @@ router.patch("/tasks/:attemptId/draft", (req, res, next) => {
     `INSERT INTO attempt_events (attempt_id, event_type, payload_json) VALUES (?, 'draft', ?)`
   ).run(a.id, JSON.stringify({ text: text.slice(0, 200), length: text.length }));
   res.json({ ok: true });
-});
+}
+
+router.patch("/tasks/:attemptId/draft", saveTaskDraft);
+/** navigator.sendBeacon only supports POST — same handler as PATCH for pagehide flush */
+router.post("/tasks/:attemptId/draft", saveTaskDraft);
 
 router.post("/tasks/:attemptId/submit", (req, res, next) => {
   try {

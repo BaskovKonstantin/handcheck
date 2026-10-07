@@ -12,7 +12,12 @@ const {
   cooldownActive,
 } = require("../assessment/service");
 const { submitAttemptAnswer: coreSubmitAttemptAnswer } = require("../../lib/assessment-submit");
-const { openAttemptTimer, deadlineAtIso, getCurrentAttemptId } = require("../../lib/assessment-timing");
+const {
+  openAttemptTimer,
+  deadlineAtIso,
+  getCurrentAttemptId,
+  remainingMsUntilDeadline,
+} = require("../../lib/assessment-timing");
 const { createInvitation, respondToInvitation } = require("../invitations/actions");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 const { loadAttemptForSubmit, assertAttemptMutable } = require("../../lib/assessment-guards");
@@ -187,13 +192,17 @@ function getAssessmentTask(userId, attemptId) {
       throw e;
     }
   }
+  const deadlineAt = openedAt ? deadlineAtIso(openedAt, row.type) : null;
+  const serverNow = new Date().toISOString();
   const out = {
     id: row.id,
     prompt: row.prompt,
     type: row.type,
     batteryId: row.battery_id,
     openedAt,
-    deadlineAt: openedAt ? deadlineAtIso(openedAt, row.type) : null,
+    deadlineAt,
+    serverNow: openedAt ? serverNow : undefined,
+    remainingMs: deadlineAt ? remainingMsUntilDeadline(deadlineAt) : undefined,
     quickLimitSeconds: row.type === "quick" ? 60 : undefined,
   };
   if (!row.submitted_at) {

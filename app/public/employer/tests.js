@@ -511,9 +511,11 @@
     await openEditor(activeTestId);
   }
 
-  document.addEventListener("DOMContentLoaded", async () => {
+  async function boot() {
     HandCheck.employerNav();
     needs = (await HandCheck.api("/api/employer/needs")).items || [];
     await loadList();
-  });
+  }
+
+  HandCheck.bootCabinetPage("employer", () => boot());
 })();

@@ -151,10 +151,13 @@ function applyPatches(db) {
       auto_ok INTEGER,
       paste_chars INTEGER NOT NULL DEFAULT 0,
       typed_chars INTEGER NOT NULL DEFAULT 0,
+      opened_at TEXT,
       submitted_at TEXT,
       PRIMARY KEY (assignment_id, item_id)
     );
   `);
+
+  ensureColumn(db, "employer_test_assignments", "current_item_id", "TEXT");
 }
 
 module.exports = { applyPatches };

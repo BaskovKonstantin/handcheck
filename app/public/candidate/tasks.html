@@ -18,8 +18,10 @@
         </div>
       </header>
       <div id="panel" class="panel"></div>
+      <div id="company-tests-panel" class="panel panel-inset company-tests-section" hidden></div>
     </main>
     <script src="/app.js"></script>
+    <script src="/company-tests-panel.js"></script>
     <script src="/assessment-input-classify.js"></script>
     <script src="/tasks-answer-drop.js"></script>
     <script src="/tasks-draft-persist.js"></script>
@@ -604,7 +606,13 @@
       }
 
       HandCheck.bootCabinetPage("candidate", () =>
-        init().catch(() => {
+        init()
+          .then(() => {
+            const ctp = document.getElementById("company-tests-panel");
+            if (ctp) ctp.hidden = false;
+            return HandCheckCompanyTests?.mountCompanyTestsPanel();
+          })
+          .catch(() => {
           panel.innerHTML = HandCheck.emptyState("Ошибка", "Войдите как кандидат.", "/auth", "Войти");
         })
       );

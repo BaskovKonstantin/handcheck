@@ -54,6 +54,7 @@ function createApp() {
 
   app.use("/api/stats", require("./modules/stats/router"));
   app.use("/api/auth", require("./modules/auth/router"));
+  app.use("/api/candidate", require("./modules/employer-tests/candidate-router"));
   app.use("/api/candidate", require("./modules/candidates/router"));
   app.use("/api/employer", require("./modules/employers/router"));
   app.use("/api/employer", require("./modules/needs/router"));

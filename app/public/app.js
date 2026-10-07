@@ -78,14 +78,30 @@ function syncCabinetMoreActiveState(role) {
   more.classList.toggle("active", !onPrimary);
 }
 
-function updateCabinetNavIndicators() {
+function applyCabinetIndicatorLayout(indicator, applyFn, { snap = false } = {}) {
+  if (!indicator) return;
+  if (snap) indicator.style.transition = "none";
+  applyFn();
+  if (snap) {
+    void indicator.offsetWidth;
+    indicator.style.transition = "";
+  }
+}
+
+function updateCabinetNavIndicators({ snap = false } = {}) {
   const asideIndicator = document.getElementById("cabinet-nav-indicator");
   const asideActive = document.querySelector(".cabinet-aside .cabinet-nav-link.active");
   if (asideIndicator) {
     if (asideActive) {
-      asideIndicator.style.height = `${asideActive.offsetHeight}px`;
-      asideIndicator.style.transform = `translateY(${asideActive.offsetTop}px)`;
-      asideIndicator.hidden = false;
+      applyCabinetIndicatorLayout(
+        asideIndicator,
+        () => {
+          asideIndicator.style.height = `${asideActive.offsetHeight}px`;
+          asideIndicator.style.transform = `translateY(${asideActive.offsetTop}px)`;
+          asideIndicator.hidden = false;
+        },
+        { snap }
+      );
     } else {
       asideIndicator.hidden = true;
     }
@@ -106,9 +122,50 @@ function updateCabinetNavIndicators() {
 
   const tabsRect = tabs.getBoundingClientRect();
   const tabRect = tabActive.getBoundingClientRect();
-  tabsIndicator.style.width = `${tabRect.width}px`;
-  tabsIndicator.style.transform = `translateX(${tabRect.left - tabsRect.left}px)`;
-  tabsIndicator.hidden = false;
+  applyCabinetIndicatorLayout(
+    tabsIndicator,
+    () => {
+      tabsIndicator.style.width = `${tabRect.width}px`;
+      tabsIndicator.style.transform = `translateX(${tabRect.left - tabsRect.left}px)`;
+      tabsIndicator.hidden = false;
+    },
+    { snap }
+  );
+}
+
+let cabinetIndicatorResizeObserver = null;
+let snapCabinetIndicatorsQueued = false;
+
+function disconnectCabinetIndicatorObserver() {
+  cabinetIndicatorResizeObserver?.disconnect();
+  cabinetIndicatorResizeObserver = null;
+}
+
+function observeCabinetIndicatorTargets(root, selector) {
+  if (!root || !cabinetIndicatorResizeObserver) return;
+  cabinetIndicatorResizeObserver.observe(root);
+  root.querySelectorAll(selector).forEach((el) => cabinetIndicatorResizeObserver.observe(el));
+}
+
+function connectCabinetIndicatorObserver() {
+  disconnectCabinetIndicatorObserver();
+  const tabs = document.getElementById("cabinet-tabs");
+  const asideInner = document.querySelector(".cabinet-aside-inner");
+  if (!tabs && !asideInner) return;
+  cabinetIndicatorResizeObserver = new ResizeObserver(() => {
+    scheduleSnapCabinetNavIndicators();
+  });
+  observeCabinetIndicatorTargets(tabs, ".tab-link, #cabinet-more");
+  observeCabinetIndicatorTargets(asideInner, ".cabinet-nav-link");
+}
+
+function scheduleSnapCabinetNavIndicators() {
+  if (snapCabinetIndicatorsQueued) return;
+  snapCabinetIndicatorsQueued = true;
+  requestAnimationFrame(() => {
+    snapCabinetIndicatorsQueued = false;
+    updateCabinetNavIndicators({ snap: true });
+  });
 }
 
 function animateStatCounters(root, { duration = 680 } = {}) {
@@ -131,13 +188,19 @@ function animateStatCounters(root, { duration = 680 } = {}) {
 }
 
 function initUiMotion() {
-  updateCabinetNavIndicators();
-  window.addEventListener("resize", updateCabinetNavIndicators, { passive: true });
+  updateCabinetNavIndicators({ snap: true });
+  connectCabinetIndicatorObserver();
+  window.addEventListener("resize", scheduleSnapCabinetNavIndicators, { passive: true });
   document.addEventListener("click", (e) => {
     if (e.target.closest(".cabinet-nav-link, .tab-link")) {
-      requestAnimationFrame(updateCabinetNavIndicators);
+      requestAnimationFrame(() => updateCabinetNavIndicators());
     }
   });
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(() => {
+      requestAnimationFrame(() => updateCabinetNavIndicators({ snap: true }));
+    });
+  }
 }
 
 if (document.readyState === "loading") {
@@ -774,7 +837,8 @@ function ensureCabinetChrome(links, role, meEmail) {
   tabs.innerHTML = `<span class="cabinet-tabs-indicator" id="cabinet-tabs-indicator" hidden></span>${tabLinks.map((l) => navLinkHtml(l, true)).join("")}`;
   bindCabinetMoreMenu(role, links);
   syncCabinetMoreActiveState(role);
-  requestAnimationFrame(updateCabinetNavIndicators);
+  connectCabinetIndicatorObserver();
+  scheduleSnapCabinetNavIndicators();
 }
 
 function mountCabinetChromeSync(links, role) {

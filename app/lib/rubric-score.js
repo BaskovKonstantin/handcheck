@@ -88,10 +88,55 @@ function cutoffForGrade(grade) {
   return CUTOFFS[grade] ?? CUTOFFS.middle;
 }
 
+const QUICK_LEAD_PREFIX =
+  /^\s*(?:пункт\s*(?:\d+|первый|второй|третий|четвертый|четвёртый|пятый|шестой|седьмой|восьмой)\s*[.:,-]?\s*|я\s+использую\s+)/i;
+
 function stripQuickLead(text) {
-  return String(text || "")
-    .replace(/^\s*пункт\s*\d+\s*[.:]\s*/i, "")
-    .trim();
+  return String(text || "").replace(QUICK_LEAD_PREFIX, "").trim();
+}
+
+function tokenBag(text) {
+  return normalizeText(text).split(" ").filter((w) => w.length > 1);
+}
+
+function bagJaccardSimilarity(a, b) {
+  const sa = new Set(tokenBag(a));
+  const sb = new Set(tokenBag(b));
+  if (!sa.size || !sb.size) return 0;
+  let inter = 0;
+  for (const x of sa) if (sb.has(x)) inter += 1;
+  const union = sa.size + sb.size - inter;
+  return union ? inter / union : 0;
+}
+
+function tokenMatchesRubricKey(token, keys) {
+  if (!token) return false;
+  return keys.some((k) => {
+    const kn = normalizeText(k);
+    return kn && (token === kn || token.includes(kn) || kn.includes(token));
+  });
+}
+
+function looksLikeProseAnswer(raw, norm) {
+  const sentences = String(raw || "")
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.replace(/\s/g, "").length > 24);
+  if (sentences.length >= 2) return true;
+  if (
+    /\b(потому что|чтобы|если|когда|через|сначала|затем|поэтому|версионирую|отдаю|логирую|хранятся|масштабиру|делаю|использую)\b/i.test(
+      raw
+    ) &&
+    /[.!?]/.test(raw)
+  ) {
+    return true;
+  }
+  const tokens = norm.split(" ").filter(Boolean);
+  const verbs =
+    tokens.filter((t) =>
+      /(ую|ю|ем|им|ать|ить|еть|ыва|ива|ован|ён|ен)$/i.test(t)
+    ).length;
+  return verbs >= 3 && tokens.length >= 14;
 }
 
 function shingleSet(text, size = 3) {
@@ -115,34 +160,20 @@ function jaccardSimilarity(a, b) {
 
 function looksLikeKeywordListAnswer(answerText, rubric) {
   const raw = String(answerText || "");
-  const norm = normalizeText(raw);
+  const body = stripQuickLead(raw);
+  const norm = normalizeText(body);
   if (norm.length < 40) return false;
   const keys = rubric?.keys || [];
   if (!keys.length) return false;
   const hits = keys.filter((k) => keyHit(norm, k)).length;
   const keyRatio = hits / keys.length;
   const tokens = norm.split(" ").filter(Boolean);
-  const sentenceMarkers = /[.!?]/.test(raw);
-  const proseHints =
-    /\b(я|мы|нужно|использую|делаю|потому|чтобы|если|когда|через|версионирую|отдаю|логирую|хранятся|масштабиру)\w*/i.test(
-      raw
-    );
-  const avgTokenLen =
-    tokens.length > 0 ? tokens.reduce((sum, w) => sum + w.length, 0) / tokens.length : 0;
-  const commaCount = (raw.match(/,/g) || []).length;
-  if (
-    keyRatio >= 0.48 &&
-    tokens.length >= 12 &&
-    avgTokenLen < 5.6 &&
-    commaCount < 2 &&
-    !sentenceMarkers &&
-    !proseHints
-  ) {
-    return true;
-  }
-  if (keyRatio >= 0.62 && tokens.length >= 14 && avgTokenLen < 5.8 && !proseHints && commaCount < 2) {
-    return true;
-  }
+  if (tokens.length < 10) return false;
+  if (looksLikeProseAnswer(body, norm)) return false;
+  const rubricTokenShare =
+    tokens.filter((t) => tokenMatchesRubricKey(t, keys)).length / tokens.length;
+  if (keyRatio >= 0.45 && rubricTokenShare >= 0.52) return true;
+  if (keyRatio >= 0.62 && tokens.length >= 12 && rubricTokenShare >= 0.45) return true;
   return false;
 }
 
@@ -158,6 +189,16 @@ function nearDuplicateQuickBodiesMultiplier(quickAttempts) {
   if (maxSame >= 5) return 0.2;
   if (maxSame >= 4) return 0.35;
   if (maxSame >= 3) return 0.55;
+
+  let highSimPairs = 0;
+  for (let i = 0; i < norms.length; i += 1) {
+    for (let j = i + 1; j < norms.length; j += 1) {
+      if (bagJaccardSimilarity(norms[i], norms[j]) >= 0.68) highSimPairs += 1;
+    }
+  }
+  if (highSimPairs >= 12) return 0.2;
+  if (highSimPairs >= 8) return 0.35;
+  if (highSimPairs >= 5) return 0.55;
   return 1;
 }
 
@@ -215,6 +256,7 @@ module.exports = {
   duplicateQuickAnswerMultiplier,
   looksLikeKeywordListAnswer,
   stripQuickLead,
+  bagJaccardSimilarity,
   jaccardSimilarity,
   keywordTrapMultiplier,
   applyBatteryScoreGuards,

@@ -1,6 +1,9 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-dev}
     restart: unless-stopped
     ports:
       - "127.0.0.1:8810:8810"

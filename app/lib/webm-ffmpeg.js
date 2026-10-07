@@ -56,8 +56,20 @@ function writeTempWebm(buffer, prefix) {
   return { dir, filePath };
 }
 
+/** Map video before audio so concat across sessions keeps codec alignment. */
 function remuxWebmFile(inputPath, outputPath) {
-  runFfmpeg(["-y", "-i", inputPath, "-c", "copy", "-map", "0", outputPath]);
+  runFfmpeg([
+    "-y",
+    "-i",
+    inputPath,
+    "-map",
+    "0:v:0?",
+    "-map",
+    "0:a:0?",
+    "-c",
+    "copy",
+    outputPath,
+  ]);
 }
 
 function remuxWebmBuffer(buffer) {
@@ -98,10 +110,12 @@ function concatSessionWebmBuffers(sessionBuffers) {
           "-y",
           "-i",
           inPath,
+          "-map",
+          "0:v:0?",
+          "-map",
+          "0:a:0?",
           "-c",
           "copy",
-          "-map",
-          "0",
           "-output_ts_offset",
           String(offsetSec),
           outPath,

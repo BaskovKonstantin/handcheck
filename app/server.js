@@ -26,6 +26,7 @@ function createApp() {
       ok: true,
       service: "handcheck",
       version: "0.5.0",
+      commit: config.GIT_COMMIT,
       startedAt: STARTED_AT,
       now: new Date().toISOString(),
     });

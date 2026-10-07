@@ -38,6 +38,20 @@
       const QUICK_COUNT = 8;
 
       function batteryStepIndicator(currentIndex) {
+        const total = QUICK_COUNT + 1;
+        const stepNum = Math.min(currentIndex + 1, total);
+        const currentLabel =
+          currentIndex < QUICK_COUNT ? `Короткий ${currentIndex + 1}` : "Мини-проект";
+        const pct = Math.round((stepNum / total) * 100);
+        const compact = `<div class="battery-progress-compact" id="battery-progress-compact" aria-live="polite">
+          <div class="battery-progress-head">
+            <span class="battery-progress-title">Шаг ${stepNum} из ${total}</span>
+            <span class="battery-progress-current" id="battery-current-step">${currentLabel}</span>
+          </div>
+          <div class="battery-progress-bar" role="progressbar" aria-valuenow="${stepNum}" aria-valuemin="1" aria-valuemax="${total}" aria-label="Прогресс теста">
+            <div class="battery-progress-fill" style="width:${pct}%"></div>
+          </div>
+        </div>`;
         const steps = [];
         for (let i = 0; i < QUICK_COUNT; i += 1) {
           const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "";
@@ -52,7 +66,7 @@
           <span class="battery-step-num">${QUICK_COUNT + 1}</span>
           <span class="battery-step-label">Мини-проект</span>
         </li>`);
-        return `<ol class="battery-steps" aria-label="Шаги теста">${steps.join("")}</ol>`;
+        return `${compact}<ol class="battery-steps battery-steps-full" aria-label="Шаги теста">${steps.join("")}</ol>`;
       }
 
       function formatCountdown(ms) {
@@ -307,7 +321,8 @@
           pendingPasteChars += chars;
           enqueueEvent("paste", { length: chars, chars });
         });
-        let typedChars = 0;
+        let draftTimer = null;
+        let typedChars = restored.length;
         let typingPending = 0;
         let typingFlushTimer = null;
         const flushTyping = () => {
@@ -447,7 +462,6 @@
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "hidden") onPageLifecycleFlush();
         });
-        let draftTimer = null;
         if (t.type === "work") {
           draftTimer = setInterval(() => {
             persistDraft();

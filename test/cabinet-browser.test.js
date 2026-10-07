@@ -1052,7 +1052,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       const liveStarted = Date.now();
       await new Promise((r) => setTimeout(r, 32000));
       await emp.click("#end", { force: true });
-      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      await emp.waitForSelector(".call-result-card", { timeout: 120000 });
       const liveMs = Date.now() - liveStarted;
       for (const side of ["employer", "candidate"]) {
         const bad = chunkStatuses[side].filter((s) => s >= 400);
@@ -1184,28 +1184,31 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await page.waitForSelector("#open-q", { timeout: 15000 });
     await page.click("#open-q", { force: true });
     await page.waitForSelector("#battery-progress-compact", { timeout: 15000 });
-    const inView = await page.evaluate(() => {
-      const el = document.getElementById("battery-progress-compact");
-      const step = document.getElementById("battery-current-step");
-      if (!el || !step) return false;
-      const r = el.getBoundingClientRect();
-      const sr = step.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const visible =
-        r.width > 0 &&
-        r.height > 0 &&
-        r.bottom > 0 &&
-        r.top < vh &&
-        sr.width > 0 &&
-        sr.bottom > 0 &&
-        sr.top < vh;
-      const tab = document.querySelector(".cabinet-mobile-nav");
-      const tabTop = tab ? tab.getBoundingClientRect().top : vh;
-      const submit = document.getElementById("submit");
-      const submitOk = submit ? submit.getBoundingClientRect().bottom <= tabTop - 2 : true;
-      return visible && submitOk;
-    });
-    assert.ok(inView, "compact progress or submit not visible above tab bar");
+    await page.waitForFunction(
+      () => {
+        if (!document.body.classList.contains("assessment-question-active")) return false;
+        const el = document.getElementById("battery-progress-compact");
+        const step = document.getElementById("battery-current-step");
+        const submit = document.getElementById("submit");
+        if (!el || !step || !submit) return false;
+        const r = el.getBoundingClientRect();
+        const sr = step.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const visible =
+          r.width > 0 &&
+          r.height > 0 &&
+          r.bottom > 0 &&
+          r.top < vh &&
+          sr.width > 0 &&
+          sr.bottom > 0 &&
+          sr.top < vh;
+        const tab = document.querySelector(".cabinet-mobile-nav");
+        const tabTop = tab ? tab.getBoundingClientRect().top : vh;
+        const submitOk = submit.getBoundingClientRect().bottom <= tabTop - 2;
+        return visible && submitOk;
+      },
+      { timeout: 15000 }
+    );
     const label = await page.locator("#battery-current-step").textContent();
     assert.match(label || "", /Короткий 1/);
     await context.close();

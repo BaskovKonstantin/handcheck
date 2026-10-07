@@ -2655,8 +2655,22 @@ body.deck-page main.column {
     line-height: 1.35;
   }
 
+  body.assessment-question-active .cabinet-page-hero {
+    display: none;
+  }
+
   .battery-progress-compact {
     display: block;
+  }
+
+  body.assessment-question-active .battery-progress-compact {
+    position: sticky;
+    top: 0.35rem;
+    z-index: 4;
+    margin-bottom: 0.55rem;
+    padding-bottom: 0.15rem;
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(6px);
   }
 
   .battery-steps-full {

@@ -539,10 +539,10 @@ function ensureCabinetChrome(links, role, meEmail) {
   if (!tabs) {
     tabs = document.createElement("nav");
     tabs.id = "cabinet-tabs";
-    tabs.className = "cabinet-tabs";
     tabs.setAttribute("aria-label", "Быстрая навигация");
     document.body.appendChild(tabs);
   }
+  tabs.className = "cabinet-tabs cabinet-mobile-nav";
   const tabHrefs = TAB_PRIMARY[role] || links.slice(0, 4).map((l) => l.href);
   const tabLinks = tabHrefs
     .map((href) => links.find((l) => l.href === href))

@@ -37,6 +37,10 @@
 
       const QUICK_COUNT = 8;
 
+      function setQuestionChrome(active) {
+        document.body.classList.toggle("assessment-question-active", Boolean(active));
+      }
+
       function batteryStepIndicator(currentIndex) {
         const total = QUICK_COUNT + 1;
         const stepNum = Math.min(currentIndex + 1, total);
@@ -127,6 +131,7 @@
       }
 
       async function renderStartForm(category) {
+        setQuestionChrome(false);
         const onCooldown = Boolean(category?.cooldownActive && category?.retakeAt);
         const retakeWhen = onCooldown ? HandCheck.formatRetakeDateMoscow(category.retakeAt) : "";
         const retakeExplain = retakeWhen
@@ -190,6 +195,7 @@
 
       async function init() {
         const seq = HandCheck.nextCabinetPageLoad();
+        setQuestionChrome(false);
         panel.innerHTML = HandCheck.skeletonBlocks(2);
         const [cur, category] = await Promise.all([
           HandCheck.api("/api/assessment/battery/current"),
@@ -270,12 +276,17 @@
           ${batteryStepIndicator(stepIndex)}
           <p class="invite-meta">${HandCheck.escapeHtml(metaLine)}</p>
           <p class="battery-timer" id="timer-line" aria-live="polite"><span class="battery-timer-label">${timerLabel}:</span> <strong id="timer-val">—</strong></p>
-          <p>${HandCheck.escapeHtml(t.prompt)}</p>
+          <p class="task-prompt">${HandCheck.escapeHtml(t.prompt)}</p>
           <textarea id="answer" rows="5" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
           <p class="invite-meta" id="answer-len">0 / ${answerMax} символов</p>
           <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
           <button class="btn-primary" id="submit">Отправить ответ</button>
           <p class="field-error" id="err" hidden></p>`;
+        setQuestionChrome(true);
+        const progressCompact = document.getElementById("battery-progress-compact");
+        if (progressCompact) {
+          progressCompact.scrollIntoView({ block: "nearest", behavior: "instant" });
+        }
         if (restored) document.getElementById("draft-note").hidden = false;
         const ta = document.getElementById("answer");
         const lenEl = document.getElementById("answer-len");

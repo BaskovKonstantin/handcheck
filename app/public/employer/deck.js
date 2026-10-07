@@ -152,6 +152,11 @@ function renderCard(data) {
         <div>
           <h2 class="deck-name">${esc(data.card.displayName)}</h2>
           ${HandCheck.renderCategoryPill(data.card.categoryLabel, data.card.categoryStatus, data.card.gradeRelation)}
+          ${HandCheck.renderGradeRelationBar(
+            data.card.categoryLabel,
+            data.card.gradeRelation,
+            data.card.categoryStatus
+          )}
           ${HandCheck.renderPasteInputMark(data.card.pasteInputMark)}
         </div>
       </div>

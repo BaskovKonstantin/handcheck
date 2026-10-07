@@ -14,8 +14,8 @@
       <div class="landing-hero-inner">
         <div class="landing-hero-copy">
           <p class="hero-eyebrow">Найм без рейтингов и фото</p>
-          <h1 id="landing-title" class="display-title display-title-on-dark">
-            Категория по навыку.<br />Приглашение с вилкой.
+          <h1 id="landing-title" class="display-title">
+            <span class="brand-em">HandCheck</span> нанимает по навыкам, а не по резюме
           </h1>
           <p class="hero-lede hero-lede-on-dark">
             Профиль и тест задают категорию. Работодатель приглашает с вилкой зарплаты — без баллов в
@@ -23,44 +23,46 @@
           </p>
           <div class="hero-cta-row">
             <a class="btn-primary btn-lg" href="/auth">Начать бесплатно</a>
-            <a class="btn-on-dark-ghost" href="/auth?role=employer">Для работодателей</a>
+            <a class="btn-ghost btn-lg" href="/auth?role=employer">Для работодателей</a>
           </div>
         </div>
-        <div class="landing-mockup" aria-hidden="true">
-          <div class="landing-mockup-label">Колода работодателя</div>
-          <div class="landing-mockup-card">
-            <div class="landing-mockup-stack"></div>
-            <div class="landing-mockup-face">
-              <div class="deck-card-head">
-                <div class="avatar-monogram">А</div>
-                <div>
-                  <h2 class="deck-name">Анна</h2>
-                  <span class="category-pill">Backend × Middle</span>
-                </div>
-              </div>
-              <div class="chip-row">
-                <span class="chip chip-domain">backend-разработчик · HoReCa</span>
-              </div>
-              <div class="chip-row chip-row-skills">
-                <span class="chip chip-skill">node</span>
-                <span class="chip chip-skill">typescript</span>
-              </div>
-              <ul class="deck-phrases">
-                <li>Короткие ответы по API сданы</li>
-                <li>Рабочая задача доведена до конца</li>
-              </ul>
+        <nav class="landing-entry-nav" aria-label="Быстрый вход">
+          <a href="/auth?role=candidate">
+            <div>
+              <p class="entry-title">Я кандидат</p>
+              <p class="entry-desc">Пройти тесты и получать приглашения с вилкой зарплаты</p>
             </div>
-          </div>
-          <div class="landing-mockup-actions">
-            <span class="mock-pill mock-pill-ghost">Отказать</span>
-            <span class="mock-pill mock-pill-ghost">Отложить</span>
-            <span class="mock-pill mock-pill-clay">Пригласить</span>
-          </div>
-        </div>
+            <span class="entry-chevron" aria-hidden="true">›</span>
+          </a>
+          <a href="/auth?role=employer">
+            <div>
+              <p class="entry-title">Я работодатель</p>
+              <p class="entry-desc">Колода кандидатов по категории, без публичных контактов</p>
+            </div>
+            <span class="entry-chevron" aria-hidden="true">›</span>
+          </a>
+          <a href="/#how">
+            <div>
+              <p class="entry-title">Как работают категории</p>
+              <p class="entry-desc">Специализация × грейд после подтверждённого теста</p>
+            </div>
+            <span class="entry-chevron" aria-hidden="true">›</span>
+          </a>
+          <a href="/auth">
+            <div>
+              <p class="entry-title">Демо-вход</p>
+              <p class="entry-desc">anna@demo.local — пароль demo-demo-demo</p>
+            </div>
+            <span class="entry-chevron" aria-hidden="true">›</span>
+          </a>
+        </nav>
       </div>
     </section>
-    <main class="column landing-main">
+    <div class="landing-ribbon" aria-hidden="true"></div>
+    <section class="landing-stats-band" aria-label="Статистика платформы">
       <div class="stats stats-expressive" id="stats"></div>
+    </section>
+    <main class="column landing-main" id="how">
       <h2 class="section-title">Как это работает</h2>
       <div class="steps steps-icons">
         <div class="step-card">
@@ -102,11 +104,11 @@
     <script>
       document.getElementById("site-header").innerHTML = `
         <div class="site-header site-header-landing cabinet-header-v3">
-          <a class="logo logo-on-dark" href="/">${HandCheck.LOGO_MARK}<span>HandCheck</span></a>
+          <a class="logo" href="/">${HandCheck.LOGO_MARK}<span>HandCheck</span></a>
           <nav class="site-nav">
             <a href="/auth?role=candidate">Кандидатам</a>
             <a href="/auth?role=employer">Работодателям</a>
-            <a href="/auth">Войти</a>
+            <a class="btn-ghost btn-sm" href="/auth">Войти</a>
             <a class="btn-primary" href="/auth">Начать</a>
           </nav>
         </div>`;
@@ -116,9 +118,15 @@
           const fmt = (v, demo) =>
             demo ? `${v || 2} <span class="stat-label">в демо</span>` : String(v);
           document.getElementById("stats").innerHTML = `
-            <div class="stat stat-forest"><div class="stat-value">${fmt(s.categories, s.categoriesDemo)}</div><div class="stat-label">категорий подтверждено</div></div>
-            <div class="stat stat-clay"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты к приглашениям</div></div>
-            <div class="stat stat-ink"><div class="stat-value">${fmt(s.invitations, s.invitationsDemo)}</div><div class="stat-label">приглашений</div></div>`;
+            <div class="landing-stats-primary">
+              <div class="stat stat-forest"><div class="stat-value">${fmt(s.categories, s.categoriesDemo)}</div><div class="stat-label">категорий подтверждено</div></div>
+              <div class="stat stat-clay"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты к приглашениям</div></div>
+              <div class="stat stat-ink"><div class="stat-value">${fmt(s.invitations, s.invitationsDemo)}</div><div class="stat-label">приглашений</div></div>
+            </div>
+            <div class="landing-stats-side invite-meta">
+              <p style="margin:0 0 0.75rem;opacity:0.9">Платформа для честного найма: категория по тесту, приглашение с вилкой, созвон с записью.</p>
+              <a class="btn-on-dark-ghost" href="/auth?role=employer">Открыть кабинет работодателя</a>
+            </div>`;
         });
     </script>
   </body>

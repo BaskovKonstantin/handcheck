@@ -1,0 +1,53 @@
+"use strict";
+
+const { chromium } = require("playwright");
+const fs = require("fs");
+const path = require("path");
+
+const OUT = path.join(__dirname, "..", "handcheck-ui", "round66", "mercor-after");
+const BASE = process.env.HC_SCREEN_BASE || "http://127.0.0.1:8811";
+const PASS = "demo-demo-demo";
+
+const PAGES = [
+  { name: "landing", url: "/", auth: false },
+  { name: "auth", url: "/auth", auth: false },
+  { name: "candidate-today", url: "/candidate/today", auth: "anna@demo.local" },
+  { name: "candidate-tasks", url: "/candidate/tasks", auth: "anna@demo.local" },
+  { name: "candidate-invitations", url: "/candidate/invitations", auth: "anna@demo.local" },
+  { name: "candidate-calls", url: "/candidate/calls", auth: "anna@demo.local" },
+  { name: "employer-deck", url: "/employer/deck", auth: "cafe@demo.local" },
+  { name: "employer-list", url: "/employer/list", auth: "cafe@demo.local" },
+  { name: "employer-need", url: "/employer/need", auth: "cafe@demo.local" },
+];
+
+async function login(page, email) {
+  await page.goto(`${BASE}/auth`, { waitUntil: "domcontentloaded" });
+  await page.fill("#email", email);
+  await page.fill("#password", PASS);
+  await page.click("#primary-action", { force: true });
+  await page.waitForURL(/\/(candidate|employer)\//, { timeout: 30000 });
+}
+
+async function main() {
+  fs.mkdirSync(OUT, { recursive: true });
+  const browser = await chromium.launch();
+  for (const width of [1280, 390]) {
+    for (const p of PAGES) {
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await context.newPage();
+      if (p.auth) await login(page, p.auth);
+      await page.goto(`${BASE}${p.url}`, { waitUntil: "networkidle", timeout: 45000 });
+      await page.waitForTimeout(500);
+      const file = path.join(OUT, `${p.name}-${width}.png`);
+      await page.screenshot({ path: file, fullPage: true });
+      await context.close();
+      console.log("wrote", file);
+    }
+  }
+  await browser.close();
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

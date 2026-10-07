@@ -1,33 +1,94 @@
 @import url("/fonts.css");
+@import url("/mercor-theme.css");
 
 [hidden] {
   display: none !important;
 }
 
 :root {
-  /* Ocean slate palette (replaces forest/orange/beige) */
-  --paper: #f3f6fc;
+  --paper: #ffffff;
+  --paper-subtle: #f9fafb;
+  --paper-muted: #f3f4f6;
+  --paper-app: #f1f5f9;
   --card: #ffffff;
-  --ink: #0f172a;
-  --ink-muted: #475569;
-  --muted: #5c677a;
-  --line: #dde4ef;
-  --forest: #0a6b7c;
-  --forest-soft: #e4f4f8;
-  --forest-glow: rgba(10, 107, 124, 0.14);
-  --accent-secondary: #5b6fd6;
-  --accent-secondary-soft: #eef1fc;
-  --clay: #c42d52;
-  --clay-hover: #a32345;
-  --clay-glow: rgba(196, 45, 82, 0.2);
-  --danger: #b42318;
+  --ink: #020817;
+  --ink-heading: #111827;
+  --text-2: #4b5563;
+  --ink-muted: var(--text-2);
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --legal: #64748b;
+  --line: #e5e7eb;
+  --line-subtle: #f3f4f6;
+  --line-hair: rgba(2, 8, 23, 0.07);
+  --line-input: #d1d5db;
+  --clay: #4f46e5;
+  --clay-hover: #6366f1;
+  --clay-press: #4338ca;
+  --clay-glow: rgba(79, 70, 229, 0.2);
   --on-clay: #ffffff;
-  --signal-warn-bg: #fff8eb;
-  --signal-warn-ink: #7a4d08;
-  --signal-warn-line: #e7c35a;
-  --display: "Unbounded", "Golos Text", system-ui, sans-serif;
-  --font: "Golos Text", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-tabular: "Golos Text", ui-sans-serif, system-ui, sans-serif;
+  --accent-soft: #eef2ff;
+  --accent-soft-line: #e0e7ff;
+  --accent-text: #4f39f6;
+  --accent-secondary: var(--clay);
+  --accent-secondary-soft: var(--accent-soft);
+  --forest: #1e1b4b;
+  --forest-soft: #eef2ff;
+  --forest-glow: rgba(79, 70, 229, 0.14);
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+  --info: #1d4ed8;
+  --info-soft: #eff6ff;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --signal-warn-bg: var(--warn-soft);
+  --signal-warn-ink: var(--warn);
+  --signal-warn-line: #fcd34d;
+  --bar-track: linear-gradient(to right, #e5e7eb, #d1d5db);
+  --bar-indigo: linear-gradient(to right, #a0a2f9, #4f46e5);
+  --bar-orange: linear-gradient(to right, #ff9b5e, #ea6234);
+  --bar-blue: linear-gradient(to right, #7cd3ff, #3281ee);
+  --grad-hero: linear-gradient(
+    135deg,
+    #6673ec 0%,
+    #8e8ddf 18%,
+    #c29cd8 32%,
+    #f6abd1 42%,
+    #ffe5e0 58%,
+    #5162ff 78%,
+    #1e1a4d 100%
+  );
+  --grad-ribbon: linear-gradient(
+    to top,
+    #5162ff 0.82%,
+    #6e7cff 18%,
+    #8e92f8 33%,
+    #baa9f9 55%,
+    #e0c7f1 80%,
+    #ffe5e0 98%
+  );
+  --grad-auth-halo: radial-gradient(50% 80% at 20% 40%, rgba(93, 52, 221, 0.1), transparent);
+  --display: "Inter", "Inter Fallback", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  --font: var(--display);
+  --font-tabular: var(--font);
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-card: 0 0 0 1px #e5e7eb, 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-accent: 0 4px 16px rgba(79, 57, 239, 0.14), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --ring-input: inset 0 0 0 1px #d1d5db;
+  --ring-focus: 0 0 0 2px #ffffff, 0 0 0 4px rgba(79, 70, 229, 0.5);
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -35,15 +96,22 @@
   --space-5: 1.25rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 16px;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --container: 1600px;
+  --gutter: 56px;
+  --gutter-m: 24px;
+  --content-app: 1152px;
+  --rail-w: 80px;
+  --header-h: 68px;
+  --tabbar-h: 64px;
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --dur-fast: 180ms;
-  --dur: 260ms;
-  --dur-deck: 340ms;
+  --ease-count: cubic-bezier(0, 0.7, 0.3, 1);
+  --dur-fast: 150ms;
+  --dur: 200ms;
+  --dur-slow: 300ms;
+  --dur-deck: 320ms;
   --press-scale: 0.97;
 }
 
@@ -66,10 +134,12 @@ body {
   font-family: var(--font);
   color: var(--ink);
   background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
 }
 
 a {
-  color: var(--forest);
+  color: var(--clay);
   text-decoration: none;
 }
 
@@ -1382,7 +1452,7 @@ body.has-cabinet-chrome main {
   }
 
   body.has-cabinet-chrome {
-    padding-left: 15.5rem;
+    padding-left: var(--rail-w);
   }
 
   .cabinet-aside {
@@ -1394,7 +1464,7 @@ body.has-cabinet-chrome main {
     bottom: 0;
     height: 100vh;
     min-height: 100vh;
-    width: 15rem;
+    width: var(--rail-w);
     padding: 1.15rem 0.75rem 1rem;
     border-right: 1px solid var(--line);
     background: var(--card);
@@ -1402,11 +1472,7 @@ body.has-cabinet-chrome main {
   }
 
   body.has-cabinet-chrome {
-    background: linear-gradient(
-      90deg,
-      var(--card) 15rem,
-      var(--paper) 15rem
-    );
+    background: var(--paper-subtle);
   }
 
   .cabinet-aside-inner {
@@ -1420,7 +1486,7 @@ body.has-cabinet-chrome main {
 
   .cabinet-aside .cabinet-nav-link {
     width: 100%;
-    border-radius: 10px;
+    border-radius: var(--radius-sm);
     font-weight: 500;
   }
 
@@ -2670,7 +2736,7 @@ body.deck-page main.column {
   }
 
   body.has-cabinet-chrome {
-    padding-left: 15.5rem;
+    padding-left: var(--rail-w);
   }
 }
 

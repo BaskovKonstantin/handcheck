@@ -49,9 +49,8 @@ const API_RETRIES = 2;
 
 (function preloadAppFonts() {
   const hrefs = [
-    "/fonts/golos/golos-cyrillic-400.woff2",
-    "/fonts/golos/golos-latin-400.woff2",
-    "/fonts/unbounded/unbounded-cyrillic-700.woff2",
+    "/fonts/inter/inter-cyrillic-wght-normal.woff2",
+    "/fonts/inter/inter-latin-wght-normal.woff2",
   ];
   for (const href of hrefs) {
     if (document.querySelector(`link[data-hc-preload="${href}"]`)) continue;
@@ -456,7 +455,32 @@ function formatAuditLogTime(iso) {
 function renderPasteInputMark(pasteInputMark) {
   if (!pasteInputMark?.label) return "";
   const label = escapeHtml(pasteInputMark.label);
-  return `<span class="integrity-chip paste-input" title="${label}">${label}</span>`;
+  return `<span class="integrity-chip paste-input paste-input-chip" title="${label}">${label}</span>`;
+}
+
+const GRADE_RELATION_HINT = {
+  exact: "совпадает с потребностью",
+  lower: "ниже потребности",
+  higher: "выше потребности",
+};
+
+function renderGradeRelationBar(label, gradeRelation, categoryStatus) {
+  if (!label || categoryStatus === "unconfirmed") return "";
+  const rel = gradeRelation || "exact";
+  const hint = GRADE_RELATION_HINT[rel] || GRADE_RELATION_HINT.exact;
+  const fillClass =
+    rel === "lower"
+      ? "grade-relation-fill-orange"
+      : rel === "higher"
+        ? "grade-relation-fill-blue"
+        : "grade-relation-fill-indigo";
+  return `<div class="grade-relation-row" role="img" aria-label="${escapeHtml(label)}: ${hint}">
+    <div class="grade-relation-head">
+      <span class="grade-relation-label">${escapeHtml(label)}</span>
+      <span class="grade-relation-hint">${escapeHtml(hint)}</span>
+    </div>
+    <div class="grade-relation-track"><span class="grade-relation-fill ${fillClass}"></span></div>
+  </div>`;
 }
 
 const EMPLOYER_MATCH_GROUPS = [
@@ -1086,6 +1110,7 @@ window.HandCheck = {
     }
     return `<span class="${cls}">${escapeHtml(label || "")}</span>`;
   },
+  renderGradeRelationBar,
   escapeHtml,
   resolveEmployerNeedId,
   persistEmployerNeedId,

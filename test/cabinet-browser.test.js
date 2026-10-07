@@ -1323,10 +1323,10 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await page.click("#start", { force: true });
     await page.waitForSelector("#open-q", { timeout: 15000 });
     await page.click("#open-q", { force: true });
-    await page.waitForSelector(".battery-progress", { state: "visible", timeout: 15000 });
+    await page.waitForSelector("#battery-progress-compact", { state: "visible", timeout: 15000 });
     await page.waitForFunction(
       () => {
-        const steps = document.querySelector(".battery-steps");
+        const steps = document.querySelector(".battery-steps-full");
         return steps && getComputedStyle(steps).display === "none";
       },
       { timeout: 5000 }

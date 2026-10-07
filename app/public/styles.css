@@ -2768,6 +2768,12 @@ body.deck-page main.column {
   color: var(--clay);
 }
 
+@media (max-width: 480px) {
+  .battery-steps.battery-steps-full {
+    display: none;
+  }
+}
+
 .choice-chip-row {
   display: flex;
   flex-wrap: wrap;

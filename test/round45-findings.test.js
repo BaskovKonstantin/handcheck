@@ -136,10 +136,10 @@ describe("round45 findings (unit)", () => {
 
   it("tasks page uses compact progress strip CSS on mobile", () => {
     const css = fs.readFileSync(path.join(__dirname, "../app/public/styles.css"), "utf8");
-    assert.match(css, /\.battery-progress[\s\S]*display: block/);
-    assert.match(css, /\.battery-steps[\s\S]*display: none/);
+    assert.match(css, /\.battery-progress-compact[\s\S]*display: block/);
+    assert.match(css, /\.battery-steps\.battery-steps-full[\s\S]*display: none/);
     const tasks = fs.readFileSync(path.join(__dirname, "../app/public/candidate/tasks.html"), "utf8");
-    assert.match(tasks, /battery-progress-label/);
+    assert.match(tasks, /battery-progress-compact/);
     assert.match(tasks, /telemetryOpen = false/);
   });
 });

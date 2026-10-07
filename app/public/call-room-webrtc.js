@@ -17,10 +17,9 @@
   const RECORDER_VIDEO_BPS = 100_000;
   const RECORDER_AUDIO_BPS = 15_000;
   const RECORDER_TOTAL_BPS = RECORDER_VIDEO_BPS + RECORDER_AUDIO_BPS;
-  const CHUNK_UPLOAD_MS = 12_000;
+  const CHUNK_UPLOAD_MS = 3_000;
   /** Chromium keepalive fetch body limit (~64 KB). */
   const KEEPALIVE_BODY_LIMIT = 60 * 1024;
-
   function wsUrl(callId) {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${location.host}/ws/calls/${callId}`;
@@ -431,6 +430,33 @@
       return since != null ? Math.max(0, Date.now() - since) : 0;
     }
 
+    function uploadKeepaliveBatch(parts) {
+      const mime = pickRecorderMime() || "video/webm";
+      const blob = new Blob(parts, { type: mime });
+      if (!blob.size || blob.size > KEEPALIVE_BODY_LIMIT) return;
+      const form = new FormData();
+      form.append("file", blob, `chunk-emergency-${uploadedChunkCount}.webm`);
+      void postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size).then((res) => {
+        if (res?.ok) uploadedChunkCount += 1;
+      });
+    }
+
+    function emergencyUploadPendingRecording() {
+      if (!chunkQueue?.emergencyFlushKeepalive) return;
+      chunkQueue.emergencyFlushKeepalive((parts) => uploadKeepaliveBatch(parts));
+    }
+
+    function flushRecordingOnPageExit() {
+      try {
+        if (recorder && recorder.state !== "inactive" && typeof recorder.requestData === "function") {
+          recorder.requestData();
+        }
+      } catch {
+        /* ignore */
+      }
+      emergencyUploadPendingRecording();
+    }
+
     function startChunkUploadLoop() {
       clearInterval(chunkUploadTimer);
       chunkUploadTimer = setInterval(() => {
@@ -443,18 +469,14 @@
         });
       }, CHUNK_UPLOAD_MS);
       const onPageHide = () => {
-        const mime = pickRecorderMime() || "video/webm";
-        void flushRecordingChunks()
-          .then(() => {
-            const tail = chunkQueue?.drainRemainingBlobs(mime);
-            if (!tail?.size) return;
-            const form = new FormData();
-            form.append("file", tail, "chunk-emergency.webm");
-            return postMultipart(`/api/calls/${callId}/recording-chunk`, form, tail.size);
-          })
-          .catch(() => {});
+        flushRecordingOnPageExit();
+      };
+      const onVisibility = () => {
+        if (global.document?.visibilityState === "hidden") flushRecordingOnPageExit();
       };
       global.addEventListener("pagehide", onPageHide);
+      global.addEventListener("beforeunload", onPageHide);
+      global.document?.addEventListener("visibilitychange", onVisibility);
     }
 
     let uploadRecordingLock = Promise.resolve();

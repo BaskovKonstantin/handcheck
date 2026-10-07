@@ -114,9 +114,9 @@
             .map((r) => {
               const invited =
                 r.reviewStatus === "invited"
-                  ? '<span class="status-pill accepted">приглашён</span>'
+                  ? '<span class="status-pill accepted">Приглашён</span>'
                   : r.reviewStatus === "declined"
-                    ? '<span class="status-pill declined">отклонил приглашение</span>'
+                    ? '<span class="status-pill declined">Отклонил приглашение</span>'
                     : "";
               const explain = (r.explanation || [])
                 .map((line) => `<li>${esc(line)}</li>`)

@@ -438,7 +438,6 @@ body.call-room-page {
   background: var(--paper);
   border: 1px solid var(--line);
   color: var(--muted);
-  text-transform: lowercase;
 }
 
 .status-pill.accepted {

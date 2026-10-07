@@ -77,7 +77,7 @@ async function assertCabinetPage(page, urlPath, contentSelector, emailHint) {
 
 const runBrowser = process.env.RUN_BROWSER === "1";
 
-describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrowser }, () => {
+describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrowser }, () => {
   before(async () => {
     if (!PORT) {
       const srv = require("node:net").createServer();
@@ -1413,6 +1413,346 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
         `employer video duration ${dur}s vs wall ~${wallSec}s (multi-reload gap bug)`
       );
       assert.ok(dur < 180, `duration ${dur}s still looks inflated`);
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
+  });
+
+  function browserDbPath() {
+    return path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+  }
+
+  function candidateChunkCountForInvitation(invId) {
+    const Database = require("better-sqlite3");
+    const db = new Database(browserDbPath());
+    const call = db
+      .prepare(
+        `SELECT recording_path FROM calls WHERE invitation_id = ? ORDER BY started_at DESC LIMIT 1`
+      )
+      .get(invId);
+    db.close();
+    if (!call?.recording_path) return 0;
+    const dir = path.join(call.recording_path, "chunks", "candidate");
+    if (!fs.existsSync(dir)) return 0;
+    return fs.readdirSync(dir).filter((f) => /^\d+\.webm$/.test(f)).length;
+  }
+
+  async function joinLiveCall(emp, cand, invId) {
+    await emp.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+    await cand.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+    await emp.check("#consent", { force: true });
+    await emp.click("#join", { force: true });
+    await cand.check("#consent", { force: true });
+    await cand.click("#join", { force: true });
+    await emp.waitForFunction(
+      () => (window.__hcPcs || []).some((pc) => pc.connectionState === "connected"),
+      { timeout: 60000 }
+    );
+  }
+
+  it("round49: invitation status pills use sentence case on both sides", async () => {
+    const Database = require("better-sqlite3");
+    const db = new Database(browserDbPath());
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+    const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+    const { newId } = require("../app/lib/ids");
+    const invAccepted = newId();
+    const invDeclined = newId();
+    db.prepare(
+      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+       VALUES (?, ?, ?, ?, 180000, 220000, 'r49 pill accepted', 'email', 'accepted')`
+    ).run(invAccepted, cafe.id, need.id, anna.id);
+    db.prepare(
+      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+       VALUES (?, ?, ?, ?, 170000, 210000, 'r49 pill declined', 'email', 'declined')`
+    ).run(invDeclined, cafe.id, need.id, anna.id);
+    db.close();
+
+    const assertPillsCapitalized = async (page, urlPath) => {
+      await page.goto(`${BASE}${urlPath}`, { waitUntil: "commit", timeout: 30000 });
+      await page.waitForSelector(".status-pill", { timeout: 20000 });
+      const texts = await page.$$eval(".status-pill", (els) =>
+        els.map((el) => (el.textContent || "").trim()).filter(Boolean)
+      );
+      assert.ok(texts.length > 0, `no pills on ${urlPath}`);
+      for (const t of texts) {
+        assert.match(t, /^[А-ЯЁA-Z]/, `pill "${t}" on ${urlPath}`);
+      }
+    };
+
+    const candCtx = await browser.newContext({ viewport: { width: 390, height: 900 } });
+    const empCtx = await browser.newContext({ viewport: { width: 390, height: 900 } });
+    const cand = await candCtx.newPage();
+    const emp = await empCtx.newPage();
+    await login(cand, "anna@demo.local");
+    await login(emp, "cafe@demo.local");
+    await assertPillsCapitalized(cand, "/candidate/invitations");
+    await assertPillsCapitalized(emp, "/employer/invitations");
+    await candCtx.close();
+    await empCtx.close();
+  });
+
+  it("round49: candidate reload keeps pre-reload recording chunks on server", async () => {
+    const { ffmpegAvailable, readDurationSecondsFromBuffer, maxPacketGapSeconds } = require("../app/lib/webm-ffmpeg");
+    if (!ffmpegAvailable()) return;
+
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const Database = require("better-sqlite3");
+      const db = new Database(browserDbPath());
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round49 reload chunk', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+
+      const hooks = () => {
+        window.__hcPcs = [];
+        const Orig = window.RTCPeerConnection;
+        window.RTCPeerConnection = class extends Orig {
+          constructor(...args) {
+            super(...args);
+            window.__hcPcs.push(this);
+          }
+        };
+      };
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      await empCtx.addInitScript(hooks);
+      await candCtx.addInitScript(hooks);
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await joinLiveCall(emp, cand, invId);
+      const liveStarted = Date.now();
+      await new Promise((r) => setTimeout(r, 6000));
+      await cand.reload({ waitUntil: "commit" });
+      await cand.waitForSelector("#join:not([disabled])", { timeout: 20000 });
+      await cand.click("#join", { force: true });
+      await new Promise((r) => setTimeout(r, 3000));
+      const chunksAfterReload = candidateChunkCountForInvitation(invId);
+      assert.ok(chunksAfterReload >= 1, `expected candidate chunks after reload, got ${chunksAfterReload}`);
+      await new Promise((r) => setTimeout(r, 12000));
+      await emp.click("#end", { force: true });
+      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      const liveSec = (Date.now() - liveStarted) / 1000;
+      const recordingMeta = await emp.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        return r.json();
+      }, invId);
+      const buf = await emp.evaluate(async ({ callId, side }) => {
+        const res = await fetch(`/api/calls/${callId}/recording?side=${side}`, { credentials: "include" });
+        const ab = await res.arrayBuffer();
+        return Array.from(new Uint8Array(ab));
+      }, { callId: recordingMeta.callId, side: "candidate" });
+      const webm = Buffer.from(buf);
+      const dur = readDurationSecondsFromBuffer(webm);
+      assert.ok(dur && dur > 0, `duration ${dur}`);
+      assert.ok(
+        dur >= liveSec - 12,
+        `candidate duration ${dur}s vs live ~${liveSec}s (lost pre-reload media)`
+      );
+      const tmp = path.join(ROOT, "data", `r49-reload-${PORT}.webm`);
+      fs.writeFileSync(tmp, webm);
+      assert.ok(maxPacketGapSeconds(tmp) <= 0.5);
+      const dec = require("child_process").spawnSync(
+        "ffmpeg",
+        ["-v", "error", "-i", tmp, "-f", "null", "-"],
+        { encoding: "utf8" }
+      );
+      assert.equal(dec.status, 0, dec.stderr);
+      fs.unlinkSync(tmp);
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
+  });
+
+  it("round49: reload after upload tick still keeps recording tail", async () => {
+    const { ffmpegAvailable } = require("../app/lib/webm-ffmpeg");
+    if (!ffmpegAvailable()) return;
+
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const Database = require("better-sqlite3");
+      const db = new Database(browserDbPath());
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round49 reload after tick', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+
+      const hooks = () => {
+        window.__hcPcs = [];
+        const Orig = window.RTCPeerConnection;
+        window.RTCPeerConnection = class extends Orig {
+          constructor(...args) {
+            super(...args);
+            window.__hcPcs.push(this);
+          }
+        };
+      };
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      await empCtx.addInitScript(hooks);
+      await candCtx.addInitScript(hooks);
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await joinLiveCall(emp, cand, invId);
+      const liveStarted = Date.now();
+      await new Promise((r) => setTimeout(r, 11000));
+      await cand.reload({ waitUntil: "commit" });
+      await cand.waitForSelector("#join:not([disabled])", { timeout: 20000 });
+      await cand.click("#join", { force: true });
+      await new Promise((r) => setTimeout(r, 10000));
+      await emp.click("#end", { force: true });
+      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      const liveSec = (Date.now() - liveStarted) / 1000;
+      const recordingMeta = await emp.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        return r.json();
+      }, invId);
+      const buf = await emp.evaluate(async ({ callId, side }) => {
+        const res = await fetch(`/api/calls/${callId}/recording?side=${side}`, { credentials: "include" });
+        const ab = await res.arrayBuffer();
+        return Array.from(new Uint8Array(ab));
+      }, { callId: recordingMeta.callId, side: "candidate" });
+      const { readDurationSecondsFromBuffer } = require("../app/lib/webm-ffmpeg");
+      const dur = readDurationSecondsFromBuffer(Buffer.from(buf));
+      assert.ok(dur >= liveSec - 12, `candidate duration ${dur}s vs live ~${liveSec}s`);
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
+  });
+
+  it("round49: tab close uploads pending recording tail", async () => {
+    const { ffmpegAvailable, readDurationSecondsFromBuffer } = require("../app/lib/webm-ffmpeg");
+    if (!ffmpegAvailable()) return;
+
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const Database = require("better-sqlite3");
+      const db = new Database(browserDbPath());
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round49 tab close', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+
+      const hooks = () => {
+        window.__hcPcs = [];
+        const Orig = window.RTCPeerConnection;
+        window.RTCPeerConnection = class extends Orig {
+          constructor(...args) {
+            super(...args);
+            window.__hcPcs.push(this);
+          }
+        };
+      };
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      await empCtx.addInitScript(hooks);
+      await candCtx.addInitScript(hooks);
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await joinLiveCall(emp, cand, invId);
+      const liveStarted = Date.now();
+      await new Promise((r) => setTimeout(r, 7000));
+      const chunkUploadPromise = cand
+        .waitForResponse(
+          (res) => res.url().includes("/recording-chunk") && res.status() === 200,
+          { timeout: 20000 }
+        )
+        .catch(() => null);
+      await cand.close({ runBeforeUnload: true });
+      await chunkUploadPromise;
+      await new Promise((r) => setTimeout(r, 6000));
+      let chunksAfterClose = 0;
+      let bytesAfterClose = 0;
+      for (let i = 0; i < 8; i += 1) {
+        const Database = require("better-sqlite3");
+        const db = new Database(browserDbPath());
+        const call = db
+          .prepare(`SELECT id, recording_path FROM calls WHERE invitation_id = ? LIMIT 1`)
+          .get(invId);
+        db.close();
+        if (call?.recording_path) {
+          const dir = path.join(call.recording_path, "chunks", "candidate");
+          if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir).filter((f) => /^\d+\.webm$/.test(f));
+            chunksAfterClose = files.length;
+            bytesAfterClose = files.reduce(
+              (sum, f) => sum + fs.statSync(path.join(dir, f)).size,
+              0
+            );
+          }
+        }
+        if (chunksAfterClose >= 1 && bytesAfterClose > 20_000) break;
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      assert.ok(chunksAfterClose >= 1, `expected chunks after tab close, got ${chunksAfterClose}`);
+      assert.ok(bytesAfterClose > 20_000, `expected chunk bytes after tab close, got ${bytesAfterClose}`);
+      await emp.waitForFunction(
+        () => document.body?.textContent?.includes("вышел") || document.body?.textContent?.includes("комнат"),
+        { timeout: 30000 }
+      ).catch(() => {});
+      await new Promise((r) => setTimeout(r, 6000));
+      await emp.click("#end", { force: true });
+      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      const liveSec = (Date.now() - liveStarted) / 1000;
+      const recordingMeta = await emp.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        return r.json();
+      }, invId);
+      const { finalizeMergedWebm } = require("../app/lib/recording-store");
+      const { listChunkFiles } = require("../app/lib/recording-store");
+      const chunkPaths = listChunkFiles(recordingMeta.callId, "candidate");
+      assert.ok(chunkPaths.length >= 1, "expected stored candidate chunks after finalize");
+      const merged = finalizeMergedWebm(
+        chunkPaths.map((p) => fs.readFileSync(p)),
+        Math.round(liveSec * 1000)
+      );
+      const chunkDur = readDurationSecondsFromBuffer(merged);
+      assert.ok(chunkDur && chunkDur > 0, `chunk merge duration ${chunkDur}`);
+      assert.ok(
+        chunkDur >= liveSec - 14,
+        `candidate chunk duration ${chunkDur}s vs live ~${liveSec}s after tab close`
+      );
       await empCtx.close();
       await candCtx.close();
     } finally {

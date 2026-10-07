@@ -124,6 +124,7 @@ function renderCard(data) {
         <div>
           <h2 class="deck-name">${esc(data.card.displayName)}</h2>
           ${HandCheck.renderCategoryPill(data.card.categoryLabel, data.card.categoryStatus)}
+          ${HandCheck.renderPasteInputMark(data.card.pasteInputMark)}
         </div>
       </div>
       ${domains ? `<div class="chip-row">${domains}</div>` : ""}

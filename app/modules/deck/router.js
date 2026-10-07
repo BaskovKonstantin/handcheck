@@ -9,6 +9,7 @@ const { httpError } = require("../../middleware/errors");
 const { loadCandidatesForNeed, applyFilters } = require("../matching/pool");
 const { employerCandidateView } = require("../../lib/privacy");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
+const { getEmployerPasteInputMark } = require("../../lib/employer-paste-indicator");
 const { listDeferredCandidates } = require("../../lib/employer-deferred-list");
 
 const router = express.Router();
@@ -27,7 +28,9 @@ router.get("/needs/:id/deck/next", (req, res, next) => {
   items = applyFilters(items, req.query);
   if (!items.length) return res.json({ card: null });
   const c = items[0];
+  const db = getDb();
   const aiUsage = summarizeAiUsageForEmployer(req.user.id, c.id);
+  const pasteInputMark = getEmployerPasteInputMark(db, c.id);
   const card = employerCandidateView(req.user.id, {
     id: c.id,
     displayName: c.displayName,
@@ -39,6 +42,7 @@ router.get("/needs/:id/deck/next", (req, res, next) => {
     taskPhrases: c.taskPhrases,
     integrationNote: c.integrationNote,
     aiUsage,
+    pasteInputMark,
     phone: c.phone,
     contact_email: c.contact_email,
   }, null);

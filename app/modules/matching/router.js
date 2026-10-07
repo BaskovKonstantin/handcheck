@@ -7,6 +7,7 @@ const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
 const { loadCandidatesForNeed, applyFilters, publicMatchShape } = require("./pool");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
+const { getEmployerPasteInputMark } = require("../../lib/employer-paste-indicator");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -23,6 +24,8 @@ router.get("/needs/:id/matches", (req, res, next) => {
     items: items.map((c) => {
       const row = publicMatchShape(c);
       row.aiUsage = summarizeAiUsageForEmployer(req.user.id, c.id);
+      const pasteInputMark = getEmployerPasteInputMark(db, c.id);
+      if (pasteInputMark) row.pasteInputMark = pasteInputMark;
       return row;
     }),
   });

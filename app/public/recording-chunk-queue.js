@@ -2,31 +2,112 @@
 "use strict";
 
 (function (global) {
-  function createRecordingChunkQueue({ uploadBlob }) {
+  const MAX_UPLOAD_BLOB_BYTES = 48 * 1024;
+  const MAX_PENDING_BLOB_BYTES = 48 * 1024;
+
+  function partSize(part) {
+    return part?.size || 0;
+  }
+
+  function pendingBytes(parts) {
+    return parts.reduce((sum, p) => sum + partSize(p), 0);
+  }
+
+  function splitPartsIntoUploadBatches(parts, maxBytes = MAX_UPLOAD_BLOB_BYTES) {
+    if (!parts?.length) return [];
+    const batches = [];
+    let batch = [];
+    let total = 0;
+    for (const part of parts) {
+      const sz = partSize(part);
+      if (!batch.length) {
+        batch.push(part);
+        total = sz;
+        if (total >= maxBytes) {
+          batches.push(batch);
+          batch = [];
+          total = 0;
+        }
+        continue;
+      }
+      if (total + sz > maxBytes) {
+        batches.push(batch);
+        batch = [part];
+        total = sz;
+        if (total >= maxBytes) {
+          batches.push(batch);
+          batch = [];
+          total = 0;
+        }
+        continue;
+      }
+      batch.push(part);
+      total += sz;
+    }
+    if (batch.length) batches.push(batch);
+    return batches;
+  }
+
+  function takeNextUploadBatch(chunks, maxBytes = MAX_UPLOAD_BLOB_BYTES) {
+    if (!chunks.length) return null;
+    const pending = [];
+    let total = 0;
+    while (chunks.length) {
+      const next = chunks[0];
+      const sz = partSize(next);
+      if (pending.length && total + sz > maxBytes) break;
+      pending.push(chunks.shift());
+      total += sz;
+      if (total >= maxBytes) break;
+    }
+    if (!pending.length) return null;
+    return { pending, count: pending.length, bytes: total };
+  }
+
+  function createRecordingChunkQueue({
+    uploadBlob,
+    maxUploadBytes = MAX_UPLOAD_BLOB_BYTES,
+    maxPendingBytes = MAX_PENDING_BLOB_BYTES,
+  }) {
     let chunks = [];
     let flushChain = Promise.resolve();
-
+    let flushGeneration = 0;
+    let inFlight = null;
     function push(blob) {
       if (blob?.size) chunks.push(blob);
+      if (pendingBlobBytes() >= maxPendingBytes) {
+        flush();
+      }
     }
 
-    function snapshotPending() {
-      if (!chunks.length) return null;
-      const pending = chunks.slice();
-      const count = pending.length;
-      return { pending, count };
-    }
-
-    function commitUploaded(count) {
-      if (count > 0) chunks.splice(0, count);
+    function collectAllPendingParts() {
+      const parts = [];
+      if (inFlight?.pending?.length) parts.push(...inFlight.pending);
+      if (chunks.length) parts.push(...chunks);
+      chunks = [];
+      inFlight = null;
+      return parts;
     }
 
     async function flushOnce() {
-      const snap = snapshotPending();
+      if (inFlight) return chunks.length > 0;
+      const snap = takeNextUploadBatch(chunks, maxUploadBytes);
       if (!snap) return false;
-      await uploadBlob(snap.pending);
-      commitUploaded(snap.count);
-      return true;
+      const gen = flushGeneration;
+      inFlight = snap;
+      try {
+        await uploadBlob(snap.pending);
+        if (gen === flushGeneration) {
+          inFlight = null;
+        }
+        return chunks.length > 0 || inFlight != null;
+      } catch (err) {
+        if (gen === flushGeneration) {
+          chunks.unshift(...snap.pending);
+          inFlight = null;
+        }
+        throw err;
+      }
     }
 
     function flush() {
@@ -38,25 +119,48 @@
       return flushChain;
     }
 
+    function emergencyFlushKeepalive(uploadBatch) {
+      flushGeneration += 1;
+      const parts = collectAllPendingParts();
+      if (!parts.length) return [];
+      const batches = splitPartsIntoUploadBatches(parts, maxUploadBytes);
+      for (const batch of batches) {
+        uploadBatch(batch);
+      }
+      return batches;
+    }
+
     function drainRemainingBlobs(mimeType) {
-      if (!chunks.length) return null;
-      const blob = new Blob(chunks, { type: mimeType || "video/webm" });
-      chunks = [];
+      const parts = collectAllPendingParts();
+      if (!parts.length) return null;
+      const blob = new Blob(parts, { type: mimeType || "video/webm" });
       return blob.size ? blob : null;
     }
 
     function pendingCount() {
-      return chunks.length;
+      return chunks.length + (inFlight ? inFlight.count : 0);
+    }
+
+    function pendingBlobBytes() {
+      let total = pendingBytes(chunks);
+      if (inFlight?.pending) total += pendingBytes(inFlight.pending);
+      return total;
     }
 
     return {
       push,
       flush,
       waitForIdle: () => flushChain,
+      emergencyFlushKeepalive,
       drainRemainingBlobs,
       pendingCount,
+      pendingBlobBytes,
     };
   }
 
-  global.HandCheckRecordingChunkQueue = { createRecordingChunkQueue };
+  global.HandCheckRecordingChunkQueue = {
+    createRecordingChunkQueue,
+    MAX_UPLOAD_BLOB_BYTES,
+    MAX_PENDING_BLOB_BYTES,
+  };
 })(window);

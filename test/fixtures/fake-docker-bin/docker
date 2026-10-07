@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LOG_RMI="${FAKE_DOCKER_RMI_LOG:-}"
+COMPOSE_DIR="${HANDCHECK_COMPOSE_DIR:-}"
+
+case "${1:-}" in
+  info)
+    if [[ "${2:-}" == "-f" && "${3:-}" == "{{.DockerRootDir}}" ]]; then
+      echo /var/lib/docker
+      exit 0
+    fi
+    ;;
+  system)
+    if [[ "${2:-}" == "df" ]]; then
+      echo "TYPE TOTAL ACTIVE SIZE RECLAIMABLE"
+      exit 0
+    fi
+    ;;
+  image)
+    if [[ "${2:-}" == "prune" ]]; then
+      exit 0
+    fi
+    ;;
+  builder)
+    if [[ "${3:-}" == "prune" ]]; then
+      exit 0
+    fi
+    ;;
+  compose)
+    if [[ "${2:-}" == "images" && "${3:-}" == "-q" && "${4:-}" == "web" ]]; then
+      echo "${FAKE_DOCKER_CURRENT_ID:-sha256:current}"
+      exit 0
+    fi
+    ;;
+  images)
+    if [[ "${2:-}" == "--format" ]]; then
+      echo "${FAKE_DOCKER_PREV_ID:-sha256:previous} handcheck-web"
+      echo "${FAKE_DOCKER_CURRENT_ID:-sha256:current} handcheck-web"
+      echo "${FAKE_DOCKER_OLD_ID:-sha256:old} handcheck-web"
+      exit 0
+    fi
+    if [[ "${2:-}" == "rmi" ]]; then
+      if [[ -n "$LOG_RMI" ]]; then
+        echo "$2" >>"$LOG_RMI"
+      fi
+      exit 0
+    fi
+    ;;
+  rmi)
+    if [[ -n "$LOG_RMI" ]]; then
+      echo "$*" >>"$LOG_RMI"
+    fi
+    exit 0
+    ;;
+esac
+
+if [[ -x /usr/bin/docker ]]; then
+  exec /usr/bin/docker "$@"
+fi
+echo "fake-docker: unhandled: $*" >&2
+exit 1

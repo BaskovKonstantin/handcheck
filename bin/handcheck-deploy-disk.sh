@@ -67,18 +67,15 @@ post_prune() {
   docker builder prune -af --filter "until=24h" || true
   local keep=()
   if [[ -d "$COMPOSE_DIR" ]]; then
-    (
-      cd "$COMPOSE_DIR"
-      local current_id prev_id
-      current_id="$(docker compose images -q web 2>/dev/null | head -1 || true)"
-      if [[ -n "$current_id" ]]; then
-        keep+=("$current_id")
-        prev_id="$(docker images --format '{{.ID}} {{.Repository}}' | awk -v cur="$current_id" '$2 ~ /handcheck/ && $1 != cur { print $1; exit }')"
-        if [[ -n "$prev_id" ]]; then
-          keep+=("$prev_id")
-        fi
+    local current_id prev_id
+    current_id="$(cd "$COMPOSE_DIR" && docker compose images -q web 2>/dev/null | head -1 || true)"
+    if [[ -n "$current_id" ]]; then
+      keep+=("$current_id")
+      prev_id="$(docker images --format '{{.ID}} {{.Repository}}' | awk -v cur="$current_id" '$2 ~ /handcheck/ && $1 != cur { print $1; exit }')"
+      if [[ -n "$prev_id" ]]; then
+        keep+=("$prev_id")
       fi
-    )
+    fi
   fi
   if [[ "${#keep[@]}" -gt 0 ]]; then
     echo "Keeping HandCheck images for rollback: ${keep[*]}"

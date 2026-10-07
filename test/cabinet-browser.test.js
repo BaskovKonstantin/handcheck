@@ -40,6 +40,27 @@ async function login(page, email) {
   await page.waitForURL(/\/(candidate|employer)\//, { timeout: 45000 });
 }
 
+function assertNoHorizontalScroll(page, label) {
+  return page
+    .evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
+    .then((overflow) => assert.equal(overflow, false, `horizontal scroll on ${label}`));
+}
+
+function assertBoxesDisjoint(boxes, label) {
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i];
+      const b = boxes[j];
+      const disjoint =
+        a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+      assert.ok(
+        disjoint,
+        `${label}: "${a.text}" overlaps "${b.text}" (${JSON.stringify(a)} vs ${JSON.stringify(b)})`
+      );
+    }
+  }
+}
+
 async function assertCabinetPage(page, urlPath, contentSelector, emailHint) {
   await page.route("**/api/**", async (route) => {
     await new Promise((r) => setTimeout(r, API_DELAY_MS));
@@ -332,7 +353,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
-  it("candidate today at 390 uses compact three-up stat tiles", async () => {
+  it("candidate today at 390 stacks summary stat tiles full width", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
     const page = await context.newPage();
     await login(page, "anna@demo.local");
@@ -342,9 +363,39 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       return window.getComputedStyle(el).gridTemplateColumns;
     });
     const parts = cols.split(" ").filter(Boolean);
-    assert.equal(parts.length, 3, `expected 3-up grid, got ${cols}`);
-    const tileCount = await page.locator(".stat-tile-grid-today .stat-tile").count();
-    assert.equal(tileCount, 3);
+    assert.equal(parts.length, 1, `expected stacked grid, got ${cols}`);
+    const widths = await page.$$eval(".stat-tile-grid-today .stat-tile", (tiles) =>
+      tiles.map((t) => t.getBoundingClientRect().width)
+    );
+    assert.equal(widths.length, 3);
+    for (const w of widths) {
+      assert.ok(w > 300, `stat tile width ${w}px should exceed 300px at 390 viewport`);
+    }
+    await assertNoHorizontalScroll(page, "candidate/today@390");
+    await context.close();
+  });
+
+  it("employer deck need stat labels do not overlap at 1280", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/deck`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".deck-need-stats dt", { timeout: 30000 });
+    const labelBoxes = await page.$$eval(".deck-need-stats dt", (nodes) =>
+      nodes.map((n) => {
+        const r = n.getBoundingClientRect();
+        return {
+          left: r.left,
+          right: r.right,
+          top: r.top,
+          bottom: r.bottom,
+          text: (n.textContent || "").trim(),
+        };
+      })
+    );
+    assert.ok(labelBoxes.length >= 2, "expected deck need stat labels");
+    assertBoxesDisjoint(labelBoxes, "deck-need-stats dt@1280");
+    await assertNoHorizontalScroll(page, "employer/deck@1280");
     await context.close();
   });
 

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-Pk" && "${2:-}" == "/" ]]; then
+  kb="${FAKE_DF_KB:-1048576}"
+  echo "Filesystem     1024-blocks  Used Available Use% Mounted on"
+  echo "/dev/sda1      120000000 119000000 ${kb} 99% /"
+  exit 0
+fi
+exec /usr/bin/df "$@"

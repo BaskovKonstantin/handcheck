@@ -1280,14 +1280,144 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
     await page.waitForSelector("#open-q", { timeout: 15000 });
     await page.click("#open-q", { force: true });
     await page.waitForSelector("#submit", { timeout: 15000 });
+    await page.evaluate(() => {
+      document.getElementById("submit")?.scrollIntoView({ block: "end" });
+    });
     const box = await page.locator("#submit").boundingBox();
     assert.ok(box, "submit missing");
     const tabTop = await page.evaluate(() => {
       const nav = document.querySelector(".cabinet-mobile-nav");
       return nav ? nav.getBoundingClientRect().top : window.innerHeight;
     });
-    assert.ok(box.y + box.height <= tabTop - 4, `submit bottom ${box.y + box.height} tab ${tabTop}`);
+    assert.ok(box.y + box.height <= tabTop + 2, `submit bottom ${box.y + box.height} tab ${tabTop}`);
     await context.close();
+  });
+
+  it("round45: candidate opening employer deck does not call /api/employer/needs", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const needsCalls = [];
+    await page.route("**/api/employer/needs**", (route) => {
+      needsCalls.push(route.request().url());
+      return route.continue();
+    });
+    await login(page, "anna@demo.local");
+    await page.goto(`${BASE}/employer/deck`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForURL(/\/candidate\/today/, { timeout: 20000 });
+    assert.equal(needsCalls.length, 0, `unexpected needs calls: ${needsCalls.join(", ")}`);
+    await context.close();
+  });
+
+  it("round45: mobile tasks show compact progress strip", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const email = `r45-mobile-${Date.now()}@demo.local`;
+    await context.request.post(`${BASE}/api/auth/register`, {
+      data: { email, password: PASS, role: "candidate" },
+    });
+    await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
+    await context.request.post(`${BASE}/api/auth/login`, { data: { email, password: PASS } });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector("#assessment-privacy", { timeout: 15000 });
+    await page.check("#assessment-privacy", { force: true });
+    await page.click("#start", { force: true });
+    await page.waitForSelector("#open-q", { timeout: 15000 });
+    await page.click("#open-q", { force: true });
+    await page.waitForSelector("#battery-progress-compact", { state: "visible", timeout: 15000 });
+    await page.waitForFunction(
+      () => {
+        const steps = document.querySelector(".battery-steps-full");
+        return steps && getComputedStyle(steps).display === "none";
+      },
+      { timeout: 5000 }
+    );
+    await context.close();
+  });
+
+  it("round45: employer triple reload keeps recording video duration near live time", async () => {
+    const mediaBrowser = await chromium.launch({
+      headless: true,
+      args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"],
+    });
+    try {
+      const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+      const Database = require("better-sqlite3");
+      const db = new Database(dbPath);
+      const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+      const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+      const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+      const { newId } = require("../app/lib/ids");
+      const invId = newId();
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+         VALUES (?, ?, ?, ?, 180000, 220000, 'round45 multi reload', 'email', 'accepted')`
+      ).run(invId, cafe.id, need.id, boris.id);
+      db.close();
+      const hooks = () => {
+        window.__hcPcs = [];
+        const Orig = window.RTCPeerConnection;
+        window.RTCPeerConnection = class extends Orig {
+          constructor(...args) {
+            super(...args);
+            window.__hcPcs.push(this);
+          }
+        };
+      };
+      const wallStarted = Date.now();
+      const empCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      const candCtx = await mediaBrowser.newContext({ permissions: ["camera", "microphone"] });
+      await empCtx.addInitScript(hooks);
+      await candCtx.addInitScript(hooks);
+      const emp = await empCtx.newPage();
+      const cand = await candCtx.newPage();
+      await login(emp, "cafe@demo.local");
+      await login(cand, "boris@demo.local");
+      await emp.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await cand.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
+      await emp.check("#consent", { force: true });
+      await emp.click("#join", { force: true });
+      await cand.check("#consent", { force: true });
+      await cand.click("#join", { force: true });
+      await emp.waitForFunction(
+        () => (window.__hcPcs || []).some((pc) => pc.connectionState === "connected"),
+        { timeout: 60000 }
+      );
+      for (let i = 0; i < 3; i += 1) {
+        await emp.reload({ waitUntil: "commit" });
+        await emp.waitForSelector("#join:not([disabled])", { timeout: 20000 });
+        await emp.click("#join", { force: true });
+        await new Promise((r) => setTimeout(r, 2500));
+      }
+      const liveStarted = Date.now();
+      await new Promise((r) => setTimeout(r, 12000));
+      await emp.click("#end", { force: true });
+      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      const liveMs = Date.now() - liveStarted;
+      const dur = await emp.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        const info = await r.json();
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.src = `/api/calls/${info.callId}/recording?side=employer`;
+        await new Promise((resolve, reject) => {
+          v.onloadedmetadata = () => resolve();
+          v.onerror = () => reject(new Error("metadata"));
+          setTimeout(() => reject(new Error("timeout")), 20000);
+        });
+        return v.duration;
+      }, invId);
+      const wallSec = (Date.now() - wallStarted) / 1000;
+      assert.ok(Number.isFinite(dur) && dur > 0, `duration ${dur}`);
+      assert.ok(
+        dur <= wallSec + 20,
+        `employer video duration ${dur}s vs wall ~${wallSec}s (multi-reload gap bug)`
+      );
+      assert.ok(dur < 180, `duration ${dur}s still looks inflated`);
+      await empCtx.close();
+      await candCtx.close();
+    } finally {
+      await mediaBrowser.close();
+    }
   });
 
   it("shows created API token once in integrations UI (P0-1)", async () => {

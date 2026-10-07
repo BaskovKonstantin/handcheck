@@ -2,7 +2,8 @@ FROM node:20-bookworm-slim
 WORKDIR /app
 ARG GIT_COMMIT=dev
 ENV GIT_COMMIT=$GIT_COMMIT
-RUN apt-get update && apt-get install -y python3 make g++ ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ ffmpeg \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 COPY package.json ./
 RUN npm install --omit=dev
 COPY app ./app

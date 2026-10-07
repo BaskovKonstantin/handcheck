@@ -73,10 +73,10 @@ describe("round38 findings (unit)", () => {
     assert.match(text, /HandCheck|оператор платформы/i);
   });
 
-  it("minutes plural helper uses минуты for 1", () => {
+  it("minutes plural helper uses genitive after «Около»", () => {
     assert.equal(formatMinutesAboutRu(1), "минуты");
-    assert.match(durationPhrase(90), /минуты разговора/);
-    assert.match(durationPhrase(120), /2 минуты разговора/);
+    assert.match(durationPhrase(60), /минуты разговора/);
+    assert.match(durationPhrase(120), /2 минут разговора/);
   });
 
   it("keyword-list trap fails while honest distinct answers pass guard", () => {

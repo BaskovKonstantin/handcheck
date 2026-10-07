@@ -16,6 +16,7 @@ const { rejectOversizedBody } = require("../../middleware/reject-oversized-body"
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
+const { formatMinutesAboutRu } = require("../../lib/call-analysis-summary");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail);
@@ -83,7 +84,7 @@ function callDurationLabel(startedAt, endedAt) {
   if (sec < 60) return `Короткий звонок, меньше минуты`;
   const min = Math.floor(sec / 60);
   if (min === 1) return `Около минуты`;
-  return `Около ${min} мин`;
+  return `Около ${formatMinutesAboutRu(min)}`;
 }
 
 function ensureCall(invitationId) {

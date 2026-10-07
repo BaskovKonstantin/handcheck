@@ -255,6 +255,9 @@
 
   function mount(role) {
     const main = document.getElementById("main");
+    if (main) {
+      main.innerHTML = HandCheck.skeletonBlocks(3);
+    }
     loadAll(main).catch(() => {
       main.innerHTML = HandCheck.loadErrorState(
         "Не удалось загрузить интеграции",

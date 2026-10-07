@@ -73,7 +73,7 @@
                 <div class="list-row-main">
                   <div class="list-row-head">
                     <strong>${esc(r.displayName || "Кандидат")}</strong>
-                    ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus)}
+                    ${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}
                     ${invited}
                   </div>
                   ${HandCheck.renderPasteInputMark(r.pasteInputMark)}

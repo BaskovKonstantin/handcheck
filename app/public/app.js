@@ -393,6 +393,9 @@ const EMPLOYER_MATCH_GROUPS = [
 function classifyEmployerMatchGroup(item, need) {
   const status = item.categoryStatus || "confirmed";
   if (status === "unconfirmed") return "unconfirmed";
+  if (item.gradeRelation === "lower" || item.gradeRelation === "higher") {
+    return "other_grade";
+  }
   if (status === "other_grade" || status === "off_grade" || status === "grade_mismatch") {
     return "other_grade";
   }
@@ -995,11 +998,13 @@ window.HandCheck = {
   formatRetakeDateMoscow,
   needInactiveBannerHtml,
   formatSpecGradeLabel,
-  renderCategoryPill(label, categoryStatus) {
-    const cls =
-      categoryStatus === "unconfirmed"
-        ? "category-pill category-pill-unconfirmed"
-        : "category-pill";
+  renderCategoryPill(label, categoryStatus, gradeRelation) {
+    let cls = "category-pill";
+    if (categoryStatus === "unconfirmed") {
+      cls += " category-pill-unconfirmed";
+    } else if (gradeRelation === "lower" || gradeRelation === "higher") {
+      cls += " category-pill-grade-mismatch";
+    }
     return `<span class="${cls}">${escapeHtml(label || "")}</span>`;
   },
   escapeHtml,

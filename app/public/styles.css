@@ -564,6 +564,12 @@ textarea:focus {
   border: 1px dashed color-mix(in srgb, var(--ink-muted) 35%, var(--line));
 }
 
+.category-pill-grade-mismatch {
+  background: color-mix(in srgb, #c9a227 18%, var(--card));
+  color: color-mix(in srgb, #6b5a12 75%, var(--ink));
+  border: 1px solid color-mix(in srgb, #c9a227 35%, var(--line));
+}
+
 .category-pill {
   display: inline-block;
   padding: 0.2rem 0.65rem;

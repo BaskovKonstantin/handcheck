@@ -6,8 +6,16 @@
 - Mobile deck: safe padding under floating actions + tab bar; deck-wrap overflow visible.
 - Desktop: full-width cabinet heroes; deck need stats panel; employer list grouped by match tier with collapse + «Показать ещё»; quieter list secondary actions; amber paste chip; candidate today zero-states + profile/integration steps + cooldown copy.
 - Sidebar tagline removed; screenshots in `handcheck-ui/round66/{before,after}/`.
-- Tests: `npm test` (304 pass), `test/round66-design.test.js`.
+- Tests: `npm test`, `test/round66-design.test.js`.
 - Mobile list: stack actions under `.list-row-main` ≤640px; Playwright asserts `.list-row-main` width >200px at 360–430.
+- Merged `origin/main` (P2-1 grade mismatch labels): `gradeRelation` on pills + grouping.
+
+## 2026-10-07 — round 66 P2-1 (off-grade confirmed pool labels)
+
+- Branch: `cursor/round66-p2-1-grade-mismatch-dd1a`
+- Fix: same-spec confirmed Junior/Senior in Middle need pool keep real `categoryLabel` + `categoryStatus: confirmed`; `gradeRelation` + honest Russian `explanation`; rank exact → off-grade → unconfirmed.
+- UI: amber `.category-pill-grade-mismatch`; MCP `getDeckNext` passes `categoryStatus` / `gradeRelation`.
+- Tests: `test/round66-findings.test.js`.
 
 ## 2026-10-07 — CI ffmpeg install (PR apt stall)
 

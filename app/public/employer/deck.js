@@ -151,7 +151,7 @@ function renderCard(data) {
         <div class="avatar-monogram" title="Без фото по правилам платформы">${monogram}</div>
         <div>
           <h2 class="deck-name">${esc(data.card.displayName)}</h2>
-          ${HandCheck.renderCategoryPill(data.card.categoryLabel, data.card.categoryStatus)}
+          ${HandCheck.renderCategoryPill(data.card.categoryLabel, data.card.categoryStatus, data.card.gradeRelation)}
           ${HandCheck.renderPasteInputMark(data.card.pasteInputMark)}
         </div>
       </div>

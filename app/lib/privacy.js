@@ -6,6 +6,7 @@ function employerCandidateView(viewerEmployerId, candidate, invitation) {
     displayName: candidate.displayName,
     categoryLabel: candidate.categoryLabel,
     categoryStatus: candidate.categoryStatus,
+    gradeRelation: candidate.gradeRelation,
     stack: candidate.stack,
     backgroundDomains: candidate.backgroundDomains,
     explanation: candidate.explanation,

@@ -38,7 +38,7 @@ jobs:
         run: npm test
 
       - name: Cabinet browser regression
-        run: npm run test:browser
+        run: timeout --signal=TERM --kill-after=30s 20m npm run test:browser
         env:
           DEMO_MODE: "1"
           DEMO_PASSWORD: demo-demo-demo

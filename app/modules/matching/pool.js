@@ -12,6 +12,7 @@ const {
   CATEGORY_STATUS_UNCONFIRMED,
   unconfirmedLabelForNeed,
 } = require("../../lib/category-status");
+const { isEligibleForEmployerPool } = require("../../lib/employer-pool-eligibility");
 
 const UNCONFIRMED_TEST_SCORE = 0.38;
 const UNCONFIRMED_MOTIVATION = 0.42;
@@ -132,7 +133,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
   );
   const confirmedRows = db
     .prepare(
-      `SELECT u.id AS user_id, u.email, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
+      `SELECT u.id AS user_id, u.email, u.email_confirmed_at, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email, cp.availability,
               cc.test_score, cc.motivation, cc.assigned_at, c.label AS category_label,
               priv.trust_ok
        FROM candidate_categories cc
@@ -141,13 +142,14 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
        JOIN categories c ON c.id = cc.category_id
        JOIN candidate_private priv ON priv.candidate_user_id = u.id
        WHERE cc.specialization = ? AND cc.grade = ?
-         AND cp.availability = 'open' AND priv.trust_ok = 1`
+         AND cp.availability = 'open' AND priv.trust_ok = 1
+         AND u.email_confirmed_at IS NOT NULL`
     )
     .all(need.specialization, need.grade);
 
   const unconfirmedRows = db
     .prepare(
-      `SELECT u.id AS user_id, u.email, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email,
+      `SELECT u.id AS user_id, u.email, u.email_confirmed_at, u.is_test, cp.display_name, cp.stack_json, cp.phone, cp.contact_email,
               u.created_at AS assigned_at, priv.trust_ok
        FROM users u
        JOIN candidate_profiles cp ON cp.user_id = u.id
@@ -157,6 +159,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
        WHERE u.role = 'candidate'
          AND cp.availability = 'open'
          AND priv.trust_ok = 1
+         AND u.email_confirmed_at IS NOT NULL
          AND cc_match.candidate_user_id IS NULL
          AND NOT EXISTS (
            SELECT 1 FROM candidate_categories cc_other
@@ -171,6 +174,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
 
   for (const r of confirmedRows) {
     if (!employerIsTest && r.is_test) continue;
+    if (!isEligibleForEmployerPool(r)) continue;
     seen.add(r.user_id);
     pushCandidateRow(out, {
       db,
@@ -188,6 +192,7 @@ function loadCandidatesForNeed(need, employerUserId, options = {}) {
 
   for (const r of unconfirmedRows) {
     if (!employerIsTest && r.is_test) continue;
+    if (!isEligibleForEmployerPool(r)) continue;
     if (seen.has(r.user_id)) continue;
     pushCandidateRow(out, {
       db,

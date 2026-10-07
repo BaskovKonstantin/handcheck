@@ -18,13 +18,15 @@ function parseBirthDate(value) {
   return { y, mo, d };
 }
 
+const MAX_REGISTRATION_AGE_YEARS = 100;
+
 /** Full years on reference date (UTC calendar). */
 function ageYearsOnDate(birth, ref = new Date()) {
   const ry = ref.getUTCFullYear();
   const rm = ref.getUTCMonth() + 1;
   const rd = ref.getUTCDate();
   let age = ry - birth.y;
-  if (rm < birth.mo || (rm === birth.mo && rd < birth.day)) age -= 1;
+  if (rm < birth.mo || (rm === birth.mo && rd < birth.d)) age -= 1;
   return age;
 }
 
@@ -38,6 +40,20 @@ function classifyRegistrationAge(role, birthDateIso) {
     return { ok: false, code: "invalid_birth_date", field: "birthDate" };
   }
   const age = ageYearsOnDate(birth);
+  if (age < 0) {
+    return {
+      ok: false,
+      code: "birth_date_in_future",
+      message: "Дата рождения не может быть в будущем.",
+    };
+  }
+  if (age > MAX_REGISTRATION_AGE_YEARS) {
+    return {
+      ok: false,
+      code: "birth_date_too_old",
+      message: `Укажите реалистичную дату рождения (не старше ${MAX_REGISTRATION_AGE_YEARS} лет).`,
+    };
+  }
   if (age < 15) {
     return {
       ok: false,
@@ -60,4 +76,5 @@ module.exports = {
   parseBirthDate,
   ageYearsOnDate,
   classifyRegistrationAge,
+  MAX_REGISTRATION_AGE_YEARS,
 };

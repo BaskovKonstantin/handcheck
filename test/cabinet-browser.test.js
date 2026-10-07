@@ -259,8 +259,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await login(page, "anna@demo.local");
     await page.goto(`${BASE}/candidate/today`, { waitUntil: "commit", timeout: 30000 });
     await page.waitForSelector(".stat-tile-grid-today");
-    const callsValue = await page.locator(".stat-tile-ink .stat-tile-value").textContent();
-    assert.equal(callsValue.trim(), "0");
+    const callsZero = page.locator(".stat-tile-ink .stat-zero");
+    assert.ok(await callsZero.count(), "expected friendly zero state for calls tile");
     const roomBtn = page.locator('.timeline-section a:has-text("Комната")');
     assert.equal(await roomBtn.count(), 0);
     await context.close();

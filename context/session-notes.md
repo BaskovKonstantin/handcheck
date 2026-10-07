@@ -1,3 +1,16 @@
+# Session notes (round 57 fixes)
+
+## P2 keepalive
+- Routine `uploadRecordingChunk` → `postMultipart(..., { keepalive: false })`; emergency `uploadKeepaliveBatch` only path with `keepalive: true` when blob ≤ limit.
+
+## P3 call-room warning
+- `recordingUploadDegraded` persisted on every `emit()`; `onUploadRecovered` clears chunk upload banner in `call.js`.
+
+## P3 tasks drop
+- `tasks-answer-drop.js`: caret from pointer, internal move; removed `suppressNextInputClassify` (was swallowing first keystroke).
+
+---
+
 # Session notes (round 55 P2 fixes)
 
 ## P2-1 recording chunk queue

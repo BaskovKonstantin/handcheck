@@ -72,10 +72,12 @@
    * @param {() => void} [opts.onPeerEnded]
    * @param {(state: object) => void} [opts.onState]
    * @param {(message: string) => void} [opts.onUploadError]
+   * @param {() => void} [opts.onUploadRecovered]
    * @param {(message: string) => void} [opts.onTranscriptError]
    */
   function createCallSession(opts) {
-    const { callId, role, onPeerEnded, onState, onUploadError, onTranscriptError } = opts;
+    const { callId, role, onPeerEnded, onState, onUploadError, onUploadRecovered, onTranscriptError } =
+      opts;
     let ws = null;
     let pc = null;
     let localStream = null;
@@ -97,17 +99,22 @@
     let ended = false;
     let liveFeaturesStarted = false;
     let liveStartedAt = null;
+    let recordingUploadDegraded = false;
 
     function peerIsConnected() {
       return pc?.connectionState === "connected";
     }
 
-    function emit(patch) {
+    function emit(patch = {}) {
+      if (typeof patch.recordingUploadDegraded === "boolean") {
+        recordingUploadDegraded = patch.recordingUploadDegraded;
+      }
       if (typeof onState === "function") {
         onState({
           peerConnected: peerIsConnected(),
           connectionState: pc?.connectionState || "new",
           recording: Boolean(recorder && recorder.state === "recording"),
+          recordingUploadDegraded,
           speechAvailable: Boolean(speech),
           speechNote: speechNoteShown ? "Расшифровка недоступна в этом браузере" : "",
           ...patch,
@@ -381,7 +388,9 @@
                 chunkUploadFailed = true;
                 emit({ recordingUploadDegraded: true });
                 if (typeof onUploadError === "function") {
-                  onUploadError("Не удалось сохранить фрагмент записи — повторим при завершении звонка");
+                  onUploadError(
+                    "Сбой загрузки фрагмента записи — повторяем автоматически"
+                  );
                 }
               }
             },
@@ -389,6 +398,9 @@
               if (chunkUploadFailed) {
                 chunkUploadFailed = false;
                 emit({ recordingUploadDegraded: false });
+                if (typeof onUploadRecovered === "function") {
+                  onUploadRecovered();
+                }
               }
             },
           })
@@ -407,8 +419,10 @@
       emit({ recording: true });
     }
 
-    async function postMultipart(url, form, blobSize) {
-      const useKeepalive = blobSize > 0 && blobSize <= KEEPALIVE_BODY_LIMIT;
+    async function postMultipart(url, form, blobSize, options = {}) {
+      const wantKeepalive = Boolean(options.keepalive);
+      const useKeepalive =
+        wantKeepalive && blobSize > 0 && blobSize <= KEEPALIVE_BODY_LIMIT;
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
@@ -422,13 +436,14 @@
       if (!blob?.size) return;
       const form = new FormData();
       form.append("file", blob, `chunk-${uploadedChunkCount}.webm`);
-      const res = await postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size);
+      const res = await postMultipart(
+        `/api/calls/${callId}/recording-chunk`,
+        form,
+        blob.size,
+        { keepalive: false }
+      );
       if (!res.ok) throw new Error("chunk_upload_failed");
       uploadedChunkCount += 1;
-      if (chunkUploadFailed) {
-        chunkUploadFailed = false;
-        emit({ recordingUploadDegraded: false });
-      }
       return true;
     }
 
@@ -463,7 +478,9 @@
       keepaliveBytesInFlight += blob.size;
       const form = new FormData();
       form.append("file", blob, `chunk-emergency-${uploadedChunkCount}.webm`);
-      void postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size)
+      void postMultipart(`/api/calls/${callId}/recording-chunk`, form, blob.size, {
+        keepalive: true,
+      })
         .then((res) => {
           keepaliveBytesInFlight -= blob.size;
           if (res?.ok) uploadedChunkCount += 1;
@@ -498,7 +515,7 @@
           chunkUploadFailed = true;
           emit({ recordingUploadDegraded: true });
           if (typeof onUploadError === "function") {
-            onUploadError("Не удалось сохранить фрагмент записи — повторим при завершении звонка");
+            onUploadError("Сбой загрузки фрагмента записи — повторяем автоматически");
           }
         });
       }, CHUNK_UPLOAD_MS);
@@ -538,7 +555,9 @@
       }
       form.append("durationMs", String(durationMs));
       const bodySize = tail?.size || 0;
-      const res = await postMultipart(`/api/calls/${callId}/recording`, form, bodySize);
+      const res = await postMultipart(`/api/calls/${callId}/recording`, form, bodySize, {
+        keepalive: false,
+      });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           const code = err?.error || `recording_upload_${res.status}`;

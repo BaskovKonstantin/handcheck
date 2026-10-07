@@ -2,6 +2,7 @@
 
 const { newId } = require("./ids");
 const { httpError } = require("../middleware/errors");
+const { companyTestStatusLabel } = require("./company-test-status");
 const {
   assertEmployerOwnsTest,
   candidateHasConfirmedCategory,
@@ -85,12 +86,27 @@ function listItems(db, testId) {
     .all(testId);
 }
 
-function openCurrentItem(db, assignment, items) {
+function assertAssignmentActive(db, assignment) {
   if (assignment.status === "submitted" || assignment.status === "expired") return;
   if (new Date(assignment.due_at).getTime() < Date.now()) {
     db.prepare("UPDATE employer_test_assignments SET status = 'expired' WHERE id = ?").run(assignment.id);
     throw httpError(409, "deadline_passed", { message: "Срок выполнения теста истёк" });
   }
+}
+
+function itemDeadlineMs(item, openedAt) {
+  if (!openedAt || !item.time_limit_sec) return null;
+  return new Date(openedAt).getTime() + item.time_limit_sec * 1000;
+}
+
+function isItemExpired(item, answerRow) {
+  if (!answerRow?.opened_at || answerRow.submitted_at) return false;
+  const deadline = itemDeadlineMs(item, answerRow.opened_at);
+  return Boolean(deadline && Date.now() > deadline);
+}
+
+function openCurrentItem(db, assignment, items) {
+  assertAssignmentActive(db, assignment);
   let currentId = assignment.current_item_id;
   if (!currentId && items.length) currentId = items[0].id;
   if (!currentId) return null;
@@ -120,18 +136,71 @@ function openCurrentItem(db, assignment, items) {
   return currentId;
 }
 
-function itemDeadlineMs(item, openedAt) {
-  if (!openedAt || !item.time_limit_sec) return null;
-  return new Date(openedAt).getTime() + item.time_limit_sec * 1000;
+function finalizeItemAnswer(db, assignment, item, { answerText, choiceJson, autoOk, pasteChars, typedChars, timedOut }) {
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE employer_test_answers SET answer_text = ?, choice_json = ?, auto_ok = ?, paste_chars = ?, typed_chars = ?, timed_out = ?, submitted_at = ? WHERE assignment_id = ? AND item_id = ?`
+  ).run(
+    answerText,
+    choiceJson,
+    autoOk,
+    pasteChars,
+    typedChars,
+    timedOut ? 1 : 0,
+    now,
+    assignment.id,
+    item.id
+  );
+
+  const items = listItems(db, assignment.test_id);
+  const idx = items.findIndex((x) => x.id === item.id);
+  const next = items[idx + 1];
+  if (next) {
+    db.prepare("UPDATE employer_test_assignments SET current_item_id = ? WHERE id = ?").run(
+      next.id,
+      assignment.id
+    );
+    const refreshed = db
+      .prepare("SELECT * FROM employer_test_assignments WHERE id = ?")
+      .get(assignment.id);
+    openCurrentItem(db, refreshed, items);
+  } else {
+    db.prepare(
+      `UPDATE employer_test_assignments SET status = 'submitted', submitted_at = ?, current_item_id = NULL WHERE id = ?`
+    ).run(now, assignment.id);
+  }
+  return { ok: true, completed: !next, timedOut: Boolean(timedOut) };
 }
 
-function assertItemTimeOpen(item, answerRow) {
-  const deadline = itemDeadlineMs(item, answerRow.opened_at);
-  if (deadline && Date.now() > deadline) {
-    throw httpError(409, "quick_time_expired", {
-      message: "Время на этот вопрос истекло",
-    });
+function parseAnswerPayload(item, body) {
+  const pasteChars = Math.max(0, Number(body.pasteChars) || 0);
+  const typedChars = Math.max(0, Number(body.typedChars) || 0);
+  if (item.kind === "single" || item.kind === "multi") {
+    const choiceIds = Array.isArray(body.choiceIds)
+      ? body.choiceIds.map((x) => String(x))
+      : body.choiceId
+        ? [String(body.choiceId)]
+        : [];
+    const key = JSON.parse(item.answer_key_json || "{}");
+    const autoOk = gradeChoiceAnswer(item.kind, key, choiceIds) ? 1 : 0;
+    return {
+      answerText: "",
+      choiceJson: JSON.stringify(choiceIds),
+      autoOk,
+      pasteChars,
+      typedChars,
+    };
   }
+  const answerText = String(body.answerText ?? "").trim();
+  const key = JSON.parse(item.rubric_keys_json || "{}");
+  const hits = keywordHits(answerText, key.keywords || []);
+  return {
+    answerText,
+    choiceJson: "[]",
+    autoOk: hits.length > 0 ? 1 : 0,
+    pasteChars,
+    typedChars,
+  };
 }
 
 function submitItemAnswer(db, assignment, item, body) {
@@ -144,50 +213,71 @@ function submitItemAnswer(db, assignment, item, body) {
   if (answerRow.submitted_at) {
     throw httpError(409, "already_submitted", { message: "Ответ на этот вопрос уже отправлен" });
   }
-  assertItemTimeOpen(item, answerRow);
 
-  let autoOk = null;
-  let answerText = "";
-  let choiceJson = "[]";
-  const pasteChars = Math.max(0, Number(body.pasteChars) || 0);
-  const typedChars = Math.max(0, Number(body.typedChars) || 0);
+  const expired = isItemExpired(item, answerRow);
+  const parsed = parseAnswerPayload(item, body);
+  return finalizeItemAnswer(db, assignment, item, { ...parsed, timedOut: expired });
+}
 
-  if (item.kind === "single" || item.kind === "multi") {
-    const choiceIds = Array.isArray(body.choiceIds)
-      ? body.choiceIds.map((x) => String(x))
-      : body.choiceId
-        ? [String(body.choiceId)]
-        : [];
-    choiceJson = JSON.stringify(choiceIds);
-    const key = JSON.parse(item.answer_key_json || "{}");
-    autoOk = gradeChoiceAnswer(item.kind, key, choiceIds) ? 1 : 0;
-  } else {
-    answerText = String(body.answerText ?? "").trim();
-    const key = JSON.parse(item.rubric_keys_json || "{}");
-    const hits = keywordHits(answerText, key.keywords || []);
-    autoOk = hits.length > 0 ? 1 : 0;
+function expireCurrentItemIfNeeded(db, assignment, items) {
+  if (assignment.status !== "started") return assignment;
+  let current = assignment;
+  for (let guard = 0; guard < items.length + 1; guard += 1) {
+    const itemId = current.current_item_id;
+    if (!itemId) break;
+    const item = items.find((x) => x.id === itemId);
+    const answerRow = db
+      .prepare("SELECT * FROM employer_test_answers WHERE assignment_id = ? AND item_id = ?")
+      .get(current.id, itemId);
+    if (!item || !answerRow || answerRow.submitted_at || !isItemExpired(item, answerRow)) break;
+    const empty = parseAnswerPayload(item, { answerText: "", choiceIds: [], pasteChars: 0, typedChars: 0 });
+    finalizeItemAnswer(db, current, item, { ...empty, timedOut: true });
+    current = db.prepare("SELECT * FROM employer_test_assignments WHERE id = ?").get(current.id);
+    if (current.status === "submitted") break;
   }
+  return current;
+}
 
-  const now = new Date().toISOString();
-  db.prepare(
-    `UPDATE employer_test_answers SET answer_text = ?, choice_json = ?, auto_ok = ?, paste_chars = ?, typed_chars = ?, submitted_at = ? WHERE assignment_id = ? AND item_id = ?`
-  ).run(answerText, choiceJson, autoOk, pasteChars, typedChars, now, assignment.id, item.id);
-
+function buildCandidateAssignmentJson(db, assignment, { syncExpiry = false } = {}) {
   const items = listItems(db, assignment.test_id);
-  const idx = items.findIndex((x) => x.id === item.id);
-  const next = items[idx + 1];
-  if (next) {
-    db.prepare("UPDATE employer_test_assignments SET current_item_id = ? WHERE id = ?").run(
-      next.id,
-      assignment.id
-    );
-    openCurrentItem(db, { ...assignment, current_item_id: next.id, status: "started" }, items);
-  } else {
-    db.prepare(
-      `UPDATE employer_test_assignments SET status = 'submitted', submitted_at = ?, current_item_id = NULL WHERE id = ?`
-    ).run(now, assignment.id);
+  let current = assignment;
+  if (syncExpiry && current.status === "started") {
+    current = expireCurrentItemIfNeeded(db, current, items);
   }
-  return { ok: true, completed: !next };
+  const answers = db
+    .prepare("SELECT * FROM employer_test_answers WHERE assignment_id = ?")
+    .all(current.id);
+  const byItem = new Map(answers.map((a) => [a.item_id, a]));
+  const currentId = current.current_item_id;
+  return {
+    id: current.id,
+    status: current.status,
+    statusLabel: companyTestStatusLabel(current.status),
+    dueAt: current.due_at,
+    title: current.title,
+    intro: current.intro,
+    currentItemId: currentId,
+    items: items.map((it) => {
+      const ans = byItem.get(it.id);
+      const opened = ans?.opened_at;
+      const deadline =
+        opened && it.time_limit_sec
+          ? new Date(new Date(opened).getTime() + it.time_limit_sec * 1000).toISOString()
+          : null;
+      return {
+        id: it.id,
+        position: it.position,
+        kind: it.kind,
+        prompt: it.prompt,
+        options: JSON.parse(it.options_json || "[]"),
+        timeLimitSec: it.time_limit_sec,
+        openedAt: opened || null,
+        deadlineAt: deadline,
+        submitted: Boolean(ans?.submitted_at),
+        timedOut: Boolean(ans?.timed_out),
+      };
+    }),
+  };
 }
 
 function buildEmployerReview(db, assignment) {
@@ -204,6 +294,7 @@ function buildEmployerReview(db, assignment) {
   return {
     id: assignment.id,
     status: assignment.status,
+    statusLabel: companyTestStatusLabel(assignment.status),
     dueAt: assignment.due_at,
     submittedAt: assignment.submitted_at,
     testTitle: assignment.title,
@@ -219,6 +310,8 @@ function buildEmployerReview(db, assignment) {
       if (kind === "single" || kind === "multi") {
         choiceMark = ans?.auto_ok === 1 ? "ok" : ans?.auto_ok === 0 ? "bad" : null;
       }
+      const pasteInputMark =
+        ans && mostlyPasted(ans.paste_chars, ans.typed_chars) ? { label: "Вставка" } : null;
       return {
         itemId: it.id,
         position: it.position,
@@ -229,7 +322,10 @@ function buildEmployerReview(db, assignment) {
         choiceIds,
         choiceMark,
         keywordHits: hits,
-        pasteInputMark: ans && mostlyPasted(ans.paste_chars, ans.typed_chars) ? { label: "Вставка" } : null,
+        pasteInputMark,
+        pasteChars: ans?.paste_chars ?? 0,
+        typedChars: ans?.typed_chars ?? 0,
+        timedOut: Boolean(ans?.timed_out),
       };
     }),
   };
@@ -242,6 +338,9 @@ module.exports = {
   listItems,
   openCurrentItem,
   submitItemAnswer,
+  expireCurrentItemIfNeeded,
+  buildCandidateAssignmentJson,
   buildEmployerReview,
   defaultDueAtIso,
+  isItemExpired,
 };

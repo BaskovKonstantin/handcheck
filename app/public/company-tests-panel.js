@@ -1,7 +1,27 @@
-/* global HandCheck */
+/* global HandCheck, HandCheckInputClassify */
 (function () {
+  let timerInterval = null;
+  let telemetry = { pasteChars: 0, typedChars: 0, pendingPaste: 0, trackedLen: 0 };
+
   function esc(s) {
     return HandCheck.escapeHtml(s);
+  }
+
+  function resetTelemetry() {
+    telemetry = { pasteChars: 0, typedChars: 0, pendingPaste: 0, trackedLen: 0 };
+  }
+
+  function clearTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function actionLabel(status) {
+    if (status === "assigned") return "Начать";
+    if (status === "started") return "Продолжить";
+    return null;
   }
 
   function renderTakeUi(state) {
@@ -17,7 +37,7 @@
     let body = "";
     if (current.kind === "single" || current.kind === "multi") {
       const input = current.kind === "single" ? "radio" : "checkbox";
-      body = `<ul>${(current.options || [])
+      body = `<ul class="company-test-choice-list">${(current.options || [])
         .map(
           (o) =>
             `<li><label><input type="${input}" name="ct-choice" value="${esc(o.id)}" /> ${esc(o.label)}</label></li>`
@@ -40,7 +60,25 @@
     </article>`;
   }
 
+  function attachTextTelemetry(ta) {
+    if (!ta) return;
+    resetTelemetry();
+    ta.addEventListener("paste", (ev) => {
+      const clip = ev.clipboardData?.getData("text") || "";
+      telemetry.pasteChars += clip.length;
+    });
+    ta.addEventListener("input", (ev) => {
+      if (typeof InputEvent === "undefined" || !(ev instanceof InputEvent)) return;
+      const inputType = typeof ev.inputType === "string" ? ev.inputType : "";
+      if (inputType === "insertFromPaste" || inputType === "insertFromDrop") return;
+      if (inputType === "insertText" || inputType === "insertCompositionText") {
+        telemetry.typedChars += (ev.data || "").length;
+      }
+    });
+  }
+
   async function mountCompanyTestsPanel() {
+    clearTimer();
     const host = document.getElementById("company-tests-panel");
     if (!host) return;
     host.innerHTML = `<h2 class="h3">Задания от компаний</h2><p class="loading"><span class="loading-dot"></span>Загрузка…</p>`;
@@ -53,83 +91,113 @@
     host.innerHTML = `<h2 class="h3">Задания от компаний</h2>
       <ul class="company-tests-assign-list">
         ${items
-          .map(
-            (a) => `<li>
-            <button type="button" class="employer-tests-list-btn" data-open-assignment="${esc(a.id)}">
+          .map((a) => {
+            const label = a.statusLabel || a.status;
+            const action = actionLabel(a.status);
+            const btn = action
+              ? `<button type="button" class="btn-primary btn-sm" data-company-test-action="${esc(a.status)}" data-assignment-id="${esc(a.id)}">${action}</button>`
+              : "";
+            return `<li class="company-tests-assign-row">
+            <div class="company-tests-assign-main">
               <span><strong>${esc(a.companyName)}</strong> — ${esc(a.title)}</span>
-              <span class="invite-meta">${esc(a.status)} · до ${esc(new Date(a.dueAt).toLocaleDateString("ru-RU"))}</span>
-            </button>
-          </li>`
-          )
+              <span class="invite-meta">${esc(label)} · до ${esc(new Date(a.dueAt).toLocaleDateString("ru-RU"))}</span>
+            </div>
+            ${btn}
+          </li>`;
+          })
           .join("")}
       </ul>
       <div id="company-test-active"></div>`;
-    host.querySelectorAll("[data-open-assignment]").forEach((btn) => {
-      btn.addEventListener("click", () => openAssignment(btn.dataset.openAssignment));
+    host.querySelectorAll("[data-company-test-action]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.assignmentId;
+        const action = btn.dataset.companyTestAction;
+        if (action === "assigned") beginAssignment(id);
+        else if (action === "started") continueAssignment(id);
+      });
     });
   }
 
-  let pasteChars = 0;
-  let typedChars = 0;
-
-  async function openAssignment(id) {
+  async function loadTakeState(assignmentId, { start } = {}) {
     const active = document.getElementById("company-test-active");
     if (!active) return;
     active.innerHTML = HandCheck.skeletonBlocks(1);
-    await HandCheck.api(`/api/candidate/company-tests/${id}/start`, { method: "POST", body: "{}" });
-    const state = await HandCheck.api(`/api/candidate/company-tests/${id}`);
+    if (start) {
+      await HandCheck.api(`/api/candidate/company-tests/${assignmentId}/start`, {
+        method: "POST",
+        body: "{}",
+      });
+    }
+    const state = await HandCheck.api(`/api/candidate/company-tests/${assignmentId}`);
     active.innerHTML = renderTakeUi(state);
-    bindTakeUi(id, state);
+    bindTakeUi(assignmentId, state);
+  }
+
+  function beginAssignment(id) {
+    return loadTakeState(id, { start: true });
+  }
+
+  function continueAssignment(id) {
+    return loadTakeState(id, { start: false });
+  }
+
+  async function submitCurrentAnswer(assignmentId, state) {
+    const current = state.items.find((it) => it.id === state.currentItemId);
+    if (!current) return;
+    const ta = document.getElementById("company-test-answer");
+    let body = {
+      itemId: current.id,
+      pasteChars: telemetry.pasteChars,
+      typedChars: telemetry.typedChars,
+    };
+    if (current.kind === "single") {
+      const picked = document.querySelector('input[name="ct-choice"]:checked');
+      body.choiceId = picked?.value;
+    } else if (current.kind === "multi") {
+      body.choiceIds = [...document.querySelectorAll('input[name="ct-choice"]:checked')].map((el) => el.value);
+    } else {
+      body.answerText = ta?.value || "";
+    }
+    await HandCheck.api(`/api/candidate/company-tests/${assignmentId}/answers`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    resetTelemetry();
+    clearTimer();
+    const next = await HandCheck.api(`/api/candidate/company-tests/${assignmentId}`);
+    const active = document.getElementById("company-test-active");
+    active.innerHTML = renderTakeUi(next);
+    bindTakeUi(assignmentId, next);
   }
 
   function bindTakeUi(assignmentId, state) {
+    clearTimer();
+    const ta = document.getElementById("company-test-answer");
+    attachTextTelemetry(ta);
+
     const timerEl = document.getElementById("company-test-timer");
     if (timerEl?.dataset.deadline) {
       const deadline = new Date(timerEl.dataset.deadline).getTime();
       const tick = () => {
         const left = deadline - Date.now();
-        timerEl.textContent = left > 0 ? `⏱ ${Math.ceil(left / 1000)} с` : "⏱ время вышло";
+        if (left <= 0) {
+          clearTimer();
+          timerEl.textContent = "⏱ время вышло";
+          void submitCurrentAnswer(assignmentId, state).catch((e) =>
+            HandCheck.toast(HandCheck.formatApiError(e), "error")
+          );
+          return;
+        }
+        timerEl.textContent = `⏱ ${Math.ceil(left / 1000)} с`;
       };
       tick();
-      setInterval(tick, 500);
+      timerInterval = setInterval(tick, 500);
     }
-    const ta = document.getElementById("company-test-answer");
-    if (ta && window.AssessmentInputClassify) {
-      ta.addEventListener("paste", () => {
-        pasteChars += (ta.value || "").length;
-      });
-      ta.addEventListener("input", () => {
-        typedChars += 1;
-      });
-    }
-    document.getElementById("company-test-answer-submit")?.addEventListener("click", async () => {
-      const current = state.items.find((it) => it.id === state.currentItemId);
-      if (!current) return;
-      let body = { itemId: current.id, pasteChars, typedChars };
-      if (current.kind === "single") {
-        const picked = document.querySelector('input[name="ct-choice"]:checked');
-        body.choiceId = picked?.value;
-      } else if (current.kind === "multi") {
-        body.choiceIds = [...document.querySelectorAll('input[name="ct-choice"]:checked')].map(
-          (el) => el.value
-        );
-      } else {
-        body.answerText = ta?.value || "";
-      }
-      try {
-        await HandCheck.api(`/api/candidate/company-tests/${assignmentId}/answers`, {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
-        pasteChars = 0;
-        typedChars = 0;
-        const next = await HandCheck.api(`/api/candidate/company-tests/${assignmentId}`);
-        const active = document.getElementById("company-test-active");
-        active.innerHTML = renderTakeUi(next);
-        bindTakeUi(assignmentId, next);
-      } catch (e) {
-        HandCheck.toast(HandCheck.formatApiError(e), "error");
-      }
+
+    document.getElementById("company-test-answer-submit")?.addEventListener("click", () => {
+      void submitCurrentAnswer(assignmentId, state).catch((e) =>
+        HandCheck.toast(HandCheck.formatApiError(e), "error")
+      );
     });
     document.getElementById("company-test-final-submit")?.addEventListener("click", async () => {
       await HandCheck.api(`/api/candidate/company-tests/${assignmentId}/submit`, {
@@ -137,9 +205,10 @@
         body: "{}",
       });
       HandCheck.toast("Тест отправлен", "success");
+      clearTimer();
       await mountCompanyTestsPanel();
     });
   }
 
-  window.HandCheckCompanyTests = { mountCompanyTestsPanel };
+  window.HandCheckCompanyTests = { mountCompanyTestsPanel, beginAssignment, continueAssignment };
 })();

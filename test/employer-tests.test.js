@@ -95,7 +95,7 @@ describe("employer vacancy tests (constructor)", () => {
     assert.equal(res.body.error, "candidate_unconfirmed");
   });
 
-  it("enforces per-question time limit", async () => {
+  it("advances on per-question time expiry instead of locking the test", async () => {
     const { getDb } = require("../app/db");
     const db = getDb();
     const need = db
@@ -110,11 +110,17 @@ describe("employer vacancy tests (constructor)", () => {
       intro: "",
     });
     const testId = created.body.id;
-    const item = await agent.post(`/api/employer/tests/${testId}/items`).send({
+    const item1 = await agent.post(`/api/employer/tests/${testId}/items`).send({
       kind: "text",
       prompt: "Fast",
       rubricKeys: { keywords: ["x"] },
       timeLimitSec: 30,
+    });
+    const item2 = await agent.post(`/api/employer/tests/${testId}/items`).send({
+      kind: "text",
+      prompt: "Second",
+      rubricKeys: { keywords: ["y"] },
+      timeLimitSec: 120,
     });
     await agent.post(`/api/employer/tests/${testId}/publish`);
     const assign = await agent.post(`/api/employer/tests/${testId}/assign`).send({ candidateId: anna.id });
@@ -123,12 +129,52 @@ describe("employer vacancy tests (constructor)", () => {
     await annaAgent.post(`/api/candidate/company-tests/${assign.body.id}/start`).send({});
     db.prepare(
       `UPDATE employer_test_answers SET opened_at = datetime('now', '-2 minutes') WHERE assignment_id = ? AND item_id = ?`
-    ).run(assign.body.id, item.body.id);
+    ).run(assign.body.id, item1.body.id);
     const late = await annaAgent
       .post(`/api/candidate/company-tests/${assign.body.id}/answers`)
-      .send({ itemId: item.body.id, answerText: "x" });
-    assert.equal(late.status, 409);
-    assert.equal(late.body.error, "quick_time_expired");
+      .send({ itemId: item1.body.id, answerText: "x" });
+    assert.equal(late.status, 200);
+    assert.equal(late.body.timedOut, true);
+    const view = await annaAgent.get(`/api/candidate/company-tests/${assign.body.id}`);
+    assert.equal(view.body.currentItemId, item2.body.id);
+    await annaAgent
+      .post(`/api/candidate/company-tests/${assign.body.id}/answers`)
+      .send({ itemId: item2.body.id, answerText: "y keyword answer" });
+    const submit = await annaAgent.post(`/api/candidate/company-tests/${assign.body.id}/submit`).send({});
+    assert.equal(submit.status, 200);
+  });
+
+  it("GET assignment does not start timer until POST start", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const need = db
+      .prepare(
+        "SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')"
+      )
+      .get();
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const created = await agent.post("/api/employer/tests").send({
+      needId: need.id,
+      title: "No auto start",
+      intro: "",
+    });
+    const testId = created.body.id;
+    await agent.post(`/api/employer/tests/${testId}/items`).send({
+      kind: "text",
+      prompt: "Q",
+      rubricKeys: { keywords: ["a"] },
+      timeLimitSec: 60,
+    });
+    await agent.post(`/api/employer/tests/${testId}/publish`);
+    const assign = await agent.post(`/api/employer/tests/${testId}/assign`).send({ candidateId: anna.id });
+    const annaAgent = request.agent(app);
+    await annaAgent.post("/api/auth/login").send({ email: "anna@demo.local", password: "demo-demo-demo" });
+    const peek = await annaAgent.get(`/api/candidate/company-tests/${assign.body.id}`);
+    assert.equal(peek.body.status, "assigned");
+    assert.equal(peek.body.items[0].openedAt, null);
+    await annaAgent.post(`/api/candidate/company-tests/${assign.body.id}/start`).send({});
+    const started = await annaAgent.get(`/api/candidate/company-tests/${assign.body.id}`);
+    assert.ok(started.body.items[0].openedAt);
   });
 
   it("reorders items on draft", async () => {

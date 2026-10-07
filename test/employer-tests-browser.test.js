@@ -9,6 +9,8 @@ const { chromium } = require("playwright");
 
 const ROOT = path.join(__dirname, "..");
 const PASS = "demo-demo-demo";
+const PASTE_120 =
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
 let PORT = "";
 let BASE = "";
 let serverProc;
@@ -83,7 +85,39 @@ async function employerSeedInviteWithTest(page) {
   return setupCache;
 }
 
-async function completeCompanyTestOnPage(page) {
+async function employerSeedSingleTextTest(page) {
+  await login(page, "cafe@demo.local");
+  await page.goto(`${BASE}/employer/need`, { waitUntil: "domcontentloaded" });
+  return page.evaluate(async (pasteText) => {
+    const needs = await HandCheck.api("/api/employer/needs");
+    const needId = needs.items[0].id;
+    const created = await HandCheck.api("/api/employer/tests", {
+      method: "POST",
+      body: JSON.stringify({ needId, title: "Paste probe", intro: "" }),
+    });
+    await HandCheck.api(`/api/employer/tests/${created.id}/items`, {
+      method: "POST",
+      body: JSON.stringify({
+        kind: "text",
+        prompt: "Опишите REST",
+        rubricKeys: { keywords: ["api", "rest"] },
+        timeLimitSec: 300,
+      }),
+    });
+    await HandCheck.api(`/api/employer/tests/${created.id}/publish`, { method: "POST", body: "{}" });
+    const matches = await HandCheck.api(`/api/employer/needs/${needId}/matches`);
+    const anna = (matches.items || []).find((x) => x.displayName === "Анна");
+    const assign = await HandCheck.api(`/api/employer/tests/${created.id}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ candidateId: anna.id }),
+    });
+    return { assignmentId: assign.id, pasteText };
+  }, PASTE_120);
+}
+
+async function completeCompanyTestOnPage(page, assignmentId) {
+  await page.click(`button[data-assignment-id="${assignmentId}"][data-company-test-action="assigned"]`);
+  await page.waitForSelector("#company-test-active", { timeout: 30000 });
   for (let step = 0; step < 12; step += 1) {
     await page.waitForTimeout(350);
     const finalBtn = page.locator("#company-test-final-submit");
@@ -150,17 +184,15 @@ describe("employer tests UI", { skip: !process.env.RUN_BROWSER }, () => {
     await login(anna, "anna@demo.local");
     await anna.goto(`${BASE}/candidate/tasks`, { waitUntil: "domcontentloaded" });
     await anna.waitForSelector("#company-tests-panel", { timeout: 45000 });
-    await anna.waitForSelector(`[data-open-assignment="${assignmentId}"]`, { timeout: 30000 });
-    await anna.click(`[data-open-assignment="${assignmentId}"]`);
-    await anna.waitForSelector("#company-test-active", { timeout: 30000 });
-    await completeCompanyTestOnPage(anna);
+    await anna.waitForSelector(`button[data-assignment-id="${assignmentId}"]`, { timeout: 30000 });
+    await completeCompanyTestOnPage(anna, assignmentId);
     await anna.waitForFunction(
       async (aid) => {
         const list = await HandCheck.api("/api/candidate/company-tests");
         const row = (list.items || []).find((x) => x.id === aid);
         return row?.status === "submitted";
       },
-      setupCache.assignmentId,
+      assignmentId,
       { timeout: 30000 }
     );
     await assertNoHorizontalScroll(anna, "candidate-take-390");
@@ -179,6 +211,7 @@ describe("employer tests UI", { skip: !process.env.RUN_BROWSER }, () => {
     ]);
     const reviewJson = await reviewResp.json();
     assert.ok(reviewJson.items?.length > 0, "review API returned items");
+    assert.equal(reviewJson.statusLabel, "Сдан");
     await employer.waitForFunction(
       (aid) => {
         const panel = document.getElementById(`review-${aid}`);
@@ -190,6 +223,41 @@ describe("employer tests UI", { skip: !process.env.RUN_BROWSER }, () => {
     const hasMark = await employer.locator(".employer-test-review-panel .status-pill").count();
     assert.ok(hasMark > 0, "expected per-question review marks");
     await assertNoHorizontalScroll(employer, "employer-review-390");
+    await employer.close();
+  });
+
+  it("records paste vs typing for employer review paste chip", async () => {
+    const setupPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const { assignmentId } = await employerSeedSingleTextTest(setupPage);
+    await setupPage.close();
+
+    const anna = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await login(anna, "anna@demo.local");
+    await anna.goto(`${BASE}/candidate/tasks`, { waitUntil: "domcontentloaded" });
+    await anna.waitForSelector(`button[data-assignment-id="${assignmentId}"]`, { timeout: 30000 });
+    await anna.click(`button[data-assignment-id="${assignmentId}"][data-company-test-action="assigned"]`);
+    await anna.waitForSelector("#company-test-answer", { timeout: 30000 });
+    const ta = anna.locator("#company-test-answer");
+    await anna.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await anna.evaluate(async (text) => {
+      await navigator.clipboard.writeText(text);
+    }, PASTE_120);
+    await ta.click();
+    await anna.keyboard.press("Control+V");
+    await ta.pressSequentially(" rest api", { delay: 20 });
+    await anna.click("#company-test-answer-submit");
+    await anna.click("#company-test-final-submit");
+    await anna.close();
+
+    const employer = await browser.newPage();
+    await login(employer, "cafe@demo.local");
+    const review = await employer.evaluate(async (aid) => {
+      return HandCheck.api(`/api/employer/test-assignments/${aid}`);
+    }, assignmentId);
+    const textItem = (review.items || []).find((x) => x.kind === "text");
+    assert.ok(textItem.pasteChars >= 100, `expected paste chars, got ${textItem.pasteChars}`);
+    assert.ok(textItem.typedChars > 0, "expected typed chars");
+    assert.ok(textItem.pasteInputMark?.label === "Вставка");
     await employer.close();
   });
 });

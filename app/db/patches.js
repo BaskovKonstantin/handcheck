@@ -158,6 +158,8 @@ function applyPatches(db) {
   `);
 
   ensureColumn(db, "employer_test_assignments", "current_item_id", "TEXT");
+  ensureColumn(db, "employer_test_answers", "opened_at", "TEXT");
+  ensureColumn(db, "employer_test_answers", "timed_out", "INTEGER NOT NULL DEFAULT 0");
 }
 
 module.exports = { applyPatches };

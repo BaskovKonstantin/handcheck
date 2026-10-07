@@ -76,8 +76,9 @@ async function assertCabinetPage(page, urlPath, contentSelector, emailHint) {
 }
 
 const runBrowser = process.env.RUN_BROWSER === "1";
+const RECORDING_IT_MS = 240_000;
 
-describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrowser }, () => {
+describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrowser }, () => {
   before(async () => {
     if (!PORT) {
       const srv = require("node:net").createServer();
@@ -105,8 +106,12 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
   });
 
   after(async () => {
-    if (browser) await browser.close();
-    if (serverProc) serverProc.kill("SIGTERM");
+    if (browser) await browser.close().catch(() => {});
+    if (serverProc) {
+      serverProc.kill("SIGTERM");
+      await new Promise((r) => setTimeout(r, 400));
+      if (serverProc.exitCode == null) serverProc.kill("SIGKILL");
+    }
   });
 
   it("candidate cabinet routes render content and chrome", async () => {
@@ -1439,6 +1444,69 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
     return fs.readdirSync(dir).filter((f) => /^\d+\.webm$/.test(f)).length;
   }
 
+  async function waitForCandidateChunksOnDisk(invId, minCount = 1, timeoutMs = 45_000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const n = candidateChunkCountForInvitation(invId);
+      if (n >= minCount) return n;
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    throw new Error(
+      `timed out waiting for >=${minCount} candidate chunk(s) on disk (have ${candidateChunkCountForInvitation(invId)})`
+    );
+  }
+
+  async function waitForRecordingChunkPost(page, timeoutMs = 45_000) {
+    await page.waitForResponse(
+      (res) =>
+        res.url().includes("/recording-chunk") &&
+        res.request().method() === "POST" &&
+        res.status() === 200,
+      { timeout: timeoutMs }
+    );
+  }
+
+  async function fetchCandidateRecordingBuffer(page, callId) {
+    const payload = await page.evaluate(async (id) => {
+      const res = await fetch(`/api/calls/${id}/recording?side=candidate`, {
+        credentials: "include",
+      });
+      if (!res.ok) return { ok: false, status: res.status };
+      const ab = await res.arrayBuffer();
+      return { ok: true, bytes: Array.from(new Uint8Array(ab)) };
+    }, callId);
+    if (!payload.ok) return null;
+    return Buffer.from(payload.bytes);
+  }
+
+  async function waitForPlayableCandidateRecording(page, invId, timeoutMs = 90_000) {
+    const { readDurationSecondsFromBuffer } = require("../app/lib/webm-ffmpeg");
+    const { MIN_PLAYABLE_RECORDING_BYTES } = require("../app/lib/call-recording");
+    const start = Date.now();
+    let lastDur = null;
+    let lastSides = [];
+    while (Date.now() - start < timeoutMs) {
+      const info = await page.evaluate(async (id) => {
+        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+        return r.json();
+      }, invId);
+      lastSides = info.recordingSides || [];
+      if (info.status === "ended" && lastSides.includes("candidate") && info.callId) {
+        const buf = await fetchCandidateRecordingBuffer(page, info.callId);
+        if (buf && buf.length >= MIN_PLAYABLE_RECORDING_BYTES) {
+          lastDur = readDurationSecondsFromBuffer(buf);
+          if (lastDur && lastDur > 0) {
+            return { info, buf, dur: lastDur };
+          }
+        }
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    throw new Error(
+      `candidate recording not playable within ${timeoutMs}ms (sides=${lastSides.join(",")}, lastDuration=${lastDur})`
+    );
+  }
+
   async function joinLiveCall(emp, cand, invId) {
     await emp.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
     await cand.goto(`${BASE}/call/${invId}`, { waitUntil: "commit" });
@@ -1503,7 +1571,10 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
     await page.close();
   });
 
-  it("round53: visibility hide during uploads has no page errors or duplicate chunks", async () => {
+  it(
+    "round53: visibility hide during uploads has no page errors or duplicate chunks",
+    { timeout: RECORDING_IT_MS },
+    async () => {
     const { ffmpegAvailable, readDurationSecondsFromBuffer } = require("../app/lib/webm-ffmpeg");
     if (!ffmpegAvailable()) return;
 
@@ -1612,7 +1683,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
     } finally {
       await mediaBrowser.close();
     }
-  });
+  }
+  );
 
   it("round49: invitation status pills use sentence case on both sides", async () => {
     const Database = require("better-sqlite3");
@@ -1657,8 +1729,11 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
     await empCtx.close();
   });
 
-  it("round49: candidate reload keeps pre-reload recording chunks on server", async () => {
-    const { ffmpegAvailable, readDurationSecondsFromBuffer, maxPacketGapSeconds } = require("../app/lib/webm-ffmpeg");
+  it(
+    "round49: candidate reload keeps pre-reload recording chunks on server",
+    { timeout: RECORDING_IT_MS },
+    async () => {
+    const { ffmpegAvailable, maxPacketGapSeconds } = require("../app/lib/webm-ffmpeg");
     if (!ffmpegAvailable()) return;
 
     const mediaBrowser = await chromium.launch({
@@ -1699,28 +1774,20 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
       await login(cand, "boris@demo.local");
       await joinLiveCall(emp, cand, invId);
       const liveStarted = Date.now();
-      await new Promise((r) => setTimeout(r, 6000));
+      await waitForRecordingChunkPost(cand);
+      await waitForCandidateChunksOnDisk(invId, 1);
       await cand.reload({ waitUntil: "commit" });
       await cand.waitForSelector("#join:not([disabled])", { timeout: 20000 });
       await cand.click("#join", { force: true });
-      await new Promise((r) => setTimeout(r, 3000));
+      await waitForRecordingChunkPost(cand);
       const chunksAfterReload = candidateChunkCountForInvitation(invId);
       assert.ok(chunksAfterReload >= 1, `expected candidate chunks after reload, got ${chunksAfterReload}`);
-      await new Promise((r) => setTimeout(r, 12000));
+      await new Promise((r) => setTimeout(r, 8000));
       await emp.click("#end", { force: true });
       await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      await emp.waitForSelector(".call-result-card", { timeout: 60_000 });
       const liveSec = (Date.now() - liveStarted) / 1000;
-      const recordingMeta = await emp.evaluate(async (id) => {
-        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
-        return r.json();
-      }, invId);
-      const buf = await emp.evaluate(async ({ callId, side }) => {
-        const res = await fetch(`/api/calls/${callId}/recording?side=${side}`, { credentials: "include" });
-        const ab = await res.arrayBuffer();
-        return Array.from(new Uint8Array(ab));
-      }, { callId: recordingMeta.callId, side: "candidate" });
-      const webm = Buffer.from(buf);
-      const dur = readDurationSecondsFromBuffer(webm);
+      const { buf: webm, dur } = await waitForPlayableCandidateRecording(emp, invId);
       assert.ok(dur && dur > 0, `duration ${dur}`);
       assert.ok(
         dur >= liveSec - 12,
@@ -1741,9 +1808,13 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
     } finally {
       await mediaBrowser.close();
     }
-  });
+  }
+  );
 
-  it("round49: reload after upload tick still keeps recording tail", async () => {
+  it(
+    "round49: reload after upload tick still keeps recording tail",
+    { timeout: RECORDING_IT_MS },
+    async () => {
     const { ffmpegAvailable } = require("../app/lib/webm-ffmpeg");
     if (!ffmpegAvailable()) return;
 
@@ -1785,34 +1856,32 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
       await login(cand, "boris@demo.local");
       await joinLiveCall(emp, cand, invId);
       const liveStarted = Date.now();
-      await new Promise((r) => setTimeout(r, 11000));
+      await waitForRecordingChunkPost(cand);
+      await waitForCandidateChunksOnDisk(invId, 1);
+      await new Promise((r) => setTimeout(r, 4000));
       await cand.reload({ waitUntil: "commit" });
       await cand.waitForSelector("#join:not([disabled])", { timeout: 20000 });
       await cand.click("#join", { force: true });
-      await new Promise((r) => setTimeout(r, 10000));
+      await waitForRecordingChunkPost(cand);
+      await new Promise((r) => setTimeout(r, 6000));
       await emp.click("#end", { force: true });
       await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      await emp.waitForSelector(".call-result-card", { timeout: 60_000 });
       const liveSec = (Date.now() - liveStarted) / 1000;
-      const recordingMeta = await emp.evaluate(async (id) => {
-        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
-        return r.json();
-      }, invId);
-      const buf = await emp.evaluate(async ({ callId, side }) => {
-        const res = await fetch(`/api/calls/${callId}/recording?side=${side}`, { credentials: "include" });
-        const ab = await res.arrayBuffer();
-        return Array.from(new Uint8Array(ab));
-      }, { callId: recordingMeta.callId, side: "candidate" });
-      const { readDurationSecondsFromBuffer } = require("../app/lib/webm-ffmpeg");
-      const dur = readDurationSecondsFromBuffer(Buffer.from(buf));
+      const { dur } = await waitForPlayableCandidateRecording(emp, invId);
       assert.ok(dur >= liveSec - 12, `candidate duration ${dur}s vs live ~${liveSec}s`);
       await empCtx.close();
       await candCtx.close();
     } finally {
       await mediaBrowser.close();
     }
-  });
+  }
+  );
 
-  it("round49: tab close uploads pending recording tail", async () => {
+  it(
+    "round49: tab close uploads pending recording tail",
+    { timeout: RECORDING_IT_MS },
+    async () => {
     const { ffmpegAvailable, readDurationSecondsFromBuffer } = require("../app/lib/webm-ffmpeg");
     if (!ffmpegAvailable()) return;
 
@@ -1920,7 +1989,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 360000, skip: !runBrows
     } finally {
       await mediaBrowser.close();
     }
-  });
+  }
+  );
 
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });

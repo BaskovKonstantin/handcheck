@@ -61,19 +61,19 @@ function createRecordingChunkQueue({
   }
 
   async function flushOnce() {
-    if (inFlight) return chunks.length > 0;
+    if (inFlight) return false;
     const snap = takeNextUploadBatch(chunks, maxUploadBytes);
     if (!snap) return false;
     const gen = flushGeneration;
-    inFlight = snap;
+    inFlight = { pending: snap.pending, count: snap.count, gen };
     try {
       await uploadBlob(snap.pending);
-      if (gen === flushGeneration) {
+      if (inFlight?.gen === gen) {
         inFlight = null;
       }
-      return chunks.length > 0 || inFlight != null;
+      return chunks.length > 0;
     } catch (err) {
-      if (gen === flushGeneration) {
+      if (inFlight?.gen === gen) {
         chunks.unshift(...snap.pending);
         inFlight = null;
       }
@@ -95,6 +95,7 @@ function createRecordingChunkQueue({
    */
   function emergencyFlushKeepalive(uploadBatch) {
     flushGeneration += 1;
+    inFlight = null;
     const parts = collectQueuedPartsOnly();
     if (!parts.length) return [];
     const batches = splitPartsIntoUploadBatches(parts, maxUploadBytes);
@@ -124,7 +125,18 @@ function createRecordingChunkQueue({
   return {
     push,
     flush,
-    waitForIdle: () => flushChain,
+    waitForIdle: (timeoutMs = 90_000) => {
+      if (!timeoutMs) return flushChain;
+      return Promise.race([
+        flushChain,
+        new Promise((_, reject) => {
+          setTimeout(
+            () => reject(new Error("recording_chunk_queue_idle_timeout")),
+            timeoutMs
+          );
+        }),
+      ]);
+    },
     emergencyFlushKeepalive,
     requeueParts,
     drainRemainingBlobs,

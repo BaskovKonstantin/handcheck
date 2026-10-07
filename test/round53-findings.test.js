@@ -94,9 +94,31 @@ describe("round53 findings (unit)", () => {
       emergencySizes.push(parts.map((p) => p.size));
     });
     assert.deepEqual(emergencySizes, [[3000]]);
-    assert.ok(queue._testInFlight());
+    assert.equal(queue._testInFlight(), null, "emergency releases upload lock");
     resolveUpload();
     await queue.waitForIdle();
+  });
+
+  it("P2-3: emergency during in-flight upload cannot spin waitForIdle", async () => {
+    let resolveUpload;
+    const queue = createRecordingChunkQueue({
+      uploadBlob: () =>
+        new Promise((resolve) => {
+          resolveUpload = resolve;
+        }),
+    });
+    queue.push(blob(5000));
+    void queue.flush();
+    for (let i = 0; i < 20 && !queue._testInFlight(); i += 1) {
+      await new Promise((r) => setImmediate(r));
+    }
+    queue.push(blob(4000));
+    queue.emergencyFlushKeepalive((parts) => {
+      assert.deepEqual(parts.map((p) => p.size), [4000]);
+    });
+    resolveUpload();
+    await queue.waitForIdle(5000);
+    assert.equal(queue.pendingCount(), 0);
   });
 
   it("P2-3: second keepalive batch is re-queued while first is in flight", () => {

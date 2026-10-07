@@ -69,21 +69,46 @@ function prefersReducedMotion() {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 }
 
+function syncCabinetMoreActiveState(role) {
+  const more = document.getElementById("cabinet-more");
+  if (!more) return;
+  const primary = new Set(TAB_PRIMARY[role] || []);
+  const path = window.location.pathname;
+  const onPrimary = [...primary].some((href) => path === href || path.startsWith(`${href}/`));
+  more.classList.toggle("active", !onPrimary);
+}
+
 function updateCabinetNavIndicators() {
   const asideIndicator = document.getElementById("cabinet-nav-indicator");
   const asideActive = document.querySelector(".cabinet-aside .cabinet-nav-link.active");
-  if (asideIndicator && asideActive) {
-    asideIndicator.style.height = `${asideActive.offsetHeight}px`;
-    asideIndicator.style.transform = `translateY(${asideActive.offsetTop}px)`;
-    asideIndicator.hidden = false;
+  if (asideIndicator) {
+    if (asideActive) {
+      asideIndicator.style.height = `${asideActive.offsetHeight}px`;
+      asideIndicator.style.transform = `translateY(${asideActive.offsetTop}px)`;
+      asideIndicator.hidden = false;
+    } else {
+      asideIndicator.hidden = true;
+    }
   }
+  const tabs = document.getElementById("cabinet-tabs");
   const tabsIndicator = document.getElementById("cabinet-tabs-indicator");
-  const tabActive = document.querySelector(".cabinet-tabs .tab-link.active");
-  if (tabsIndicator && tabActive) {
-    tabsIndicator.style.width = `${tabActive.offsetWidth}px`;
-    tabsIndicator.style.transform = `translateX(${tabActive.offsetLeft}px)`;
-    tabsIndicator.hidden = false;
+  if (!tabsIndicator || !tabs) return;
+
+  let tabActive = document.querySelector(".cabinet-tabs .tab-link.active:not(.cabinet-more-btn)");
+  const moreBtn = document.getElementById("cabinet-more");
+  if (!tabActive && moreBtn?.classList.contains("active")) {
+    tabActive = moreBtn;
   }
+  if (!tabActive) {
+    tabsIndicator.hidden = true;
+    return;
+  }
+
+  const tabsRect = tabs.getBoundingClientRect();
+  const tabRect = tabActive.getBoundingClientRect();
+  tabsIndicator.style.width = `${tabRect.width}px`;
+  tabsIndicator.style.transform = `translateX(${tabRect.left - tabsRect.left}px)`;
+  tabsIndicator.hidden = false;
 }
 
 function animateStatCounters(root, { duration = 680 } = {}) {
@@ -739,6 +764,7 @@ function ensureCabinetChrome(links, role, meEmail) {
     .filter(Boolean);
   tabs.innerHTML = `<span class="cabinet-tabs-indicator" id="cabinet-tabs-indicator" hidden></span>${tabLinks.map((l) => navLinkHtml(l, true)).join("")}`;
   bindCabinetMoreMenu(role, links);
+  syncCabinetMoreActiveState(role);
   requestAnimationFrame(updateCabinetNavIndicators);
 }
 

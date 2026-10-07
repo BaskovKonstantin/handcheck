@@ -135,6 +135,86 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
+  async function assertNoMobileCabinetOverflow(page, urlPath, { width }) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${BASE}${urlPath}`, { waitUntil: "networkidle", timeout: 60000 });
+    await page.waitForSelector("#cabinet-tabs", { timeout: 20000 });
+    await page.waitForTimeout(100);
+    const metrics = await page.evaluate(() => {
+      const vw = document.documentElement.clientWidth;
+      const sw = document.documentElement.scrollWidth;
+      const ind = document.getElementById("cabinet-tabs-indicator");
+      const active = document.querySelector(
+        ".cabinet-tabs .tab-link.active:not(.cabinet-more-btn), #cabinet-more.active"
+      );
+      const ir = ind && !ind.hidden ? ind.getBoundingClientRect() : null;
+      const ar = active?.getBoundingClientRect();
+      let maxRight = 0;
+      for (const el of document.querySelectorAll(
+        ".cabinet-page-hero, .cabinet-page-hero-pattern, .cabinet-tabs-indicator"
+      )) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0) maxRight = Math.max(maxRight, rect.right);
+      }
+      return {
+        sw,
+        vw,
+        maxRight,
+        indDelta: ir && ar ? Math.abs(ir.left - ar.left) : ind?.hidden ? 0 : 999,
+      };
+    });
+    assert.ok(
+      metrics.sw <= metrics.vw + 1,
+      `${urlPath}@${width}px scrollWidth ${metrics.sw} > viewport ${metrics.vw}`
+    );
+    assert.ok(
+      metrics.maxRight <= metrics.vw + 1,
+      `${urlPath}@${width}px chrome maxRight ${metrics.maxRight} > viewport ${metrics.vw}`
+    );
+    assert.ok(
+      metrics.indDelta <= 2,
+      `${urlPath}@${width}px tab indicator delta ${metrics.indDelta}px`
+    );
+  }
+
+  it("round72: mobile cabinet has no horizontal overflow and aligned tab indicator", async () => {
+    const widths = [320, 360, 390, 430];
+    const employerRoutes = [
+      "/employer/deck",
+      "/employer/need",
+      "/employer/list",
+      "/employer/deferred",
+      "/employer/profile",
+      "/employer/invitations",
+      "/employer/calls",
+      "/employer/integrations",
+    ];
+    const candidateRoutes = [
+      "/candidate/today",
+      "/candidate/profile",
+      "/candidate/tasks",
+      "/candidate/invitations",
+      "/candidate/calls",
+      "/candidate/past",
+      "/candidate/integrations",
+    ];
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    for (const path of employerRoutes) {
+      for (const width of widths) {
+        await assertNoMobileCabinetOverflow(page, path, { width });
+      }
+    }
+    await login(page, "anna@demo.local");
+    for (const path of candidateRoutes) {
+      for (const width of widths) {
+        await assertNoMobileCabinetOverflow(page, path, { width });
+      }
+    }
+    await context.close();
+  });
+
   it("round66: prefers-reduced-motion keeps cabinet usable at 390", async () => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 900 },

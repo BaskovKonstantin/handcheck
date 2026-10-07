@@ -472,6 +472,8 @@ function getDeckNext(userId, needId, filters = {}) {
       id: c.id,
       displayName: c.displayName,
       categoryLabel: c.categoryLabel,
+      categoryStatus: c.categoryStatus,
+      gradeRelation: c.gradeRelation,
       stack: c.stack,
       backgroundDomains: c.backgroundDomains,
       explanation: c.explanation.slice(0, 2),

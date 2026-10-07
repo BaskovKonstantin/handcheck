@@ -1,5 +1,12 @@
 # Session notes
 
+## 2026-10-07 — round 63 (MCP JSON-RPC errors + WS upgrade HTTP status)
+
+- Branch: `cursor/round63-p3-mcp-ws-1bd3`
+- P3-1: `/mcp` parse/size errors → JSON-RPC (`-32700` / `-32000`); REST unchanged.
+- P3-2: refused `/ws/calls/:id` upgrade → HTTP 401/403/404/410 before socket close (not bare destroy).
+- Tests: `test/round63-findings.test.js`.
+
 ## 2026-10-07 — round 62 (WS origin + JSON parse)
 
 - Branch: `cursor/ws-origin-json-body-84eb`

@@ -7,6 +7,20 @@ const { isForbiddenBrowserOrigin } = require("../../lib/browser-same-origin");
 
 const rooms = new Map();
 
+/** Refused upgrade HTTP statuses: 401 no session; 403 bad Origin / non-participant; 404 unknown call; 410 ended call. */
+const UPGRADE_REASON = {
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  410: "Gone",
+};
+
+function rejectUpgrade(socket, statusCode) {
+  const reason = UPGRADE_REASON[statusCode] || "Error";
+  socket.write(`HTTP/1.1 ${statusCode} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+  socket.destroy();
+}
+
 function broadcastCallEnded(callId) {
   const set = rooms.get(callId);
   if (!set) return;
@@ -27,23 +41,27 @@ function attachSignaling(server) {
     const fakeReq = { headers: { cookie: req.headers.cookie } };
     const session = loadSession(fakeReq);
     if (!session) {
-      socket.destroy();
+      rejectUpgrade(socket, 401);
       return;
     }
     if (isForbiddenBrowserOrigin(req)) {
-      socket.destroy();
+      rejectUpgrade(socket, 403);
       return;
     }
     const db = getDb();
     const call = db.prepare("SELECT invitation_id, status FROM calls WHERE id = ?").get(callId);
-    if (!call || call.status === "ended") {
-      socket.destroy();
+    if (!call) {
+      rejectUpgrade(socket, 404);
+      return;
+    }
+    if (call.status === "ended") {
+      rejectUpgrade(socket, 410);
       return;
     }
     const inv = db.prepare("SELECT * FROM invitations WHERE id = ?").get(call.invitation_id);
     const uid = session.user_id;
     if (!inv || inv.status !== "accepted" || ![inv.candidate_user_id, inv.employer_user_id].includes(uid)) {
-      socket.destroy();
+      rejectUpgrade(socket, 403);
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => {

@@ -446,7 +446,10 @@ function bindRoomControls(info, me) {
       }
       await HandCheck.api(`/api/calls/${callId}/end`, { method: "POST" });
       clearInterval(timerTick);
-      location.href = `/call/${invitationId}`;
+      localEndInProgress = false;
+      roomPhase = "ended";
+      const endedInfo = await HandCheck.api(`/api/calls/for-invitation/${invitationId}`);
+      renderEndedView(endedInfo, me);
     } catch (e) {
       endBtn.disabled = false;
       roomErr.hidden = false;

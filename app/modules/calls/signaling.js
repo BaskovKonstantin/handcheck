@@ -68,7 +68,17 @@ function attachSignaling(server) {
         }
       });
       ws.on("close", () => {
+        const closedUserId = ws.userId;
         set.delete(ws);
+        const sameUserReconnected = [...set].some(
+          (peer) => peer.userId === closedUserId && peer.readyState === 1
+        );
+        if (set.size > 0 && !sameUserReconnected) {
+          const payload = JSON.stringify({ t: "peer_left" });
+          for (const peer of set) {
+            if (peer.readyState === 1) peer.send(payload);
+          }
+        }
         if (set.size === 0) rooms.delete(callId);
       });
     });

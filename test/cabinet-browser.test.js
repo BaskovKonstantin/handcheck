@@ -1052,7 +1052,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       const liveStarted = Date.now();
       await new Promise((r) => setTimeout(r, 32000));
       await emp.click("#end", { force: true });
-      await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
+      await emp.waitForSelector(".call-result-card", { timeout: 120000 });
       const liveMs = Date.now() - liveStarted;
       for (const side of ["employer", "candidate"]) {
         const bad = chunkStatuses[side].filter((s) => s >= 400);
@@ -1163,6 +1163,101 @@ describe("cabinet pages (browser, slow API)", { timeout: 180000, skip: !runBrows
       .get(attemptId).c;
     db.close();
     assert.ok(pasteCount >= 1, `paste events ${pasteCount}`);
+    await context.close();
+  });
+
+  it("round41: mobile battery progress shows current step in viewport at 390x844", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const email = `r41-step-${Date.now()}@demo.local`;
+    await context.request.post(`${BASE}/api/auth/register`, {
+      data: { email, password: PASS, role: "candidate" },
+    });
+    await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
+    await context.request.post(`${BASE}/api/auth/login`, {
+      data: { email, password: PASS },
+    });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit" });
+    await page.waitForSelector("#assessment-privacy", { timeout: 15000 });
+    await page.check("#assessment-privacy", { force: true });
+    await page.click("#start", { force: true });
+    await page.waitForSelector("#open-q", { timeout: 15000 });
+    await page.click("#open-q", { force: true });
+    await page.waitForSelector("#battery-progress-compact", { timeout: 15000 });
+    await page.waitForFunction(
+      () => {
+        if (!document.body.classList.contains("assessment-question-active")) return false;
+        const el = document.getElementById("battery-progress-compact");
+        const step = document.getElementById("battery-current-step");
+        const submit = document.getElementById("submit");
+        if (!el || !step || !submit) return false;
+        const r = el.getBoundingClientRect();
+        const sr = step.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const visible =
+          r.width > 0 &&
+          r.height > 0 &&
+          r.bottom > 0 &&
+          r.top < vh &&
+          sr.width > 0 &&
+          sr.bottom > 0 &&
+          sr.top < vh;
+        const tab = document.querySelector(".cabinet-mobile-nav");
+        const tabTop = tab ? tab.getBoundingClientRect().top : vh;
+        const submitOk = submit.getBoundingClientRect().bottom <= tabTop - 2;
+        return visible && submitOk;
+      },
+      { timeout: 15000 }
+    );
+    const label = await page.locator("#battery-current-step").textContent();
+    assert.match(label || "", /Короткий 1/);
+    await context.close();
+  });
+
+  it("round41: expired quick question reload advances without page error", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const email = `r41-stuck-${Date.now()}@demo.local`;
+    await context.request.post(`${BASE}/api/auth/register`, {
+      data: { email, password: PASS, role: "candidate" },
+    });
+    await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
+    await context.request.post(`${BASE}/api/auth/login`, {
+      data: { email, password: PASS },
+    });
+    const page = await context.newPage();
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit" });
+    await page.waitForSelector("#assessment-privacy", { timeout: 15000 });
+    await page.check("#assessment-privacy", { force: true });
+    await page.click("#start", { force: true });
+    await page.waitForSelector("#open-q", { timeout: 15000 });
+    await page.click("#open-q", { force: true });
+    await page.waitForSelector("#answer", { timeout: 15000 });
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const user = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+    const attempt = db
+      .prepare(
+        `SELECT a.id FROM attempts a
+         JOIN batteries b ON b.id = a.battery_id
+         WHERE a.candidate_user_id = ? AND a.submitted_at IS NULL
+         ORDER BY a.rowid LIMIT 1`
+      )
+      .get(user.id);
+    const past = new Date(Date.now() - 120_000).toISOString();
+    db.prepare("UPDATE attempts SET opened_at = ?, started_at = ? WHERE id = ?").run(
+      past,
+      past,
+      attempt.id
+    );
+    db.close();
+    await page.reload({ waitUntil: "commit" });
+    await page.waitForSelector("#open-q, #submit", { timeout: 15000 });
+    assert.equal(errors.length, 0, errors.join("; "));
+    const hasNext = await page.evaluate(() => Boolean(document.querySelector("#open-q")));
+    assert.ok(hasNext, "expected next step open button after auto-expire");
     await context.close();
   });
 

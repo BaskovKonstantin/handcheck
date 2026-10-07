@@ -14,8 +14,23 @@ const QUICK_PROMPTS = [
   "Как мониторите продакшен: метрики, логи, алерты и расследование инцидентов?",
 ];
 
+/** Parallel form B — same rubric, different wording. */
+const QUICK_PROMPTS_FORM_B = [
+  "Опишите дизайн REST API для мобильного приложения: версионирование, коды ошибок, постраничная выдача.",
+  "Расскажите, как на бэкенде валидируете вход и возвращаете понятные ошибки клиенту.",
+  "Объясните идемпотентность на примере повторного запроса оплаты — что храните и как отвечаете.",
+  "Как устроите кэш ответов и сброс кэша, когда данные в источнике меняются?",
+  "Как выдаёте и проверяете токены доступа, разграничиваете роли в сервисном API?",
+  "Как вынесете долгие операции в фон: очередь, воркеры, повтор при сбоях?",
+  "Как безопасно меняете схему БД и не ломаете старых клиентов API?",
+  "Какие метрики и логи смотрите в проде и как реагируете на инцидент?",
+];
+
 const WORK_PROMPT =
   "Спроектируйте сервис бронирования столиков: API, хранение, конкурентные брони, уведомления и безопасность.";
+
+const WORK_PROMPT_FORM_B =
+  "Опишите архитектуру сервиса бронирования столиков: контракт API, хранение, гонки за слот, уведомления и защита.";
 
 const QUICK_RUBRIC = {
   keys: [
@@ -56,7 +71,16 @@ const WORK_RUBRIC = {
   minLength: 200,
 };
 
+function quickPromptsForForm(form) {
+  return form === "B" ? QUICK_PROMPTS_FORM_B : QUICK_PROMPTS;
+}
+
+function workPromptForForm(form) {
+  return form === "B" ? WORK_PROMPT_FORM_B : WORK_PROMPT;
+}
+
 function ensureEightQuickTasksForForm(db, form) {
+  const prompts = quickPromptsForForm(form);
   const ins = db.prepare(
     `INSERT INTO tasks (id, type, specialization, grade, form_key, prompt, rubric_json, status, origin)
      VALUES (?, 'quick', 'backend', 'middle', ?, ?, ?, 'published', 'manual')`
@@ -66,9 +90,26 @@ function ensureEightQuickTasksForForm(db, form) {
       `SELECT COUNT(*) AS c FROM tasks WHERE type = 'quick' AND specialization = 'backend' AND grade = 'middle' AND form_key = ? AND status = 'published'`
     )
     .get(form).c;
-  for (let i = count; i < QUICK_PROMPTS.length; i += 1) {
-    ins.run(newId(), form, QUICK_PROMPTS[i], JSON.stringify(quickRubricForIndex(i)));
+  for (let i = count; i < prompts.length; i += 1) {
+    ins.run(newId(), form, prompts[i], JSON.stringify(quickRubricForIndex(i)));
   }
+}
+
+function formsHaveIdenticalPrompts(db) {
+  const rowsA = db
+    .prepare(
+      `SELECT prompt FROM tasks WHERE type IN ('quick','work') AND specialization = 'backend' AND grade = 'middle' AND form_key = 'A' AND status = 'published' ORDER BY type, rowid`
+    )
+    .all()
+    .map((r) => r.prompt);
+  const rowsB = db
+    .prepare(
+      `SELECT prompt FROM tasks WHERE type IN ('quick','work') AND specialization = 'backend' AND grade = 'middle' AND form_key = 'B' AND status = 'published' ORDER BY type, rowid`
+    )
+    .all()
+    .map((r) => r.prompt);
+  if (rowsA.length === 0 || rowsA.length !== rowsB.length) return false;
+  return rowsA.every((p, i) => p === rowsB[i]);
 }
 
 function needsPerQuestionRubricPatch(db) {
@@ -101,11 +142,15 @@ function applyBatteryContentPatch(db) {
     )
     .get().c;
   const needsContent =
-    legacy > 0 || totalQuick < QUICK_PROMPTS.length * 2 || needsPerQuestionRubricPatch(db);
+    legacy > 0 ||
+    totalQuick < QUICK_PROMPTS.length * 2 ||
+    needsPerQuestionRubricPatch(db) ||
+    formsHaveIdenticalPrompts(db);
   if (!needsContent) return;
 
   const upd = db.prepare(`UPDATE tasks SET prompt = ?, rubric_json = ? WHERE id = ?`);
   for (const form of ["A", "B"]) {
+    const prompts = quickPromptsForForm(form);
     ensureEightQuickTasksForForm(db, form);
     const quickRows = db
       .prepare(
@@ -113,8 +158,8 @@ function applyBatteryContentPatch(db) {
       )
       .all(form);
     quickRows.forEach((row, idx) => {
-      if (idx < QUICK_PROMPTS.length) {
-        upd.run(QUICK_PROMPTS[idx], JSON.stringify(quickRubricForIndex(idx)), row.id);
+      if (idx < prompts.length) {
+        upd.run(prompts[idx], JSON.stringify(quickRubricForIndex(idx)), row.id);
       }
     });
     const work = db
@@ -123,23 +168,25 @@ function applyBatteryContentPatch(db) {
       )
       .get(form);
     if (work) {
-      upd.run(WORK_PROMPT, JSON.stringify(WORK_RUBRIC), work.id);
+      upd.run(workPromptForForm(form), JSON.stringify(WORK_RUBRIC), work.id);
     }
   }
 }
 
 function seedBatteryTasks(db, ins) {
   for (const form of ["A", "B"]) {
-    QUICK_PROMPTS.forEach((prompt, idx) => {
+    quickPromptsForForm(form).forEach((prompt, idx) => {
       ins.run(newId(), "quick", form, prompt, JSON.stringify(quickRubricForIndex(idx)));
     });
-    ins.run(newId(), "work", form, WORK_PROMPT, JSON.stringify(WORK_RUBRIC));
+    ins.run(newId(), "work", form, workPromptForForm(form), JSON.stringify(WORK_RUBRIC));
   }
 }
 
 module.exports = {
   QUICK_PROMPTS,
+  QUICK_PROMPTS_FORM_B,
   WORK_PROMPT,
+  WORK_PROMPT_FORM_B,
   QUICK_RUBRIC,
   WORK_RUBRIC,
   quickRubricForIndex,

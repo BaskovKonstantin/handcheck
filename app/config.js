@@ -52,6 +52,7 @@ function cookieSecureFromAppUrl(baseUrl) {
 }
 
 module.exports = {
+  GIT_COMMIT: process.env.GIT_COMMIT || process.env.SOURCE_COMMIT || "dev",
   PORT: Number(process.env.PORT || 8810),
   DB_PATH,
   DATA_DIR,

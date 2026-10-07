@@ -206,7 +206,7 @@ describe("task battery content", () => {
       .all()
       .map((r) => r.prompt);
     assert.ok(prompts.length >= 16);
-    assert.equal(new Set(prompts).size, 8);
+    assert.equal(new Set(prompts).size, prompts.length);
     assert.doesNotMatch(prompts.join("\n"), /QuickProbe|WorkSim/);
     if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb);
   });

@@ -25,6 +25,7 @@ const {
 } = require("../../lib/assessment-timing");
 const { recordDraftTelemetry } = require("../../lib/assessment-telemetry");
 const { submitAttemptAnswer } = require("../../lib/assessment-submit");
+const { expireStaleOpenQuickAttempts } = require("../../lib/assessment-auto-expire");
 const {
   validateClientEvent,
   MAX_EVENTS_PER_REQUEST,
@@ -151,6 +152,7 @@ router.get("/battery/current", (req, res) => {
     )
     .get(req.user.id);
   if (!battery) return res.json({ battery: null });
+  expireStaleOpenQuickAttempts(db, req.user.id, battery.id);
   const attempts = db
     .prepare(
       `SELECT id, task_id, submitted_at FROM attempts WHERE battery_id = ? ORDER BY rowid`

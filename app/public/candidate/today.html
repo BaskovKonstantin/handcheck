@@ -102,12 +102,11 @@
             cta: '<a class="btn-primary btn-sm" href="/candidate/tasks">Начать</a>',
           });
         } else if (!cat.label && onCooldown) {
-          const retakeDate = HandCheck.formatRetakeDateMoscow(cat.retakeAt);
           steps.push({
             tone: "muted",
             title: "Пересдача теста",
-            meta: `С ${retakeDate} (Москва)`,
-            cta: `<button class="btn-improve-locked btn-sm" type="button" disabled title="Пересдача с ${retakeDate}"><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача с ${retakeDate}</button>`,
+            meta: "Срок ожидания ещё не истёк",
+            cta: '<button class="btn-improve-locked btn-sm" type="button" disabled><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача недоступна</button>',
           });
         } else if (!onCooldown) {
           steps.push({

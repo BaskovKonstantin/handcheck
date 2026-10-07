@@ -37,7 +37,25 @@
 
       const QUICK_COUNT = 8;
 
+      function setQuestionChrome(active) {
+        document.body.classList.toggle("assessment-question-active", Boolean(active));
+      }
+
       function batteryStepIndicator(currentIndex) {
+        const total = QUICK_COUNT + 1;
+        const stepNum = Math.min(currentIndex + 1, total);
+        const currentLabel =
+          currentIndex < QUICK_COUNT ? `Короткий ${currentIndex + 1}` : "Мини-проект";
+        const pct = Math.round((stepNum / total) * 100);
+        const compact = `<div class="battery-progress-compact" id="battery-progress-compact" aria-live="polite">
+          <div class="battery-progress-head">
+            <span class="battery-progress-title">Шаг ${stepNum} из ${total}</span>
+            <span class="battery-progress-current" id="battery-current-step">${currentLabel}</span>
+          </div>
+          <div class="battery-progress-bar" role="progressbar" aria-valuenow="${stepNum}" aria-valuemin="1" aria-valuemax="${total}" aria-label="Прогресс теста">
+            <div class="battery-progress-fill" style="width:${pct}%"></div>
+          </div>
+        </div>`;
         const steps = [];
         for (let i = 0; i < QUICK_COUNT; i += 1) {
           const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "";
@@ -52,7 +70,7 @@
           <span class="battery-step-num">${QUICK_COUNT + 1}</span>
           <span class="battery-step-label">Мини-проект</span>
         </li>`);
-        return `<ol class="battery-steps" aria-label="Шаги теста">${steps.join("")}</ol>`;
+        return `${compact}<ol class="battery-steps battery-steps-full" aria-label="Шаги теста">${steps.join("")}</ol>`;
       }
 
       function formatCountdown(ms) {
@@ -113,6 +131,7 @@
       }
 
       async function renderStartForm(category) {
+        setQuestionChrome(false);
         const onCooldown = Boolean(category?.cooldownActive && category?.retakeAt);
         const retakeWhen = onCooldown ? HandCheck.formatRetakeDateMoscow(category.retakeAt) : "";
         const retakeExplain = retakeWhen
@@ -176,6 +195,7 @@
 
       async function init() {
         const seq = HandCheck.nextCabinetPageLoad();
+        setQuestionChrome(false);
         panel.innerHTML = HandCheck.skeletonBlocks(2);
         const [cur, category] = await Promise.all([
           HandCheck.api("/api/assessment/battery/current"),
@@ -256,12 +276,17 @@
           ${batteryStepIndicator(stepIndex)}
           <p class="invite-meta">${HandCheck.escapeHtml(metaLine)}</p>
           <p class="battery-timer" id="timer-line" aria-live="polite"><span class="battery-timer-label">${timerLabel}:</span> <strong id="timer-val">—</strong></p>
-          <p>${HandCheck.escapeHtml(t.prompt)}</p>
+          <p class="task-prompt">${HandCheck.escapeHtml(t.prompt)}</p>
           <textarea id="answer" rows="5" maxlength="${answerMax}">${HandCheck.escapeHtml(restored)}</textarea>
           <p class="invite-meta" id="answer-len">0 / ${answerMax} символов</p>
           <p class="invite-meta" id="draft-note" hidden>Черновик восстановлен</p>
           <button class="btn-primary" id="submit">Отправить ответ</button>
           <p class="field-error" id="err" hidden></p>`;
+        setQuestionChrome(true);
+        const progressCompact = document.getElementById("battery-progress-compact");
+        if (progressCompact) {
+          progressCompact.scrollIntoView({ block: "nearest", behavior: "instant" });
+        }
         if (restored) document.getElementById("draft-note").hidden = false;
         const ta = document.getElementById("answer");
         const lenEl = document.getElementById("answer-len");
@@ -307,7 +332,8 @@
           pendingPasteChars += chars;
           enqueueEvent("paste", { length: chars, chars });
         });
-        let typedChars = 0;
+        let draftTimer = null;
+        let typedChars = restored.length;
         let typingPending = 0;
         let typingFlushTimer = null;
         const flushTyping = () => {
@@ -447,7 +473,6 @@
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "hidden") onPageLifecycleFlush();
         });
-        let draftTimer = null;
         if (t.type === "work") {
           draftTimer = setInterval(() => {
             persistDraft();

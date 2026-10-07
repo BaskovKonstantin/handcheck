@@ -2,7 +2,14 @@
 "use strict";
 
 (function (global) {
-  const WS_SIGNAL = { OFFER: "offer", ANSWER: "answer", ICE: "ice", ENDED: "ended", HELLO: "hello" };
+  const WS_SIGNAL = {
+    OFFER: "offer",
+    ANSWER: "answer",
+    ICE: "ice",
+    ENDED: "ended",
+    HELLO: "hello",
+    PEER_LEFT: "peer_left",
+  };
 
   /** Target total bitrate so ~60 min fits in 80 MB upload limit (with headroom). */
   const RECORDING_LIMIT_BYTES = 80 * 1024 * 1024;
@@ -232,6 +239,10 @@
         } catch {
           /* ignore stale ice */
         }
+      } else if (msg.t === WS_SIGNAL.PEER_LEFT) {
+        if (ended || peerLeft) return;
+        peerLeft = true;
+        emit({ peerLeft: true, peerConnected: false });
       } else if (msg.t === WS_SIGNAL.ENDED) {
         if (ended) return;
         peerLeft = true;

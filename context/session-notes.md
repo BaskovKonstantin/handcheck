@@ -1,5 +1,11 @@
 # Session notes
 
+## 2026-10-07 — CI ffmpeg install (PR apt stall)
+
+- Branch: `cursor/ci-ffmpeg-robust-2ebc`
+- Problem: `apt-get install ffmpeg` stalled ~18m on ubuntu-latest (run 37660817227), job hit 25m timeout before browser regression.
+- Fix: primary `FedericoCarboni/setup-ffmpeg@v3.1` (cached static binaries, step `timeout-minutes: 5`); bounded apt fallback via `nick-fields/retry` with `--no-install-recommends` and Acquire timeouts; `Verify ffmpeg` step before tests.
+
 ## 2026-10-07 — employer paste indicator
 
 - Branch: `cursor/employer-paste-indicator-fa54`

@@ -1,0 +1,108 @@
+"use strict";
+
+const { describe, it, before } = require("node:test");
+const assert = require("node:assert");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const request = require("supertest");
+
+describe("employer vacancy tests (constructor)", () => {
+  let app;
+  let agent;
+  const tmpDb = path.join(os.tmpdir(), `hc-emp-tests-${process.pid}.sqlite`);
+
+  before(async () => {
+    if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb);
+    process.env.DB_PATH = tmpDb;
+    process.env.DEMO_MODE = "1";
+    process.env.DEMO_PASSWORD = "demo-demo-demo";
+    delete require.cache[require.resolve("../app/server")];
+    const { createApp } = require("../app/server");
+    app = createApp();
+    agent = request.agent(app);
+    await agent.post("/api/auth/login").send({
+      email: "cafe@demo.local",
+      password: "demo-demo-demo",
+    });
+  });
+
+  it("rejects test creation for another employer need", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const cafeNeed = db
+      .prepare(
+        "SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')"
+      )
+      .get();
+    const otherEmp = request.agent(app);
+    await otherEmp.post("/api/auth/login").send({ email: "other@demo.local", password: "demo-demo-demo" });
+    const res = await otherEmp.post("/api/employer/tests").send({
+      needId: cafeNeed.id,
+      title: "Чужой тест",
+    });
+    assert.equal(res.status, 404);
+  });
+
+  it("creates from template, edits, publishes, archives", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const need = db
+      .prepare("SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')")
+      .get();
+    const created = await agent.post("/api/employer/tests").send({
+      needId: need.id,
+      templateKey: "backend-api-basics",
+    });
+    assert.equal(created.status, 201);
+    const testId = created.body.id;
+    const detail = await agent.get(`/api/employer/tests/${testId}`);
+    assert.ok(detail.body.items.length >= 4);
+
+    const otherEmp = request.agent(app);
+    await otherEmp.post("/api/auth/login").send({ email: "other@demo.local", password: "demo-demo-demo" });
+    const forbidden = await otherEmp.get(`/api/employer/tests/${testId}`);
+    assert.equal(forbidden.status, 404);
+
+    const pub = await agent.post(`/api/employer/tests/${testId}/publish`);
+    assert.equal(pub.status, 200);
+    assert.equal(pub.body.status, "published");
+
+    const editBlocked = await agent.put(`/api/employer/tests/${testId}`).send({ title: "X" });
+    assert.equal(editBlocked.status, 409);
+
+    const archived = await agent.delete(`/api/employer/tests/${testId}`);
+    assert.equal(archived.status, 200);
+  });
+
+  it("reorders items on draft", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const need = db
+      .prepare("SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')")
+      .get();
+    const created = await agent.post("/api/employer/tests").send({
+      needId: need.id,
+      title: "Reorder me",
+      intro: "",
+    });
+    const testId = created.body.id;
+    const a = await agent.post(`/api/employer/tests/${testId}/items`).send({
+      kind: "text",
+      prompt: "A",
+      rubricKeys: { keywords: ["a"] },
+      timeLimitSec: 60,
+    });
+    const b = await agent.post(`/api/employer/tests/${testId}/items`).send({
+      kind: "text",
+      prompt: "B",
+      rubricKeys: { keywords: ["b"] },
+      timeLimitSec: 60,
+    });
+    const order = [b.body.id, a.body.id];
+    const re = await agent.post(`/api/employer/tests/${testId}/items/reorder`).send({ order });
+    assert.equal(re.status, 200);
+    const detail = await agent.get(`/api/employer/tests/${testId}`);
+    assert.equal(detail.body.items[0].id, b.body.id);
+  });
+});

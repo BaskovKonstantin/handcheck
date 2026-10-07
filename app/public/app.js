@@ -913,6 +913,7 @@ const CANDIDATE_LINKS = [
 
 const EMPLOYER_LINKS = [
   { href: "/employer/need", label: "Потребность" },
+  { href: "/employer/tests", label: "Тесты" },
   { href: "/employer/deck", label: "Колода" },
   { href: "/employer/list", label: "Список" },
   { href: "/employer/deferred", label: "Отложенные" },

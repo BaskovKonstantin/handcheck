@@ -3438,6 +3438,36 @@ body.has-cabinet-chrome {
   align-self: flex-start;
 }
 
+@media (max-width: 640px) {
+  .list-match-group-body .list-row-card-rich {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .list-row-card-rich {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .list-row-card-rich .list-row-main {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .list-row-card-rich .list-row-actions {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    justify-content: flex-start;
+    padding-top: 0.5rem;
+    margin-top: 0.15rem;
+    border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  }
+}
+
 .toast-root {
   position: fixed;
   bottom: 1.25rem;

@@ -7,6 +7,7 @@
 - Desktop: full-width cabinet heroes; deck need stats panel; employer list grouped by match tier with collapse + «Показать ещё»; quieter list secondary actions; amber paste chip; candidate today zero-states + profile/integration steps + cooldown copy.
 - Sidebar tagline removed; screenshots in `handcheck-ui/round66/{before,after}/`.
 - Tests: `npm test` (304 pass), `test/round66-design.test.js`.
+- Mobile list: stack actions under `.list-row-main` ≤640px; Playwright asserts `.list-row-main` width >200px at 360–430.
 
 ## 2026-10-07 — CI ffmpeg install (PR apt stall)
 

@@ -135,6 +135,22 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
+  it("round66: employer list row main stays readable at 360–430px", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/list`, { waitUntil: "networkidle", timeout: 60000 });
+    const main = page.locator(".list-row-main").first();
+    await main.waitFor({ state: "visible", timeout: 30000 });
+    for (const width of [390, 360, 430]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.waitForTimeout(200);
+      const rowWidth = await main.evaluate((el) => el.getBoundingClientRect().width);
+      assert.ok(rowWidth > 200, `list-row-main width ${rowWidth}px at viewport ${width}`);
+    }
+    await context.close();
+  });
+
   it("employer cabinet routes render content and chrome", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

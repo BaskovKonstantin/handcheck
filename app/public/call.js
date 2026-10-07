@@ -156,7 +156,7 @@ function updateRecordingLabel(state) {
     recDot?.classList.remove("live");
   } else if (state.recording) {
     recLabel.textContent = state.recordingUploadDegraded
-      ? "Запись активна — есть сбои загрузки фрагментов"
+      ? "Запись активна — загрузка фрагментов с перебоями"
       : "Запись активна";
     recDot?.classList.add("live");
   } else if (state.recordingUnavailable) {
@@ -347,6 +347,7 @@ function bindRoomControls(info, me) {
 
   const peerName =
     me.role === "employer" ? info.candidateName || "кандидат" : info.companyName || "компания";
+  let chunkUploadWarningActive = false;
 
   join.onclick = async () => {
     if (!consent.checked || join.disabled) return;
@@ -379,6 +380,15 @@ function bindRoomControls(info, me) {
         onUploadError: (message) => {
           roomErr.hidden = false;
           roomErr.textContent = message;
+          if (/фрагмент/i.test(message)) chunkUploadWarningActive = true;
+        },
+        onUploadRecovered: () => {
+          if (!chunkUploadWarningActive) return;
+          chunkUploadWarningActive = false;
+          if (/фрагмент/i.test(roomErr.textContent || "")) {
+            roomErr.hidden = true;
+            roomErr.textContent = "";
+          }
         },
         onTranscriptError: (message) => {
           roomErr.hidden = false;

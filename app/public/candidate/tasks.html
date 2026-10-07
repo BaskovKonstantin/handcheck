@@ -21,6 +21,7 @@
     </main>
     <script src="/app.js"></script>
     <script src="/assessment-input-classify.js"></script>
+    <script src="/tasks-answer-drop.js"></script>
     <script>
       const panel = document.getElementById("panel");
       let attemptId = null;
@@ -369,10 +370,32 @@
           flushTelemetry();
         };
         let otherPendingInputType = "";
-        let suppressNextInputClassify = false;
         const classifyDelta = HandCheckInputClassify.classifyLengthIncrease;
+        const dropHelpers = HandCheckTasksAnswerDrop || {};
+        const caretAt = dropHelpers.caretOffsetFromPoint;
+        const applyDrop = dropHelpers.applyTextDrop;
+        let internalTextDrag = null;
+        ta.addEventListener("dragstart", (ev) => {
+          const start = ta.selectionStart ?? 0;
+          const end = ta.selectionEnd ?? start;
+          if (start === end) return;
+          const slice = ta.value.slice(start, end);
+          internalTextDrag = { start, end, text: slice };
+          ev.dataTransfer?.setData("text/plain", slice);
+          if (ev.dataTransfer) ev.dataTransfer.effectAllowed = "move";
+        });
+        ta.addEventListener("dragend", () => {
+          internalTextDrag = null;
+        });
         ta.addEventListener("dragover", (ev) => {
           ev.preventDefault();
+          if (typeof caretAt === "function") {
+            const idx = caretAt(ta, ev.clientX, ev.clientY);
+            ta.setSelectionRange(idx, idx);
+          }
+          if (ev.dataTransfer) {
+            ev.dataTransfer.dropEffect = internalTextDrag ? "move" : "copy";
+          }
         });
         ta.addEventListener("drop", (ev) => {
           ev.preventDefault();
@@ -380,14 +403,42 @@
           const chars = text.length;
           enqueueEvent("drop", { chars });
           if (chars > 0) {
-            const start = ta.selectionStart ?? ta.value.length;
-            const end = ta.selectionEnd ?? start;
-            ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+            const dropOffset =
+              typeof caretAt === "function"
+                ? caretAt(ta, ev.clientX, ev.clientY)
+                : (ta.selectionStart ?? ta.value.length);
+            const replaceStart = ta.selectionStart ?? ta.value.length;
+            const replaceEnd = ta.selectionEnd ?? replaceStart;
+            const moveFrom =
+              internalTextDrag && internalTextDrag.text === text ? internalTextDrag : null;
+            const applied =
+              typeof applyDrop === "function"
+                ? applyDrop({
+                    value: ta.value,
+                    dropOffset,
+                    text,
+                    moveFrom,
+                    replaceStart: moveFrom ? null : replaceStart,
+                    replaceEnd: moveFrom ? null : replaceEnd,
+                  })
+                : {
+                    value:
+                      ta.value.slice(0, replaceStart) + text + ta.value.slice(replaceEnd),
+                    selectionStart: replaceStart + text.length,
+                    selectionEnd: replaceStart + text.length,
+                    insertedChars: chars,
+                  };
+            ta.value = applied.value;
+            ta.setSelectionRange(applied.selectionStart, applied.selectionEnd);
             typedChars = ta.value.length;
             syncLen();
+            if (!firstInputSent && ta.value.length > 0) {
+              firstInputSent = true;
+              enqueueEvent("first_input", { length: ta.value.length });
+            }
             enqueueEvent("other_insert", { chars, inputType: "insertFromDrop" });
-            suppressNextInputClassify = true;
           }
+          internalTextDrag = null;
           flushTelemetry();
         });
         ta.addEventListener("input", (ev) => {
@@ -396,8 +447,11 @@
             firstInputSent = true;
             enqueueEvent("first_input", { length: len });
           }
-          if (suppressNextInputClassify) {
-            suppressNextInputClassify = false;
+          if (
+            typeof InputEvent !== "undefined" &&
+            ev instanceof InputEvent &&
+            ev.inputType === "insertFromDrop"
+          ) {
             typedChars = len;
             return;
           }

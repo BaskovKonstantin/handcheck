@@ -11,6 +11,7 @@ Skills-first IT hiring (FSP 2026 special track). Category from test battery; emp
 | [docs/IMPLEMENTATION-PLAN-rev5.md](./docs/IMPLEMENTATION-PLAN-rev5.md) | Canonical rev.5 spec |
 | [docs/design.md](./docs/design.md) | Palette clay/forest, motion |
 | [docs/UX.md](./docs/UX.md) | Routes and copy |
+| [docs/JURY-DEMO.md](./docs/JURY-DEMO.md) | Jury click-path and ranking checks |
 | [AGENTS.md](./AGENTS.md) | Agent rules |
 
 ## Local
@@ -40,6 +41,8 @@ docker compose up -d --build
 ```
 
 SQLite persists in volume `/data`.
+
+For FSP jury evaluation, target **~32–64 GB RAM**, **4–16 CPU**, **no GPU** (see `docker-compose.yml` and [docs/JURY-DEMO.md](./docs/JURY-DEMO.md)).
 
 ## Operations (konBas)
 

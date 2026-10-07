@@ -7,6 +7,7 @@ const path = require("path");
 const os = require("os");
 const http = require("http");
 const request = require("supertest");
+const { registerPayload } = require("./register-payload");
 const { Client } = require("@modelcontextprotocol/sdk/client/index.js");
 const { StreamableHTTPClientTransport } = require("@modelcontextprotocol/sdk/client/streamableHttp.js");
 const { generateTokenMaterial } = require("../app/lib/api-token");
@@ -71,7 +72,7 @@ async function expectToolError(client, call, pattern) {
 
 async function registerEmployer(app, email) {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "demo-demo-demo", role: "employer" });
+  await agent.post("/api/auth/register").send(registerPayload({ email, role: "employer" }));
   await agent.post("/api/auth/confirm").send({ email, code: "000000" });
   await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
   await agent.put("/api/employer/profile").send({ companyName: "R26 Co", contactEmail: email });
@@ -80,7 +81,7 @@ async function registerEmployer(app, email) {
 
 async function registerCandidate(app, email) {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "demo-demo-demo", role: "candidate" });
+  await agent.post("/api/auth/register").send(registerPayload({ email, role: "candidate" }));
   await agent.post("/api/auth/confirm").send({ email, code: "000000" });
   await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
   return agent;

@@ -123,7 +123,7 @@ function renderCard(data) {
         <div class="avatar-monogram" title="Без фото по правилам платформы">${monogram}</div>
         <div>
           <h2 class="deck-name">${esc(data.card.displayName)}</h2>
-          <span class="category-pill">${esc(data.card.categoryLabel)}</span>
+          ${HandCheck.renderCategoryPill(data.card.categoryLabel, data.card.categoryStatus)}
         </div>
       </div>
       ${domains ? `<div class="chip-row">${domains}</div>` : ""}

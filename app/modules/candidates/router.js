@@ -155,7 +155,7 @@ router.get("/category", (req, res) => {
   const bumpRetake = (completedAt) => {
     if (!completedAt) return;
     const d = new Date(completedAt);
-    d.setDate(d.getDate() + Number(appConfig.GRADE_COOLDOWN_DAYS || 90));
+    d.setDate(d.getDate() + Number(appConfig.GRADE_COOLDOWN_DAYS || 30));
     retakeAt = d.toISOString();
     onCooldown = new Date() < d;
   };
@@ -163,6 +163,7 @@ router.get("/category", (req, res) => {
     bumpRetake(lastBattery?.completed_at);
     return res.json({
       label: null,
+      status: "unconfirmed",
       retakeAt: onCooldown ? retakeAt : null,
       cooldownActive: onCooldown,
       lastSpecialization: lastBattery?.specialization || null,
@@ -177,6 +178,7 @@ router.get("/category", (req, res) => {
   bumpRetake(last?.t);
   res.json({
     label: cat.label,
+    status: "confirmed",
     retakeAt,
     cooldownActive: onCooldown,
     specialization: cat.specialization,
@@ -239,7 +241,7 @@ router.get("/past", (req, res) => {
     let retakeAt = null;
     if (b.completed_at) {
       const d = new Date(dbDateToIso(b.completed_at));
-      d.setDate(d.getDate() + Number(appConfig.GRADE_COOLDOWN_DAYS || 90));
+      d.setDate(d.getDate() + Number(appConfig.GRADE_COOLDOWN_DAYS || 30));
       retakeAt = d.toISOString();
     }
     return {

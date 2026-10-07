@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const request = require("supertest");
+const { registerPayload } = require("./register-payload");
 const { generateTokenMaterial } = require("../app/lib/api-token");
 const { newId } = require("../app/lib/ids");
 const { scoreQuick, scoreWork, aggregateBattery, cutoffForGrade } = require("../app/lib/rubric-score");
@@ -154,11 +155,7 @@ describe("round 11 P0 fixes", () => {
   it("returns retakeAt after failed battery without category", async () => {
     const email = `fail-${Date.now()}@demo.local`;
     const agent = request.agent(app);
-    await agent.post("/api/auth/register").send({
-      email,
-      password: "demo-demo-demo",
-      role: "candidate",
-    });
+    await agent.post("/api/auth/register").send(registerPayload({ email, role: "candidate" }));
     await agent.post("/api/auth/confirm").send({ email, code: "000000" });
     await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
     await agent.put("/api/candidate/profile").send({

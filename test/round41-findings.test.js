@@ -7,6 +7,7 @@ const path = require("path");
 const os = require("os");
 const { spawnSync } = require("child_process");
 const request = require("supertest");
+const { registerPayload } = require("./register-payload");
 const { createApp } = require("../app/server");
 const {
   concatSessionWebmBuffers,
@@ -115,7 +116,7 @@ describe("round41 findings (unit)", () => {
     const { getDb } = require("../app/db");
     const agent = request.agent(app);
     const email = `r41-expire-${Date.now()}@demo.local`;
-    await agent.post("/api/auth/register").send({ email, password: "demo-demo-demo", role: "candidate" });
+    await agent.post("/api/auth/register").send(registerPayload({ email, role: "candidate" }));
     await agent.post("/api/auth/confirm").send({ email, code: "000000" });
     await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
     await agent.post("/api/assessment/battery/start").send({

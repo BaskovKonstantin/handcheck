@@ -7,6 +7,7 @@ const path = require("path");
 const os = require("os");
 const http = require("http");
 const request = require("supertest");
+const { registerPayload } = require("./register-payload");
 const { newId } = require("../app/lib/ids");
 const { validateNeedBody } = require("../app/lib/need-validation");
 const { normalizeStackToken, stackMatchesFilter, stackOverlapTokens } = require("../app/lib/stack-normalize");
@@ -96,7 +97,7 @@ describe("round 21 findings", () => {
   it("3: need POST returns 400 for invalid body", async () => {
     const agent = request.agent(app);
     const email = `r21e-${Date.now()}@demo.local`;
-    await agent.post("/api/auth/register").send({ email, password: "demo-demo-demo", role: "employer" });
+    await agent.post("/api/auth/register").send(registerPayload({ email, role: "employer" }));
     await agent.post("/api/auth/confirm").send({ email, code: "000000" });
     await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
     const res = await agent.post("/api/employer/needs").send({ title: "", specialization: "chef", grade: "x" });

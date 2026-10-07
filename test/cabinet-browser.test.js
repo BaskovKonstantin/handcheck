@@ -11,6 +11,7 @@ const ROOT = path.join(__dirname, "..");
 let PORT = process.env.HC_TEST_PORT || "";
 let BASE = "";
 const PASS = "demo-demo-demo";
+const { registerPayload } = require("./register-payload");
 const API_DELAY_MS = 900;
 
 let serverProc;
@@ -1124,7 +1125,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const email = `r34-paste-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     const loginRes = await context.request.post(`${BASE}/api/auth/login`, {
@@ -1175,7 +1176,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const email = `r41-step-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     await context.request.post(`${BASE}/api/auth/login`, {
@@ -1223,7 +1224,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const email = `r41-stuck-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     await context.request.post(`${BASE}/api/auth/login`, {
@@ -1270,7 +1271,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const email = `r38-layout-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     const loginRes = await context.request.post(`${BASE}/api/auth/login`, {
@@ -1317,7 +1318,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const email = `r45-mobile-${Date.now()}@demo.local`;
     await context.request.post(`${BASE}/api/auth/register`, {
-      data: { email, password: PASS, role: "candidate" },
+      data: registerPayload({ email, role: "candidate" }),
     });
     await context.request.post(`${BASE}/api/auth/confirm`, { data: { email, code: "000000" } });
     await context.request.post(`${BASE}/api/auth/login`, { data: { email, password: PASS } });
@@ -1398,19 +1399,32 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       await emp.click("#end", { force: true });
       await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
       const liveMs = Date.now() - liveStarted;
-      const dur = await emp.evaluate(async (id) => {
-        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
-        const info = await r.json();
-        const v = document.createElement("video");
-        v.preload = "metadata";
-        v.src = `/api/calls/${info.callId}/recording?side=employer`;
-        await new Promise((resolve, reject) => {
-          v.onloadedmetadata = () => resolve();
-          v.onerror = () => reject(new Error("metadata"));
-          setTimeout(() => reject(new Error("timeout")), 20000);
-        });
-        return v.duration;
-      }, invId);
+      let dur = NaN;
+      const metaDeadline = Date.now() + 90_000;
+      while (Date.now() < metaDeadline) {
+        try {
+          dur = await emp.evaluate(async (id) => {
+            const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+            const info = await r.json();
+            if (info.status !== "ended" || !info.callId) return NaN;
+            const sides = info.recordingSides || [];
+            if (!sides.includes("employer")) return NaN;
+            const v = document.createElement("video");
+            v.preload = "metadata";
+            v.src = `/api/calls/${info.callId}/recording?side=employer`;
+            await new Promise((resolve, reject) => {
+              v.onloadedmetadata = () => resolve();
+              v.onerror = () => reject(new Error("metadata"));
+              setTimeout(() => reject(new Error("timeout")), 15000);
+            });
+            return v.duration;
+          }, invId);
+          if (Number.isFinite(dur) && dur > 0) break;
+        } catch {
+          /* recording may still be assembling on slow CI */
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
       const wallSec = (Date.now() - wallStarted) / 1000;
       assert.ok(Number.isFinite(dur) && dur > 0, `duration ${dur}`);
       assert.ok(

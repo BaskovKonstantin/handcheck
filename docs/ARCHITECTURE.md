@@ -216,7 +216,7 @@ Vacancies/applications, PDF parse stub, short tasks, code runner.
 PORT=8810
 DB_PATH=/data/handcheck.sqlite
 SESSION_SECRET=...
-GRADE_COOLDOWN_DAYS=90
+GRADE_COOLDOWN_DAYS=30
 RANK_W_TEST=0.7
 RANK_W_FSP=0.3
 APP_BASE_URL=https://handcheck.baski.pro

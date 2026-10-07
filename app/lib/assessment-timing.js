@@ -21,6 +21,12 @@ function isPastDeadline(openedAt, type, nowMs = Date.now()) {
   return nowMs > new Date(openedAt).getTime() + deadlineMsForType(type) + grace;
 }
 
+/** Wall-clock remaining until ISO deadline (server-authoritative). */
+function remainingMsUntilDeadline(deadlineAtIso, nowMs = Date.now()) {
+  if (!deadlineAtIso) return null;
+  return Math.max(0, new Date(deadlineAtIso).getTime() - nowMs);
+}
+
 function getCurrentAttemptId(db, batteryId) {
   const row = db
     .prepare(
@@ -88,6 +94,7 @@ module.exports = {
   deadlineMsForType,
   deadlineAtIso,
   isPastDeadline,
+  remainingMsUntilDeadline,
   getCurrentAttemptId,
   assertCurrentAttempt,
   openAttemptTimer,

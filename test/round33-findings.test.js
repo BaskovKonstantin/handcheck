@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const request = require("supertest");
+const { registerPayload } = require("./register-payload");
 const answers = require("../scripts/fixtures/canonical-answer-ab.json");
 const { QUICK_DEADLINE_MS, QUICK_GRACE_MS } = require("../app/lib/assessment-timing");
 const {
@@ -52,11 +53,7 @@ function fakeCluster(size = MIN_PLAYABLE_RECORDING_BYTES + 200) {
 
 async function registerCandidate(app, email) {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({
-    email,
-    password: "demo-demo-demo",
-    role: "candidate",
-  });
+  await agent.post("/api/auth/register").send(registerPayload({ email, role: "candidate" }));
   await agent.post("/api/auth/confirm").send({ email, code: "000000" });
   await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
   await agent.put("/api/candidate/profile").send({

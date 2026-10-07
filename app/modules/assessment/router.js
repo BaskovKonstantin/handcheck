@@ -22,6 +22,7 @@ const {
   deadlineAtIso,
   getCurrentAttemptId,
   isPastDeadline,
+  remainingMsUntilDeadline,
 } = require("../../lib/assessment-timing");
 const { recordDraftTelemetry } = require("../../lib/assessment-telemetry");
 const { submitAttemptAnswer } = require("../../lib/assessment-submit");
@@ -62,7 +63,7 @@ router.post("/battery/start", (req, res, next) => {
     const last = lastSpecializationAttempt(req.user.id, specialization);
     if (cooldownActive(last?.completed_at)) {
       const retake = new Date(last.completed_at);
-      retake.setDate(retake.getDate() + Number(config.GRADE_COOLDOWN_DAYS || 90));
+      retake.setDate(retake.getDate() + Number(config.GRADE_COOLDOWN_DAYS || 30));
       throw httpError(409, "cooldown", {
         message: "Пересдача по этой специализации пока недоступна",
         retakeAt: retake.toISOString(),
@@ -184,6 +185,8 @@ router.get("/tasks/:attemptId", (req, res, next) => {
     }
     const openedAt = row.opened_at;
     const needsOpen = !row.submitted_at && !openedAt;
+    const deadlineAt = openedAt ? deadlineAtIso(openedAt, row.type) : null;
+    const serverNow = new Date().toISOString();
     res.json({
       id: row.id,
       type: row.type,
@@ -194,7 +197,9 @@ router.get("/tasks/:attemptId", (req, res, next) => {
       workAnswerMin: row.type === "work" ? WORK_ANSWER_MIN : undefined,
       draftText: row.submitted_at ? "" : String(row.answer_text || ""),
       openedAt,
-      deadlineAt: openedAt ? deadlineAtIso(openedAt, row.type) : null,
+      deadlineAt,
+      serverNow: openedAt ? serverNow : undefined,
+      remainingMs: deadlineAt ? remainingMsUntilDeadline(deadlineAt) : undefined,
       quickLimitSeconds: row.type === "quick" ? 60 : undefined,
     });
   } catch (e) {
@@ -217,13 +222,17 @@ router.post("/tasks/:attemptId/open", (req, res, next) => {
     if (!row) return next(httpError(404, "not_found"));
     if (row.submitted_at) return next(httpError(409, "already_submitted"));
     const opened = openAttemptTimer(db, req.user.id, row.id);
+    const deadlineAt = deadlineAtIso(opened.opened_at, row.type);
+    const serverNow = new Date().toISOString();
     res.json({
       id: row.id,
       type: row.type,
       needsOpen: false,
       prompt: row.prompt,
       openedAt: opened.opened_at,
-      deadlineAt: deadlineAtIso(opened.opened_at, row.type),
+      deadlineAt,
+      serverNow,
+      remainingMs: remainingMsUntilDeadline(deadlineAt),
       quickLimitSeconds: row.type === "quick" ? 60 : undefined,
     });
   } catch (e) {

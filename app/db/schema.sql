@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('candidate', 'employer')),
   email_confirmed_at TEXT,
+  birth_date TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -162,7 +162,7 @@
           </div>
           <label class="consent-option">
             <input type="checkbox" id="assessment-privacy" />
-            <span>Согласен на обработку персональных данных (ввод текста, вставка из буфера, черновики) по <a href="/privacy" target="_blank" rel="noopener">уведомлению 152-ФЗ</a>.</span>
+            <span>Начиная тест, я даю согласие на обработку персональных данных в соответствии с <a href="/privacy" target="_blank" rel="noopener">Уведомлением по 152-ФЗ</a>.</span>
           </label>
           <button class="btn-primary" id="start" type="button" ${onCooldown ? "disabled" : ""} ${
             onCooldown ? `title="Пересдача возможна после ${retakeWhen}"` : ""
@@ -432,6 +432,12 @@
         let submitting = false;
         let suppressDraft = false;
         const deadlineMs = t.deadlineAt ? new Date(t.deadlineAt).getTime() : null;
+        const serverSkewMs =
+          t.serverNow && deadlineMs ? new Date(t.serverNow).getTime() - Date.now() : 0;
+        const remainingAnchor =
+          typeof t.remainingMs === "number"
+            ? { fetchedAt: Date.now(), remainingMs: t.remainingMs }
+            : null;
         const timerVal = document.getElementById("timer-val");
         let tickTimer = null;
         const submitBtn = document.getElementById("submit");
@@ -498,17 +504,28 @@
           }
         };
         submitBtn.onclick = () => submitAnswer(false);
+        const remainingMsNow = () => {
+          if (remainingAnchor) {
+            return remainingAnchor.remainingMs - (Date.now() - remainingAnchor.fetchedAt);
+          }
+          if (deadlineMs) {
+            return deadlineMs - (Date.now() + serverSkewMs);
+          }
+          return null;
+        };
         const syncDeadlineUi = () => {
-          if (!deadlineMs) return;
-          const left = deadlineMs - Date.now();
+          const raw = remainingMsNow();
+          if (raw === null) return;
+          const left = Math.max(0, raw);
           timerVal.textContent = formatCountdown(left, { workWeek: t.type === "work" });
           if (t.type === "quick" && left <= 0 && !submitting) {
             void submitAnswer(true);
           }
         };
-        if (deadlineMs) {
+        if (deadlineMs || remainingAnchor) {
           syncDeadlineUi();
-          if (t.type === "quick" && deadlineMs <= Date.now()) {
+          const initialLeft = remainingMsNow();
+          if (t.type === "quick" && initialLeft !== null && initialLeft <= 0) {
             void submitAnswer(true);
           } else {
             tickTimer = setInterval(syncDeadlineUi, 250);

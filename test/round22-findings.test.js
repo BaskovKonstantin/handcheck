@@ -7,6 +7,7 @@ const path = require("path");
 const os = require("os");
 const http = require("http");
 const request = require("supertest");
+const { registerPayload } = require("./register-payload");
 const { newId } = require("../app/lib/ids");
 const { validateAnswerText } = require("../app/lib/assessment-answer");
 const { publicCandidateDisplayName } = require("../app/lib/public-candidate-name");
@@ -47,7 +48,7 @@ function loadFormatApiError() {
 
 async function registerEmployer(app, email) {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "demo-demo-demo", role: "employer" });
+  await agent.post("/api/auth/register").send(registerPayload({ email, role: "employer" }));
   await agent.post("/api/auth/confirm").send({ email, code: "000000" });
   await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
   return agent;
@@ -55,7 +56,7 @@ async function registerEmployer(app, email) {
 
 async function registerCandidate(app, email, displayName) {
   const agent = request.agent(app);
-  await agent.post("/api/auth/register").send({ email, password: "demo-demo-demo", role: "candidate" });
+  await agent.post("/api/auth/register").send(registerPayload({ email, role: "candidate" }));
   await agent.post("/api/auth/confirm").send({ email, code: "000000" });
   await agent.post("/api/auth/login").send({ email, password: "demo-demo-demo" });
   if (displayName !== undefined) {
@@ -119,6 +120,7 @@ describe("round 22 findings", () => {
     await registerCandidate(app, candEmail, "");
     const db = require("../app/db").getDb();
     const candId = db.prepare("SELECT id FROM users WHERE email = ?").get(candEmail).id;
+    db.prepare("UPDATE candidate_private SET trust_ok = 0 WHERE candidate_user_id = ?").run(candId);
     const bad = await employer.post("/api/employer/invitations").send({
       needId: need.body.id,
       candidateId: candId,

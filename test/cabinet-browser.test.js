@@ -40,6 +40,27 @@ async function login(page, email) {
   await page.waitForURL(/\/(candidate|employer)\//, { timeout: 45000 });
 }
 
+function assertNoHorizontalScroll(page, label) {
+  return page
+    .evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
+    .then((overflow) => assert.equal(overflow, false, `horizontal scroll on ${label}`));
+}
+
+function assertBoxesDisjoint(boxes, label) {
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i];
+      const b = boxes[j];
+      const disjoint =
+        a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+      assert.ok(
+        disjoint,
+        `${label}: "${a.text}" overlaps "${b.text}" (${JSON.stringify(a)} vs ${JSON.stringify(b)})`
+      );
+    }
+  }
+}
+
 async function assertCabinetPage(page, urlPath, contentSelector, emailHint) {
   await page.route("**/api/**", async (route) => {
     await new Promise((r) => setTimeout(r, API_DELAY_MS));
@@ -131,6 +152,86 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       const p = await context.newPage();
       await assertCabinetPage(p, path, sel, "anna@demo.local");
       await p.close();
+    }
+    await context.close();
+  });
+
+  async function assertNoMobileCabinetOverflow(page, urlPath, { width }) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${BASE}${urlPath}`, { waitUntil: "networkidle", timeout: 60000 });
+    await page.waitForSelector("#cabinet-tabs", { timeout: 20000 });
+    await page.waitForTimeout(100);
+    const metrics = await page.evaluate(() => {
+      const vw = document.documentElement.clientWidth;
+      const sw = document.documentElement.scrollWidth;
+      const ind = document.getElementById("cabinet-tabs-indicator");
+      const active = document.querySelector(
+        ".cabinet-tabs .tab-link.active:not(.cabinet-more-btn), #cabinet-more.active"
+      );
+      const ir = ind && !ind.hidden ? ind.getBoundingClientRect() : null;
+      const ar = active?.getBoundingClientRect();
+      let maxRight = 0;
+      for (const el of document.querySelectorAll(
+        ".cabinet-page-hero, .cabinet-page-hero-pattern, .cabinet-tabs-indicator"
+      )) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0) maxRight = Math.max(maxRight, rect.right);
+      }
+      return {
+        sw,
+        vw,
+        maxRight,
+        indDelta: ir && ar ? Math.abs(ir.left - ar.left) : ind?.hidden ? 0 : 999,
+      };
+    });
+    assert.ok(
+      metrics.sw <= metrics.vw + 1,
+      `${urlPath}@${width}px scrollWidth ${metrics.sw} > viewport ${metrics.vw}`
+    );
+    assert.ok(
+      metrics.maxRight <= metrics.vw + 1,
+      `${urlPath}@${width}px chrome maxRight ${metrics.maxRight} > viewport ${metrics.vw}`
+    );
+    assert.ok(
+      metrics.indDelta <= 2,
+      `${urlPath}@${width}px tab indicator delta ${metrics.indDelta}px`
+    );
+  }
+
+  it("round72: mobile cabinet has no horizontal overflow and aligned tab indicator", async () => {
+    const widths = [320, 360, 390, 430];
+    const employerRoutes = [
+      "/employer/deck",
+      "/employer/need",
+      "/employer/list",
+      "/employer/deferred",
+      "/employer/profile",
+      "/employer/invitations",
+      "/employer/calls",
+      "/employer/integrations",
+    ];
+    const candidateRoutes = [
+      "/candidate/today",
+      "/candidate/profile",
+      "/candidate/tasks",
+      "/candidate/invitations",
+      "/candidate/calls",
+      "/candidate/past",
+      "/candidate/integrations",
+    ];
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    for (const path of employerRoutes) {
+      for (const width of widths) {
+        await assertNoMobileCabinetOverflow(page, path, { width });
+      }
+    }
+    await login(page, "anna@demo.local");
+    for (const path of candidateRoutes) {
+      for (const width of widths) {
+        await assertNoMobileCabinetOverflow(page, path, { width });
+      }
     }
     await context.close();
   });
@@ -332,7 +433,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
-  it("candidate today at 390 uses compact three-up stat tiles", async () => {
+  it("candidate today at 390 stacks summary stat tiles full width", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
     const page = await context.newPage();
     await login(page, "anna@demo.local");
@@ -342,9 +443,39 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       return window.getComputedStyle(el).gridTemplateColumns;
     });
     const parts = cols.split(" ").filter(Boolean);
-    assert.equal(parts.length, 3, `expected 3-up grid, got ${cols}`);
-    const tileCount = await page.locator(".stat-tile-grid-today .stat-tile").count();
-    assert.equal(tileCount, 3);
+    assert.equal(parts.length, 1, `expected stacked grid, got ${cols}`);
+    const widths = await page.$$eval(".stat-tile-grid-today .stat-tile", (tiles) =>
+      tiles.map((t) => t.getBoundingClientRect().width)
+    );
+    assert.equal(widths.length, 3);
+    for (const w of widths) {
+      assert.ok(w > 300, `stat tile width ${w}px should exceed 300px at 390 viewport`);
+    }
+    await assertNoHorizontalScroll(page, "candidate/today@390");
+    await context.close();
+  });
+
+  it("employer deck need stat labels do not overlap at 1280", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/deck`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".deck-need-stats dt", { timeout: 30000 });
+    const labelBoxes = await page.$$eval(".deck-need-stats dt", (nodes) =>
+      nodes.map((n) => {
+        const r = n.getBoundingClientRect();
+        return {
+          left: r.left,
+          right: r.right,
+          top: r.top,
+          bottom: r.bottom,
+          text: (n.textContent || "").trim(),
+        };
+      })
+    );
+    assert.ok(labelBoxes.length >= 2, "expected deck need stat labels");
+    assertBoxesDisjoint(labelBoxes, "deck-need-stats dt@1280");
+    await assertNoHorizontalScroll(page, "employer/deck@1280");
     await context.close();
   });
 

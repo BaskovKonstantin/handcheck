@@ -60,6 +60,7 @@ function createApp() {
   app.use("/api/employer", require("./modules/matching/router"));
   app.use("/api/employer", require("./modules/deck/router"));
   app.use("/api/employer", require("./modules/invitations/router"));
+  app.use("/api/employer", require("./modules/employer-tests/router"));
   app.use("/api/assessment", require("./modules/assessment/router"));
   app.use("/api/assessment", require("./modules/tasks/router"));
   app.use("/api/calls", require("./modules/calls/router"));
@@ -89,6 +90,7 @@ function createApp() {
     ["/candidate/profile", "candidate/profile.html"],
     ["/candidate/integrations", "candidate/integrations.html"],
     ["/employer/need", "employer/need.html"],
+    ["/employer/tests", "employer/tests.html"],
     ["/employer/deck", "employer/deck.html"],
     ["/employer/list", "employer/list.html"],
     ["/employer/deferred", "employer/deferred.html"],

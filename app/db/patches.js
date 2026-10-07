@@ -102,6 +102,59 @@ function applyPatches(db) {
           AND lower(trim(candidate_profiles.display_name)) = lower(trim(substr(u.email, 1, instr(u.email, '@') - 1)))
       );
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS employer_tests (
+      id TEXT PRIMARY KEY,
+      employer_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      need_id TEXT NOT NULL REFERENCES employer_needs(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      intro TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_employer_tests_owner ON employer_tests(employer_user_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_employer_tests_need ON employer_tests(need_id, status);
+
+    CREATE TABLE IF NOT EXISTS employer_test_items (
+      id TEXT PRIMARY KEY,
+      test_id TEXT NOT NULL REFERENCES employer_tests(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('text', 'single', 'multi', 'code')),
+      prompt TEXT NOT NULL,
+      options_json TEXT NOT NULL DEFAULT '[]',
+      answer_key_json TEXT NOT NULL DEFAULT '{}',
+      rubric_keys_json TEXT NOT NULL DEFAULT '{}',
+      time_limit_sec INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_employer_test_items_test ON employer_test_items(test_id, position);
+
+    CREATE TABLE IF NOT EXISTS employer_test_assignments (
+      id TEXT PRIMARY KEY,
+      test_id TEXT NOT NULL REFERENCES employer_tests(id) ON DELETE CASCADE,
+      candidate_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      invitation_id TEXT REFERENCES invitations(id) ON DELETE SET NULL,
+      status TEXT NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned', 'started', 'submitted', 'expired')),
+      due_at TEXT NOT NULL,
+      started_at TEXT,
+      submitted_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_employer_test_assignments_candidate ON employer_test_assignments(candidate_user_id, status);
+    CREATE INDEX IF NOT EXISTS idx_employer_test_assignments_test ON employer_test_assignments(test_id);
+
+    CREATE TABLE IF NOT EXISTS employer_test_answers (
+      assignment_id TEXT NOT NULL REFERENCES employer_test_assignments(id) ON DELETE CASCADE,
+      item_id TEXT NOT NULL REFERENCES employer_test_items(id) ON DELETE CASCADE,
+      answer_text TEXT NOT NULL DEFAULT '',
+      choice_json TEXT NOT NULL DEFAULT '[]',
+      auto_ok INTEGER,
+      paste_chars INTEGER NOT NULL DEFAULT 0,
+      typed_chars INTEGER NOT NULL DEFAULT 0,
+      submitted_at TEXT,
+      PRIMARY KEY (assignment_id, item_id)
+    );
+  `);
 }
 
 module.exports = { applyPatches };

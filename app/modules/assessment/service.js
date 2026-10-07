@@ -9,7 +9,7 @@ const {
   applyBatteryScoreGuards,
 } = require("../../lib/rubric-score");
 const { computeMotivation } = require("../../lib/motivation");
-const { computeIntegrityFromWorkEvents } = require("../../lib/integrity");
+const { computeAttemptIntegrity } = require("../../lib/integrity");
 const config = require("../../config");
 const {
   BATTERY_QUICK_COUNT,
@@ -121,11 +121,18 @@ function finalizeBattery(batteryId, userId, claimedGrade) {
 
   let motivation = 0;
   const integrityParts = [];
+  const storeIntegrityMetrics = db.prepare(
+    "UPDATE attempts SET integrity_metrics_json = ? WHERE id = ?"
+  );
   for (const a of attempts) {
     const events = db
       .prepare("SELECT * FROM attempt_events WHERE attempt_id = ? ORDER BY created_at")
       .all(a.id);
-    if (events.length) integrityParts.push(computeIntegrityFromWorkEvents(events));
+    if (events.length || a.submitted_at) {
+      const { integrity: attemptIntegrity, metrics } = computeAttemptIntegrity(events, a);
+      integrityParts.push(attemptIntegrity);
+      storeIntegrityMetrics.run(JSON.stringify(metrics), a.id);
+    }
     if (a.type === "work" && workAttempt) {
       motivation = computeMotivation(
         events,
@@ -136,9 +143,7 @@ function finalizeBattery(batteryId, userId, claimedGrade) {
     }
   }
   const integrity =
-    integrityParts.length > 0
-      ? integrityParts.reduce((s, v) => s + v, 0) / integrityParts.length
-      : 0;
+    integrityParts.length > 0 ? Math.max(...integrityParts) : 0;
 
   const now = new Date().toISOString();
   db.prepare("UPDATE batteries SET completed_at = ? WHERE id = ?").run(now, batteryId);

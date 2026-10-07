@@ -20,6 +20,7 @@
       <div id="panel" class="panel"></div>
     </main>
     <script src="/app.js"></script>
+    <script src="/assessment-input-classify.js"></script>
     <script>
       const panel = document.getElementById("panel");
       let attemptId = null;
@@ -342,35 +343,57 @@
           pendingPasteChars += chars;
           enqueueEvent("paste", { length: chars, chars });
         });
+        ta.addEventListener("drop", (ev) => {
+          const text = ev.dataTransfer?.getData("text") || "";
+          enqueueEvent("drop", { chars: text.length });
+        });
         let draftTimer = null;
         let typedChars = restored.length;
         let typingPending = 0;
+        let otherPending = 0;
         let typingFlushTimer = null;
+        let otherFlushTimer = null;
         const flushTyping = () => {
           if (typingPending <= 0) return;
           const batch = typingPending;
           typingPending = 0;
           enqueueEvent("typing", { chars: batch });
         };
-        ta.addEventListener("input", () => {
+        const flushOther = () => {
+          if (otherPending <= 0) return;
+          const batch = otherPending;
+          const inputType = otherPendingInputType;
+          otherPending = 0;
+          otherPendingInputType = "";
+          enqueueEvent("other_insert", { chars: batch, inputType: inputType || undefined });
+        };
+        let otherPendingInputType = "";
+        const classifyDelta = HandCheckInputClassify.classifyLengthIncrease;
+        ta.addEventListener("input", (ev) => {
           const len = ta.value.length;
           if (!firstInputSent && len > 0) {
             firstInputSent = true;
             enqueueEvent("first_input", { length: len });
           }
           if (len > typedChars) {
-            let delta = len - typedChars;
+            const delta = len - typedChars;
             typedChars = len;
-            if (pendingPasteChars > 0) {
-              const fromPaste = Math.min(delta, pendingPasteChars);
-              pendingPasteChars -= fromPaste;
-              delta -= fromPaste;
-            }
-            if (delta > 0) {
-              typingPending += delta;
+            const inputType = ev && typeof ev.inputType === "string" ? ev.inputType : "";
+            const parts = classifyDelta(delta, inputType, pendingPasteChars);
+            pendingPasteChars = Math.max(0, pendingPasteChars - parts.paste);
+            if (parts.typing > 0) {
+              typingPending += parts.typing;
               clearTimeout(typingFlushTimer);
               typingFlushTimer = setTimeout(flushTyping, 2000);
             }
+            if (parts.other > 0) {
+              otherPending += parts.other;
+              otherPendingInputType = inputType || otherPendingInputType;
+              clearTimeout(otherFlushTimer);
+              otherFlushTimer = setTimeout(flushOther, 200);
+            }
+          } else if (len < typedChars) {
+            typedChars = len;
           }
         });
         ta.addEventListener("focus", () => enqueueEvent("focus", null));
@@ -398,7 +421,9 @@
           if (draftTimer) clearInterval(draftTimer);
           if (tickTimer) clearInterval(tickTimer);
           clearTimeout(typingFlushTimer);
+          clearTimeout(otherFlushTimer);
           flushTyping();
+          flushOther();
           ta.readOnly = true;
           submitBtn.disabled = true;
           await flushTelemetry();

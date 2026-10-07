@@ -7,6 +7,13 @@
 - UI: amber `.category-pill-grade-mismatch`; MCP `getDeckNext` passes `categoryStatus` / `gradeRelation`.
 - Tests: `test/round66-findings.test.js`.
 
+## 2026-10-07 — round 65 mobile employer list collapse
+
+- Branch: `cursor/mobile-list-row-stack-99d7`
+- Cause: duplicate `.list-row-card-rich` rules placed actions in grid column 2; three buttons at 390px starved `minmax(0,1fr)` main column (`overflow-wrap: anywhere` → one char per line).
+- Fix: `@media (max-width: 899px)` stack after late CSS block; `invite-card-top` flex-wrap on mobile.
+- Test: `round65: employer list undecided cards keep width at 390px` in `cabinet-browser.test.js`.
+
 ## 2026-10-07 — CI ffmpeg install (PR apt stall)
 
 - Branch: `cursor/ci-ffmpeg-robust-2ebc`

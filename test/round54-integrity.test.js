@@ -120,6 +120,11 @@ describe("round54 tasks input classification", () => {
       typing: 3,
       other: 0,
     });
+    assert.deepEqual(classifyLengthIncrease(218, "insertText", 0), {
+      paste: 0,
+      typing: 0,
+      other: 218,
+    });
   });
 
   it("tasks.html wires InputEvent classification and drop telemetry", () => {

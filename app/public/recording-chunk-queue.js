@@ -68,15 +68,55 @@
     uploadBlob,
     maxUploadBytes = MAX_UPLOAD_BLOB_BYTES,
     maxPendingBytes = MAX_PENDING_BLOB_BYTES,
+    onUploadFailure,
+    onUploadSuccess,
+    retryBaseMs = 1000,
+    retryMaxMs = 30_000,
   }) {
     let chunks = [];
     let flushChain = Promise.resolve();
     let flushGeneration = 0;
     let inFlight = null;
+    let retryTimer = null;
+    let retryDelayMs = retryBaseMs;
+    let uploadFailureActive = false;
+
+    function clearRetryTimer() {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+    }
+
+    function scheduleRetryFlush() {
+      if (retryTimer) return;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        void flush().catch(() => {});
+      }, retryDelayMs);
+      retryDelayMs = Math.min(retryDelayMs * 2, retryMaxMs);
+    }
+
+    function notifyUploadSuccess() {
+      retryDelayMs = retryBaseMs;
+      if (uploadFailureActive) {
+        uploadFailureActive = false;
+        if (typeof onUploadSuccess === "function") onUploadSuccess();
+      }
+    }
+
+    function notifyUploadFailure() {
+      if (!uploadFailureActive) {
+        uploadFailureActive = true;
+        if (typeof onUploadFailure === "function") onUploadFailure();
+      }
+      scheduleRetryFlush();
+    }
+
     function push(blob) {
       if (blob?.size) chunks.push(blob);
       if (pendingBlobBytes() >= maxPendingBytes) {
-        flush();
+        void flush().catch(() => {});
       }
     }
 
@@ -111,18 +151,20 @@
         if (inFlight?.gen === gen) {
           inFlight = null;
         }
+        notifyUploadSuccess();
         return chunks.length > 0;
       } catch (err) {
         if (inFlight?.gen === gen) {
           chunks.unshift(...snap.pending);
           inFlight = null;
         }
-        throw err;
+        notifyUploadFailure();
+        return false;
       }
     }
 
     function flush() {
-      flushChain = flushChain.then(async () => {
+      flushChain = flushChain.catch(() => {}).then(async () => {
         while (await flushOnce()) {
           /* drain */
         }
@@ -133,6 +175,7 @@
     function emergencyFlushKeepalive(uploadBatch) {
       flushGeneration += 1;
       inFlight = null;
+      clearRetryTimer();
       const parts = collectQueuedPartsOnly();
       if (!parts.length) return [];
       const batches = splitPartsIntoUploadBatches(parts, maxUploadBytes);

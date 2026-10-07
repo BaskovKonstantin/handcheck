@@ -42,6 +42,11 @@ router.get("/invitations", (req, res) => {
     .all(req.user.id, req.user.id);
   res.json({
     items: rows.map((r) => {
+      const assignment = getDb()
+        .prepare(
+          `SELECT id, status FROM employer_test_assignments WHERE invitation_id = ? ORDER BY due_at DESC LIMIT 1`
+        )
+        .get(r.id);
       const item = {
         id: r.id,
         candidateId: r.candidate_user_id,
@@ -55,6 +60,8 @@ router.get("/invitations", (req, res) => {
         contactChannel: r.contact_channel,
         createdAt: dbDateToIso(r.created_at),
         viaAiClient: r.action_source === "mcp",
+        companyTestAssignmentId: assignment?.id || null,
+        companyTestAssignmentStatus: assignment?.status || null,
       };
       if (r.status === "accepted") {
         item.candidatePhone = r.phone;

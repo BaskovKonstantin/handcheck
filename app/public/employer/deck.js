@@ -261,12 +261,18 @@ function bindDeckUi() {
   const sheet = document.getElementById("sheet");
   const inviteOpen = document.getElementById("invite-open");
   if (inviteOpen) {
-    inviteOpen.onclick = () => {
+    inviteOpen.onclick = async () => {
       showSalaryError(null);
       document.getElementById("invite-err").hidden = true;
       sheet.classList.remove("hidden");
+      await refreshAttachTestOptions();
     };
   }
+  const attachCheckbox = document.getElementById("attach-test");
+  const attachWrap = document.getElementById("attach-test-wrap");
+  attachCheckbox?.addEventListener("change", () => {
+    if (attachWrap) attachWrap.hidden = !attachCheckbox.checked;
+  });
   const inviteCancel = document.getElementById("invite-cancel");
   if (inviteCancel) {
     inviteCancel.onclick = () => sheet.classList.add("hidden");
@@ -277,6 +283,27 @@ function bindDeckUi() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") sheet.classList.add("hidden");
   });
+
+  async function refreshAttachTestOptions() {
+    const select = document.getElementById("attach-test-id");
+    if (!select || !needId) return;
+    try {
+      const data = await HandCheck.api(
+        `/api/employer/tests?needId=${encodeURIComponent(needId)}&status=published`
+      );
+      const tests = (data.groups || []).flatMap((g) => g.tests || []);
+      select.innerHTML = tests
+        .map((t) => `<option value="${HandCheck.escapeHtml(t.id)}">${HandCheck.escapeHtml(t.title)}</option>`)
+        .join("");
+      if (!tests.length) {
+        select.innerHTML = `<option value="">Нет опубликованных тестов</option>`;
+        if (attachCheckbox) attachCheckbox.checked = false;
+        if (attachWrap) attachWrap.hidden = true;
+      }
+    } catch {
+      select.innerHTML = `<option value="">Не удалось загрузить</option>`;
+    }
+  }
 
   const inviteSend = document.getElementById("invite-send");
   if (inviteSend) {
@@ -296,16 +323,21 @@ function bindDeckUi() {
       const btn = document.getElementById("invite-send");
       btn.disabled = true;
       try {
+        const payload = {
+          needId,
+          candidateId,
+          salaryFrom: from,
+          salaryTo: to,
+          offerText: document.getElementById("offer-text").value,
+          contactChannel: document.getElementById("contact-channel").value,
+        };
+        if (document.getElementById("attach-test")?.checked) {
+          const testId = document.getElementById("attach-test-id")?.value;
+          if (testId) payload.employerTestId = testId;
+        }
         await HandCheck.api("/api/employer/invitations", {
           method: "POST",
-          body: JSON.stringify({
-            needId,
-            candidateId,
-            salaryFrom: from,
-            salaryTo: to,
-            offerText: document.getElementById("offer-text").value,
-            contactChannel: document.getElementById("contact-channel").value,
-          }),
+          body: JSON.stringify(payload),
         });
         sheet.classList.add("hidden");
         HandCheck.toast("Приглашение отправлено", "success");

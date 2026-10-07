@@ -93,6 +93,14 @@
             const offer = i.offerText
               ? `<p class="invite-offer-text">${esc(i.offerText)}</p>`
               : "";
+            const testReview =
+              i.companyTestAssignmentId && i.companyTestAssignmentStatus === "submitted"
+                ? `<button type="button" class="btn-ghost btn-sm" data-review-test="${esc(i.companyTestAssignmentId)}">Ответы на тест</button>`
+                : "";
+            const assignTestBtn =
+              i.status === "accepted" && !i.companyTestAssignmentId
+                ? `<button type="button" class="btn-ghost btn-sm" data-assign-test data-candidate-id="${esc(i.candidateId)}" data-need-title="${esc(i.needTitle)}">Назначить тест</button>`
+                : "";
             return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
               <div class="invite-card-top">
                 <h3>${esc(i.candidateName)}</h3>
@@ -105,10 +113,65 @@
               ${channel}
               ${priorDecline}
               ${contacts}
-              <div class="invite-actions">${call}</div>
+              <div class="invite-actions">${call} ${testReview} ${assignTestBtn}</div>
+              <div class="employer-test-review-panel" id="review-${esc(i.companyTestAssignmentId || "")}" hidden></div>
             </article>`;
           })
           .join("")}</div>`;
+        list.querySelectorAll("[data-review-test]").forEach((btn) => {
+          btn.addEventListener("click", () => loadTestReview(btn.dataset.reviewTest));
+        });
+        list.querySelectorAll("[data-assign-test]").forEach((btn) => {
+          btn.addEventListener("click", () => assignTestToCandidate(btn));
+        });
+      }
+
+      async function loadTestReview(assignmentId) {
+        const panel = document.getElementById(`review-${assignmentId}`);
+        if (!panel) return;
+        panel.hidden = false;
+        panel.innerHTML = HandCheck.skeletonBlocks(1);
+        const data = await HandCheck.api(`/api/employer/test-assignments/${assignmentId}`);
+        panel.innerHTML = `<h4 class="h4">Ответы: ${esc(data.testTitle)}</h4>${(data.items || [])
+          .map((it) => {
+            const mark =
+              it.choiceMark === "ok"
+                ? '<span class="status-pill accepted">✓</span>'
+                : it.choiceMark === "bad"
+                  ? '<span class="status-pill declined">✗</span>'
+                  : "";
+            const chips = (it.keywordHits || [])
+              .map((k) => `<span class="chip chip-skill">${esc(k)}</span>`)
+              .join("");
+            const paste = it.pasteInputMark
+              ? `<span class="chip chip-paste-indicator">${esc(it.pasteInputMark.label)}</span>`
+              : "";
+            const answer =
+              it.kind === "single" || it.kind === "multi"
+                ? esc((it.choiceIds || []).join(", "))
+                : esc(it.answerText || "");
+            return `<article class="employer-test-preview-card"><p><strong>${esc(it.prompt)}</strong> ${mark}</p>
+              <p class="invite-meta">${answer}</p>
+              <div class="chip-row">${chips}${paste}</div></article>`;
+          })
+          .join("")}`;
+      }
+
+      async function assignTestToCandidate(btn) {
+        const candidateId = btn.dataset.candidateId;
+        const testsRes = await HandCheck.api("/api/employer/tests?status=published");
+        const tests = (testsRes.groups || []).flatMap((g) => g.tests || []);
+        if (!tests.length) {
+          HandCheck.toast("Нет опубликованных тестов", "error");
+          return;
+        }
+        const testId = tests[0].id;
+        await HandCheck.api(`/api/employer/tests/${testId}/assign`, {
+          method: "POST",
+          body: JSON.stringify({ candidateId }),
+        });
+        HandCheck.toast("Тест назначен", "success");
+        await loadInvitations();
       }
 
       HandCheck.bootCabinetPage("employer", () =>

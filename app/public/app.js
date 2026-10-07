@@ -634,6 +634,7 @@ const LINK_ICON = {
   "/candidate/invitations": "invitations",
   "/candidate/calls": "calls",
   "/candidate/past": "past",
+  "/employer/overview": "today",
   "/employer/need": "need",
   "/employer/deck": "deck",
   "/employer/candidates": "list",
@@ -648,7 +649,7 @@ const LINK_ICON = {
 
 const TAB_PRIMARY = {
   candidate: ["/candidate/today", "/candidate/invitations", "/candidate/calls", "/candidate/tasks"],
-  employer: ["/employer/deck", "/employer/need", "/employer/invitations", "/employer/calls"],
+  employer: ["/employer/overview", "/employer/deck", "/employer/invitations", "/employer/calls"],
 };
 
 function bindCabinetMoreMenu(role, links) {
@@ -689,7 +690,8 @@ function bindCabinetMoreMenu(role, links) {
 function navLinkHtml(l, compact) {
   const iconKey = LINK_ICON[l.href];
   const icon = iconKey ? NAV_ICONS[iconKey] : "";
-  const cls = `cabinet-nav-link${isActive(l.href) ? " active" : ""}${compact ? " tab-link" : ""}`;
+  const secondary = l.secondary ? " cabinet-nav-secondary" : "";
+  const cls = `cabinet-nav-link${secondary}${isActive(l.href) ? " active" : ""}${compact ? " tab-link" : ""}`;
   return `<a href="${l.href}" class="${cls}">${icon}<span>${l.label}</span></a>`;
 }
 
@@ -736,7 +738,12 @@ function ensureCabinetChrome(links, role, meEmail) {
     aside.setAttribute("aria-label", "Разделы кабинета");
     document.body.insertBefore(aside, document.body.querySelector("main"));
   }
-  const navLinks = links.map((l) => navLinkHtml(l, false)).join("");
+  const primaryLinks = links.filter((l) => !l.secondary);
+  const secondaryLinks = links.filter((l) => l.secondary);
+  const navLinks = primaryLinks.map((l) => navLinkHtml(l, false)).join("");
+  const secondaryBlock = secondaryLinks.length
+    ? `<div class="cabinet-nav-secondary-group">${secondaryLinks.map((l) => navLinkHtml(l, false)).join("")}</div>`
+    : "";
   aside.innerHTML = `
     <div class="cabinet-aside-brand">
       <a class="logo cabinet-aside-logo" href="/">${LOGO_MARK}<span>HandCheck</span></a>
@@ -744,6 +751,7 @@ function ensureCabinetChrome(links, role, meEmail) {
     <div class="cabinet-aside-inner">
       <span class="cabinet-nav-indicator" id="cabinet-nav-indicator" hidden></span>
       ${navLinks}
+      ${secondaryBlock}
     </div>
     <div class="cabinet-user-card">
       ${formatCabinetEmailMarkup(meEmail)}
@@ -782,7 +790,7 @@ async function refreshCabinetMeEmail(expectedRole) {
     const me = await api("/api/me");
     setCachedMeRole(me.role || "");
     if (expectedRole && me.role !== expectedRole) {
-      window.location.replace(me.role === "employer" ? "/employer/deck" : "/candidate/today");
+      window.location.replace(me.role === "employer" ? "/employer/overview" : "/candidate/today");
       return false;
     }
     cabinetMeEmail = me.email || "";
@@ -913,14 +921,15 @@ const CANDIDATE_LINKS = [
 ];
 
 const EMPLOYER_LINKS = [
+  { href: "/employer/overview", label: "Обзор" },
   { href: "/employer/need", label: "Потребность" },
   { href: "/employer/deck", label: "Колода" },
   { href: "/employer/candidates", label: "Кандидаты" },
   { href: "/employer/deferred", label: "Отложенные" },
-  { href: "/employer/profile", label: "Профиль" },
   { href: "/employer/invitations", label: "Приглашения" },
   { href: "/employer/calls", label: "Звонки" },
-  { href: "/employer/integrations", label: "Интеграции" },
+  { href: "/employer/profile", label: "Профиль", secondary: true },
+  { href: "/employer/integrations", label: "Интеграции", secondary: true },
 ];
 
 function candidateNav() {

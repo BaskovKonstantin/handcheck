@@ -88,6 +88,7 @@ function createApp() {
     ["/candidate/calls", "candidate/calls.html"],
     ["/candidate/profile", "candidate/profile.html"],
     ["/candidate/integrations", "candidate/integrations.html"],
+    ["/employer/overview", "employer/overview.html"],
     ["/employer/need", "employer/need.html"],
     ["/employer/deck", "employer/deck.html"],
     ["/employer/candidates", "employer/candidates.html"],

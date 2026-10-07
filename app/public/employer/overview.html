@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Обзор — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="overview-page">
+    <div id="site-header"></div>
+    <main class="column cabinet-content overview-layout">
+      <header class="overview-hero" id="overview-hero">
+        <div class="overview-hero-pattern" aria-hidden="true"></div>
+        <div class="overview-hero-inner">
+          <p class="hero-eyebrow" id="greeting-line">…</p>
+          <h1 id="company-line">…</h1>
+          <p class="lede">Сводка по потребностям, приглашениям и банку — без числовых оценок кандидатов.</p>
+        </div>
+      </header>
+      <div id="kpi-host"></div>
+      <section class="overview-section" id="funnel-host" aria-label="Воронка приглашений"></section>
+      <section class="overview-section" id="needs-host" aria-label="Потребности"></section>
+      <div class="overview-split">
+        <section class="overview-section" id="bank-host" aria-label="Состав банка"></section>
+        <section class="overview-section" id="activity-host" aria-label="Лента активности"></section>
+      </div>
+      <section class="overview-section" id="actions-host" aria-label="Следующие шаги"></section>
+    </main>
+    <script src="/app.js"></script>
+    <script src="/employer/overview.js"></script>
+  </body>
+</html>

@@ -201,6 +201,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
   it("round72: mobile cabinet has no horizontal overflow and aligned tab indicator", async () => {
     const widths = [320, 360, 390, 430];
     const employerRoutes = [
+      "/employer/overview",
       "/employer/deck",
       "/employer/need",
       "/employer/candidates",
@@ -275,6 +276,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const page = await context.newPage();
     await login(page, "cafe@demo.local");
     const routes = [
+      ["/employer/overview", ".overview-hero, .stat-tile, .empty-state"],
       ["/employer/deck", "#deck-card:not([hidden]), .empty-state .empty-title"],
       ["/employer/invitations", ".stat-tile, .invite-card, .empty-state"],
       ["/employer/candidates", ".candidates-table tbody tr, .candidates-card, .empty-state"],
@@ -389,6 +391,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const page = await context.newPage();
     await login(page, "cafe@demo.local");
     const paths = [
+      "/employer/overview",
       "/employer/deck",
       "/employer/need",
       "/employer/invitations",
@@ -399,7 +402,11 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       "/employer/integrations",
     ];
     for (const path of paths) {
-      if (!["/employer/deck", "/employer/need", "/employer/invitations", "/employer/calls"].includes(path)) {
+      if (
+        !["/employer/overview", "/employer/deck", "/employer/need", "/employer/invitations", "/employer/calls"].includes(
+          path
+        )
+      ) {
         await page.goto(`${BASE}/employer/deck`, { waitUntil: "commit" });
         await page.click("#cabinet-more");
         await page.waitForSelector("#cabinet-more-sheet:not([hidden])");

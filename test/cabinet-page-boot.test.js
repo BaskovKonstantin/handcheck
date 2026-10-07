@@ -24,6 +24,11 @@ const CABINET_PAGES = [
     role: "employer",
   },
   {
+    file: "employer/overview.js",
+    apis: ["/api/employer/dashboard"],
+    role: "employer",
+  },
+  {
     file: "employer/deferred.html",
     apis: ["/api/employer/needs"],
     role: "employer",

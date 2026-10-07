@@ -286,7 +286,8 @@
     root.querySelector("#test-intro")?.addEventListener("input", (e) => {
       editor.test.intro = e.target.value;
       scheduleMetaSave();
-      root.querySelector("#preview-pane")?.previousElementSibling?.textContent = e.target.value;
+      const introPreview = root.querySelector("#preview-pane")?.previousElementSibling;
+      if (introPreview) introPreview.textContent = e.target.value;
     });
     root.querySelector("#test-need")?.addEventListener("change", (e) => {
       editor.test.needId = e.target.value;
@@ -512,7 +513,6 @@
   }
 
   async function boot() {
-    HandCheck.employerNav();
     needs = (await HandCheck.api("/api/employer/needs")).items || [];
     await loadList();
   }

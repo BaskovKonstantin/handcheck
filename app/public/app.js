@@ -698,6 +698,7 @@ const LINK_ICON = {
   "/candidate/calls": "calls",
   "/candidate/past": "past",
   "/employer/overview": "today",
+  "/employer/tests": "tasks",
   "/employer/need": "need",
   "/employer/deck": "deck",
   "/employer/candidates": "list",
@@ -986,13 +987,13 @@ const CANDIDATE_LINKS = [
 
 const EMPLOYER_LINKS = [
   { href: "/employer/overview", label: "Обзор" },
-  { href: "/employer/need", label: "Потребность" },
-  { href: "/employer/tests", label: "Тесты" },
   { href: "/employer/deck", label: "Колода" },
   { href: "/employer/candidates", label: "Кандидаты" },
-  { href: "/employer/deferred", label: "Отложенные" },
+  { href: "/employer/need", label: "Потребность" },
+  { href: "/employer/tests", label: "Тесты" },
   { href: "/employer/invitations", label: "Приглашения" },
   { href: "/employer/calls", label: "Звонки" },
+  { href: "/employer/deferred", label: "Отложенные" },
   { href: "/employer/profile", label: "Профиль", secondary: true },
   { href: "/employer/integrations", label: "Интеграции", secondary: true },
 ];

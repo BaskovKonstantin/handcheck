@@ -4265,6 +4265,11 @@ textarea {
   margin-right: 0.35rem;
 }
 
+.overview-quick-links {
+  margin: 0.5rem 0 0;
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 720px) {
   .overview-split {
     grid-template-columns: 1fr;

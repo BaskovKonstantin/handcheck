@@ -113,6 +113,13 @@ async function loadOverview() {
     { gridClass: "stat-tile-grid-compact" }
   );
   HandCheck.animateStatCounters(document.getElementById("kpi-host"));
+  const kpiHost = document.getElementById("kpi-host");
+  if (kpiHost && !kpiHost.querySelector(".overview-quick-links")) {
+    kpiHost.insertAdjacentHTML(
+      "beforeend",
+      `<p class="overview-quick-links"><a class="btn-ghost btn-sm" href="/employer/tests">Тесты вакансии</a></p>`
+    );
+  }
   document.getElementById("funnel-host").innerHTML = renderFunnel(data.funnel || {});
   document.getElementById("needs-host").innerHTML = renderNeeds(data.needs || []);
   document.getElementById("bank-host").innerHTML = renderBank(data.bankComposition || []);

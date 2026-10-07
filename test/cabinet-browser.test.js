@@ -260,8 +260,9 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const employerRoutes = [
       "/employer/overview",
       "/employer/deck",
-      "/employer/need",
       "/employer/candidates",
+      "/employer/need",
+      "/employer/tests",
       "/employer/deferred",
       "/employer/profile",
       "/employer/invitations",
@@ -447,10 +448,11 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const paths = [
       "/employer/overview",
       "/employer/deck",
+      "/employer/candidates",
       "/employer/need",
+      "/employer/tests",
       "/employer/invitations",
       "/employer/calls",
-      "/employer/candidates",
       "/employer/deferred",
       "/employer/profile",
       "/employer/integrations",

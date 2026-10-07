@@ -1399,19 +1399,32 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       await emp.click("#end", { force: true });
       await emp.waitForURL(new RegExp(`/call/${invId}`), { timeout: 45000 });
       const liveMs = Date.now() - liveStarted;
-      const dur = await emp.evaluate(async (id) => {
-        const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
-        const info = await r.json();
-        const v = document.createElement("video");
-        v.preload = "metadata";
-        v.src = `/api/calls/${info.callId}/recording?side=employer`;
-        await new Promise((resolve, reject) => {
-          v.onloadedmetadata = () => resolve();
-          v.onerror = () => reject(new Error("metadata"));
-          setTimeout(() => reject(new Error("timeout")), 20000);
-        });
-        return v.duration;
-      }, invId);
+      let dur = NaN;
+      const metaDeadline = Date.now() + 90_000;
+      while (Date.now() < metaDeadline) {
+        try {
+          dur = await emp.evaluate(async (id) => {
+            const r = await fetch(`/api/calls/for-invitation/${id}`, { credentials: "include" });
+            const info = await r.json();
+            if (info.status !== "ended" || !info.callId) return NaN;
+            const sides = info.recordingSides || [];
+            if (!sides.includes("employer")) return NaN;
+            const v = document.createElement("video");
+            v.preload = "metadata";
+            v.src = `/api/calls/${info.callId}/recording?side=employer`;
+            await new Promise((resolve, reject) => {
+              v.onloadedmetadata = () => resolve();
+              v.onerror = () => reject(new Error("metadata"));
+              setTimeout(() => reject(new Error("timeout")), 15000);
+            });
+            return v.duration;
+          }, invId);
+          if (Number.isFinite(dur) && dur > 0) break;
+        } catch {
+          /* recording may still be assembling on slow CI */
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
       const wallSec = (Date.now() - wallStarted) / 1000;
       assert.ok(Number.isFinite(dur) && dur > 0, `duration ${dur}`);
       assert.ok(

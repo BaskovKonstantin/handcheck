@@ -8,7 +8,14 @@ const { seed } = require("./db/seed");
 const config = require("./config");
 const { attachUser, requireAuth, rejectApiTokenOnRest } = require("./middleware/auth");
 const { requireSessionSameOrigin } = require("./middleware/session-same-origin");
-const { errorHandler, INVALID_JSON_BODY_MSG } = require("./middleware/errors");
+const {
+  errorHandler,
+  INVALID_JSON_BODY_MSG,
+  MCP_INVALID_JSON_MSG,
+  MCP_PAYLOAD_TOO_LARGE_MSG,
+  isMcpRequest,
+  sendMcpJsonRpcError,
+} = require("./middleware/errors");
 const { attachSignaling } = require("./modules/calls/signaling");
 
 const STARTED_AT = new Date().toISOString();
@@ -106,6 +113,9 @@ function createApp() {
 
   app.use((err, req, res, next) => {
     if (err && err.type === "entity.parse.failed") {
+      if (isMcpRequest(req)) {
+        return sendMcpJsonRpcError(res, 400, -32700, MCP_INVALID_JSON_MSG);
+      }
       return res.status(400).json({
         error: "invalid_body",
         details: { message: INVALID_JSON_BODY_MSG },
@@ -116,10 +126,13 @@ function createApp() {
 
   app.use((err, req, res, next) => {
     if (err && err.type === "entity.too.large") {
+      if (isMcpRequest(req)) {
+        return sendMcpJsonRpcError(res, 413, -32000, MCP_PAYLOAD_TOO_LARGE_MSG);
+      }
       return res.status(413).json({
         error: "payload_too_large",
         details: {
-          message: "Запрос слишком большой. Уменьшите объём данных и повторите.",
+          message: MCP_PAYLOAD_TOO_LARGE_MSG,
         },
       });
     }

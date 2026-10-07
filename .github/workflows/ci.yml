@@ -28,8 +28,38 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # Cached static ffmpeg/ffprobe (avoids apt mirror stalls that consumed the job timeout on PR #45).
+      - name: Setup ffmpeg
+        id: setup_ffmpeg
+        timeout-minutes: 5
+        continue-on-error: true
+        uses: FedericoCarboni/setup-ffmpeg@v3.1
+        with:
+          ffmpeg-version: release
+          linking-type: static
+
+      - name: Setup ffmpeg (apt fallback)
+        if: steps.setup_ffmpeg.outcome == 'failure'
+        timeout-minutes: 5
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 4
+          max_attempts: 2
+          retry_wait_seconds: 20
+          command: |
+            sudo apt-get \
+              -o Acquire::Retries=3 \
+              -o Acquire::http::Timeout=90 \
+              -o Acquire::https::Timeout=90 \
+              update
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Verify ffmpeg
+        run: |
+          command -v ffmpeg
+          command -v ffprobe
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
 
       - name: Install Playwright Chromium
         run: npx playwright install chromium

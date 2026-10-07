@@ -22,6 +22,7 @@
     <script src="/app.js"></script>
     <script src="/assessment-input-classify.js"></script>
     <script src="/tasks-answer-drop.js"></script>
+    <script src="/tasks-draft-persist.js"></script>
     <script>
       const panel = document.getElementById("panel");
       let attemptId = null;
@@ -252,22 +253,9 @@
           };
           return;
         }
-        const draftKey = `handcheck:draft:v1:${attemptId}`;
-        const saved = localStorage.getItem(draftKey);
-        let restored = "";
-        let localAt = 0;
-        if (saved) {
-          try {
-            const p = JSON.parse(saved);
-            restored = p.text || "";
-            localAt = Number(p.at) || 0;
-          } catch {
-            restored = "";
-          }
-        }
-        const serverDraft = t.draftText || "";
-        if (!restored && serverDraft) restored = serverDraft;
-        else if (restored && serverDraft && serverDraft.length > restored.length) restored = serverDraft;
+        const draftKey = HandCheckTasksDraft.draftStorageKey(attemptId);
+        const stored = HandCheckTasksDraft.parseStoredDraft(localStorage.getItem(draftKey));
+        const restored = HandCheckTasksDraft.pickRestoredDraftText(stored.text, t.draftText || "");
         const stepIndex = submitted;
         const metaLine = HandCheck.formatSpecGradeLabel(
           cur.battery.specialization,
@@ -304,7 +292,21 @@
           lenEl.textContent = `${ta.value.length} / ${answerMax} символов`;
         };
         syncLen();
+        const draftLifecycle = HandCheckTasksDraft.createWorkDraftLifecycle({
+          attemptId,
+          taskType: t.type,
+          getText: () => ta.value,
+          storage: localStorage,
+          saveDraft: (text) =>
+            HandCheck.api(`/api/assessment/tasks/${attemptId}/draft`, {
+              method: "PATCH",
+              body: JSON.stringify({ answerText: text }),
+            }),
+          shouldSkip: () => submitting || suppressDraft,
+        });
+        draftLifecycle.start();
         ta.addEventListener("input", syncLen);
+        ta.addEventListener("input", () => draftLifecycle.scheduleLocalFromInput());
         let firstInputSent = false;
         const telemetryQueue = [];
         let telemetryChain = Promise.resolve();
@@ -344,7 +346,6 @@
           pendingPasteChars += chars;
           enqueueEvent("paste", { length: chars, chars });
         });
-        let draftTimer = null;
         let typedChars = restored.length;
         let typingPending = 0;
         let otherPending = 0;
@@ -509,7 +510,7 @@
           }
           submitting = true;
           telemetryOpen = false;
-          if (draftTimer) clearInterval(draftTimer);
+          draftLifecycle.stop();
           if (tickTimer) clearInterval(tickTimer);
           clearTimeout(typingFlushTimer);
           clearTimeout(otherFlushTimer);
@@ -585,38 +586,21 @@
             tickTimer = setInterval(syncDeadlineUi, 250);
           }
         }
-        const persistDraft = async () => {
-          if (submitting || suppressDraft) return;
-          const text = ta.value;
-          localStorage.setItem(draftKey, JSON.stringify({ text, at: Date.now() }));
-          try {
-            await HandCheck.api(`/api/assessment/tasks/${attemptId}/draft`, {
-              method: "PATCH",
-              body: JSON.stringify({ answerText: text }),
-            });
-          } catch {
-            /* ignore draft race after submit */
-          }
-        };
         ta.addEventListener("blur", () => {
           flushTyping();
           flushTelemetry();
-          persistDraft();
+          draftLifecycle.persistOnBlur();
         });
         const onPageLifecycleFlush = () => {
           flushTyping();
           flushOther();
           flushTelemetryBeacon();
+          draftLifecycle.flushOnLifecycleHide();
         };
         window.addEventListener("pagehide", onPageLifecycleFlush);
         document.addEventListener("visibilitychange", () => {
           if (document.visibilityState === "hidden") onPageLifecycleFlush();
         });
-        if (t.type === "work") {
-          draftTimer = setInterval(() => {
-            persistDraft();
-          }, 10000);
-        }
       }
 
       HandCheck.bootCabinetPage("candidate", () =>

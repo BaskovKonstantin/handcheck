@@ -9,7 +9,7 @@ const { httpError } = require("../../middleware/errors");
 const { loadCandidatesForNeed, applyFilters } = require("../matching/pool");
 const { employerCandidateView } = require("../../lib/privacy");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
-const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
+const { listDeferredCandidates } = require("../../lib/employer-deferred-list");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -88,24 +88,8 @@ router.delete("/needs/:id/reviews/:candidateId", (req, res, next) => {
 router.get("/needs/:id/deferred", (req, res, next) => {
   const need = getNeed(req, req.params.id);
   if (!need) return next(httpError(404, "not_found"));
-  const rows = getDb()
-    .prepare(
-      `SELECT nr.candidate_user_id, cp.display_name, u.email, c.label
-       FROM need_reviews nr
-       JOIN candidate_profiles cp ON cp.user_id = nr.candidate_user_id
-       JOIN users u ON u.id = nr.candidate_user_id
-       JOIN candidate_categories cc ON cc.candidate_user_id = nr.candidate_user_id
-       JOIN categories c ON c.id = cc.category_id
-       WHERE nr.need_id = ? AND nr.employer_user_id = ? AND nr.decision = 'later'`
-    )
-    .all(need.id, req.user.id);
-  res.json({
-    items: rows.map((r) => ({
-      candidateId: r.candidate_user_id,
-      displayName: publicCandidateDisplayName(r.display_name, r.email),
-      categoryLabel: r.label,
-    })),
-  });
+  const db = getDb();
+  res.json(listDeferredCandidates(db, need, req.user.id, req.query));
 });
 
 module.exports = router;

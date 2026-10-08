@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Кандидаты — HandCheck</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="candidates-page">
+    <div id="site-header"></div>
+    <main class="column cabinet-content candidates-layout">
+      <header class="cabinet-page-hero">
+        <div class="cabinet-page-hero-pattern" aria-hidden="true"></div>
+        <div class="cabinet-page-hero-inner">
+          <h1>Кандидаты</h1>
+          <p class="lede">Банк и подборка по потребности — без рейтинга и числовых оценок.</p>
+        </div>
+      </header>
+      <div class="candidates-sticky" id="candidates-sticky">
+        <div class="candidates-search-row">
+          <label class="candidates-search-label">
+            <span class="sr-only">Поиск</span>
+            <input
+              type="search"
+              id="search-input"
+              class="candidates-search-input"
+              placeholder="Специализация, грейд, стек, ФСП, имя…"
+              autocomplete="off"
+            />
+          </label>
+          <div class="candidates-chips" id="search-chips" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="candidates-body">
+        <aside class="candidates-filters" id="filters-rail" aria-label="Фильтры"></aside>
+        <div class="candidates-main">
+          <div class="candidates-toolbar">
+            <label class="candidates-sort-label">
+              Сортировка
+              <select id="sort-select">
+                <option value="relevance">По релевантности</option>
+                <option value="categoryDate">В категории с</option>
+                <option value="name">По имени</option>
+                <option value="status">По статусу</option>
+              </select>
+            </label>
+            <button type="button" class="btn-ghost btn-sm" id="compare-open" hidden>Сравнить выбранных</button>
+          </div>
+          <div id="candidates-table-host"></div>
+          <div class="candidates-pagination" id="pagination" hidden></div>
+        </div>
+      </div>
+      <div class="candidates-compare hidden" id="compare-panel" hidden></div>
+    </main>
+    <aside class="candidates-drawer" id="detail-drawer" aria-hidden="true" hidden>
+      <div class="candidates-drawer-backdrop" data-close-drawer="1"></div>
+      <div class="candidates-drawer-panel" role="dialog" aria-label="Карточка кандидата">
+        <button type="button" class="btn-ghost btn-sm candidates-drawer-close" data-close-drawer="1">Закрыть</button>
+        <div id="drawer-body"></div>
+        <div class="candidates-drawer-actions" id="drawer-actions"></div>
+      </div>
+    </aside>
+    <div class="invite-sheet hidden" id="sheet">
+      <div class="invite-panel">
+        <h2>Приглашение</h2>
+        <div class="salary-range">
+          <label>От <input type="number" id="salary-from" min="0" step="1" /></label>
+          <label>До <input type="number" id="salary-to" min="0" step="1" /></label>
+          <p class="field-error" id="salary-range-err" hidden></p>
+        </div>
+        <label>Текст оффера <textarea id="offer-text" rows="3"></textarea></label>
+        <label>Канал связи <input id="contact-channel" maxlength="64" /></label>
+        <p class="field-error" id="invite-err" hidden></p>
+        <button class="btn-primary" type="button" id="invite-send">Отправить</button>
+        <button class="btn-ghost" type="button" id="invite-cancel">Отмена</button>
+      </div>
+    </div>
+    <script src="/app.js"></script>
+    <script src="/employer/candidates.js"></script>
+  </body>
+</html>

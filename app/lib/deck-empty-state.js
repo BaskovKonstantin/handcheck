@@ -12,7 +12,7 @@ function getDeckEmptyState({ invitedInMatches }) {
         "Все подходящие кандидаты уже получили приглашение по этой потребности. Откройте приглашения или посмотрите полный список.",
       actions: [
         { href: "/employer/invitations", label: "Приглашения", primary: true },
-        { href: "/employer/list", label: "Список", primary: false },
+        { href: "/employer/candidates", label: "Кандидаты", primary: false },
         { href: "/employer/need", label: "Изменить потребность", primary: false },
       ],
     };
@@ -22,7 +22,7 @@ function getDeckEmptyState({ invitedInMatches }) {
     help:
       "Нет кандидатов для свайпа по текущим фильтрам. Проверьте потребность, снимите фильтры в списке или загляните в отложенные.",
     actions: [
-      { href: "/employer/list", label: "Список", primary: true },
+      { href: "/employer/candidates", label: "Кандидаты", primary: true },
       { href: "/employer/deferred", label: "Отложенные", primary: false },
       { href: "/employer/need", label: "Изменить потребность", primary: false },
     ],

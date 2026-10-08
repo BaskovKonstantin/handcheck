@@ -7,9 +7,14 @@ const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
 const { validateOptionalEmail } = require("../../lib/validation");
 const { shouldMarkUserAsTest } = require("../../lib/is-test-user");
+const { buildEmployerDashboard } = require("./dashboard");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
+
+router.get("/dashboard", (req, res) => {
+  res.json(buildEmployerDashboard(req.user.id));
+});
 
 router.get("/profile", (req, res) => {
   const p = getDb()

@@ -310,4 +310,10 @@ function publicMatchShape(c) {
   return row;
 }
 
-module.exports = { loadCandidatesForNeed, applyFilters, publicMatchShape };
+module.exports = {
+  loadCandidatesForNeed,
+  applyFilters,
+  publicMatchShape,
+  loadEpisodesAndPhrases,
+  reviewDecisionFor,
+};

@@ -1,0 +1,47 @@
+name: BB host repair
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: getBB serverUrl for host daemon
+        required: true
+        default: http://192.168.0.5:38886
+jobs:
+  repair:
+    runs-on: [self-hosted, handcheck, konbas]
+    steps:
+      - name: Restart sshd and retarget bb host daemon
+        env:
+          SERVER_URL: ${{ inputs.server_url }}
+        run: |
+          set -eux
+          echo "runner=$(hostname) user=$(whoami) SERVER_URL=$SERVER_URL"
+          # Unstick SSH if hung
+          sudo systemctl restart ssh.service || sudo systemctl restart sshd.service || true
+          sleep 2
+          sudo systemctl is-active ssh.service || sudo systemctl is-active sshd.service || true
+          # Probe getBB from konBas
+          curl -sS -m 5 "$SERVER_URL/api/v1/system/version" || true
+          echo
+          UNIT_DIR="$HOME/.config/systemd/user"
+          UNIT="$UNIT_DIR/bb-host-daemon-192-168-0-4-38886-host_w4gsx29th4.service"
+          CFG="$HOME/.bb-machines/192.168.0.4-38886/config.json"
+          if [ -f "$UNIT" ]; then
+            sed -i "s|--server-url \"[^\"]*\"|--server-url \"$SERVER_URL\"|" "$UNIT"
+            grep server-url "$UNIT" || true
+          fi
+          if [ -f "$CFG" ]; then
+            python3 - <<PY
+          import json
+          p="$CFG"
+          c=json.load(open(p))
+          c["serverUrl"]="$SERVER_URL"
+          json.dump(c, open(p,"w"), indent=2)
+          print("config", c.get("serverUrl"))
+          PY
+          fi
+          systemctl --user daemon-reload
+          systemctl --user restart bb-host-daemon-192-168-0-4-38886-host_w4gsx29th4.service
+          sleep 5
+          systemctl --user is-active bb-host-daemon-192-168-0-4-38886-host_w4gsx29th4.service
+          systemctl --user status bb-host-daemon-192-168-0-4-38886-host_w4gsx29th4.service --no-pager | head -25

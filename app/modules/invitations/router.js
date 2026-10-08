@@ -52,6 +52,7 @@ router.get("/invitations", (req, res) => {
         id: r.id,
         candidateId: r.candidate_user_id,
         candidateName: publicCandidateDisplayName(r.display_name, r.candidate_email),
+        needId: r.need_id,
         needTitle: r.need_title,
         callStatus: r.call_status || null,
         salaryFrom: r.salary_from,

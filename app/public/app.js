@@ -47,6 +47,20 @@ function formatSpecGradeLabel(specialization, grade) {
   return `${spec} × ${gr}`;
 }
 
+function pluralRu(n, one, few, many) {
+  const abs = Math.abs(Number(n)) % 100;
+  const rem = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (rem === 1) return one;
+  if (rem >= 2 && rem <= 4) return few;
+  return many;
+}
+
+function formatQuestionsRu(count) {
+  const n = Number(count) || 0;
+  return `${n} ${pluralRu(n, "вопрос", "вопроса", "вопросов")}`;
+}
+
 const API_TIMEOUT_MS = 14000;
 const API_RETRIES = 2;
 
@@ -1206,6 +1220,7 @@ window.HandCheck = {
   formatRetakeDateMoscow,
   needInactiveBannerHtml,
   formatSpecGradeLabel,
+  formatQuestionsRu,
   renderCategoryPill(label, categoryStatus, gradeRelation) {
     let cls = "category-pill";
     if (categoryStatus === "unconfirmed") {

@@ -3,6 +3,8 @@
 const { newId } = require("./ids");
 const { httpError } = require("../middleware/errors");
 const { companyTestStatusLabel } = require("./company-test-status");
+const { choiceLabelsFromOptions } = require("./choice-labels");
+const { publicCandidateDisplayName } = require("./public-candidate-name");
 const {
   assertEmployerOwnsTest,
   candidateHasConfirmedCategory,
@@ -299,7 +301,7 @@ function buildEmployerReview(db, assignment) {
     submittedAt: assignment.submitted_at,
     testTitle: assignment.title,
     candidateId: assignment.candidate_user_id,
-    candidateName: candidate?.display_name || candidate?.email,
+    candidateName: publicCandidateDisplayName(candidate?.display_name, candidate?.email),
     items: items.map((it) => {
       const ans = byItem.get(it.id);
       const kind = it.kind;
@@ -312,14 +314,16 @@ function buildEmployerReview(db, assignment) {
       }
       const pasteInputMark =
         ans && mostlyPasted(ans.paste_chars, ans.typed_chars) ? { label: "Вставка" } : null;
+      const options = JSON.parse(it.options_json || "[]");
       return {
         itemId: it.id,
         position: it.position,
         kind,
         prompt: it.prompt,
-        options: JSON.parse(it.options_json || "[]"),
+        options,
         answerText: ans?.answer_text || "",
         choiceIds,
+        choiceLabels: choiceLabelsFromOptions(options, choiceIds),
         choiceMark,
         keywordHits: hits,
         pasteInputMark,

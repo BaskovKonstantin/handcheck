@@ -47,7 +47,7 @@
             (t) => `<article class="employer-tests-template-card">
             <h3>${esc(t.title)}</h3>
             <p class="invite-meta">${esc(t.intro)}</p>
-            <p class="invite-meta">${t.itemCount} вопросов</p>
+            <p class="invite-meta">${HandCheck.formatQuestionsRu(t.itemCount)}</p>
             <button type="button" class="btn-primary btn-sm" data-template-create="${esc(t.key)}">Создать из шаблона</button>
           </article>`
           )

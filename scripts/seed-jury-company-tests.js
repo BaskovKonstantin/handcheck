@@ -2,7 +2,7 @@
 "use strict";
 
 /**
- * Idempotent demo seed for jury accounts (employer vacancy tests + one submitted assignment).
+ * Idempotent demo seed for jury accounts (employer vacancy tests + reviewable assignments).
  * Usage: DEMO_MODE=1 node scripts/seed-jury-company-tests.js
  */
 const path = require("path");
@@ -13,30 +13,111 @@ const { seed } = require("../app/db/seed");
 const { newId } = require("../app/lib/ids");
 const { getTemplate } = require("../app/modules/employer-tests/templates");
 const { insertItem } = require("../app/modules/employer-tests/service");
-
 const JURY_EMPLOYER = "jury@demo.local";
+const MARKER_INV = "jury-company-inv-";
+
 const CANDIDATES = [
-  { email: "jury-backend@demo.local", spec: "backend", cat: "backend_middle" },
-  { email: "jury-frontend@demo.local", spec: "frontend", cat: "frontend_middle" },
-  { email: "jury-qa@demo.local", spec: "qa", cat: "qa_middle" },
+  { email: "jury-backend@demo.local", spec: "backend", cat: "backend_middle", name: "Жюри Backend" },
+  { email: "jury-frontend@demo.local", spec: "frontend", cat: "frontend_middle", name: "Жюри Frontend" },
+  { email: "jury-qa@demo.local", spec: "qa", cat: "qa_middle", name: "Жюри QA" },
 ];
 
 const TEMPLATE_BY_SPEC = {
   backend: "backend-api-basics",
-  frontend: "backend-api-basics",
+  frontend: "frontend-http-api",
   qa: "qa-test-design",
 };
 
-function ensureUser(db, email, role) {
+const SPEC_TITLE = {
+  backend: "Backend",
+  frontend: "Frontend",
+  qa: "QA",
+};
+
+function needTitleForSpec(spec) {
+  return `Жюри: ${SPEC_TITLE[spec]} Middle · тест компании`;
+}
+
+function ensureUser(db, email, role, { isTest = 1 } = {}) {
   let row = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-  if (row) return row.id;
+  if (row) {
+    db.prepare("UPDATE users SET is_test = ? WHERE id = ?").run(isTest, row.id);
+    return row.id;
+  }
   const hash = bcrypt.hashSync(config.DEMO_PASSWORD, 10);
   const now = new Date().toISOString();
   const id = newId();
   db.prepare(
-    `INSERT INTO users (id, email, password_hash, role, email_confirmed_at) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, email, hash, role, now);
+    `INSERT INTO users (id, email, password_hash, role, email_confirmed_at, created_at, is_test)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, email, hash, role, now, now, isTest);
   return id;
+}
+
+function findNeedBySpec(db, employerId, spec) {
+  const title = needTitleForSpec(spec);
+  let need = db
+    .prepare(
+      `SELECT id, title FROM employer_needs
+       WHERE employer_user_id = ? AND specialization = ? AND grade = 'middle'
+       ORDER BY active DESC, title LIMIT 1`
+    )
+    .get(employerId, spec);
+  if (need && need.title !== title) {
+    db.prepare("UPDATE employer_needs SET title = ? WHERE id = ?").run(title, need.id);
+    need.title = title;
+  }
+  return need;
+}
+
+function ensureNeed(db, employerId, spec) {
+  const title = needTitleForSpec(spec);
+  let need = findNeedBySpec(db, employerId, spec);
+  if (!need) {
+    const id = newId();
+    db.prepare(
+      `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
+       VALUES (?, ?, ?, ?, 'middle', '[]', '', '', 1)`
+    ).run(id, employerId, title, spec);
+    need = { id, title };
+  }
+  return need.id;
+}
+
+function ensurePublishedTest(db, employerId, needId, spec) {
+  let test = db
+    .prepare(
+      `SELECT id FROM employer_tests WHERE employer_user_id = ? AND need_id = ? AND status = 'published' LIMIT 1`
+    )
+    .get(employerId, needId);
+  if (test) return test.id;
+
+  const tplKey = TEMPLATE_BY_SPEC[spec];
+  const tpl = getTemplate(tplKey);
+  const testId = newId();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO employer_tests (id, employer_user_id, need_id, title, intro, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'published', ?, ?)`
+  ).run(testId, employerId, needId, tpl.title, tpl.intro, now, now);
+  let pos = 0;
+  for (const item of tpl.items) {
+    insertItem(
+      db,
+      testId,
+      {
+        kind: item.kind,
+        prompt: item.prompt,
+        options: item.options || [],
+        answerKey: item.answerKey || {},
+        rubricKeys: item.rubricKeys || {},
+        timeLimitSec: item.timeLimitSec,
+      },
+      pos
+    );
+    pos += 1;
+  }
+  return testId;
 }
 
 function seedJuryCompanyTests(db) {
@@ -44,74 +125,36 @@ function seedJuryCompanyTests(db) {
     console.error("Set DEMO_MODE=1");
     process.exit(1);
   }
-  const employerId = ensureUser(db, JURY_EMPLOYER, "employer");
+  const employerId = ensureUser(db, JURY_EMPLOYER, "employer", { isTest: 1 });
   const prof = db.prepare("SELECT 1 FROM employer_profiles WHERE user_id = ?").get(employerId);
   if (!prof) {
     db.prepare(
       `INSERT INTO employer_profiles (user_id, company_name, description, industry, contact_email)
-       VALUES (?, 'Jury Demo Corp', 'FSP jury', 'IT', ?)`
+       VALUES (?, 'Жюри HandCheck', 'FSP jury', 'IT', ?)`
     ).run(employerId, JURY_EMPLOYER);
   }
 
   const needs = {};
   for (const spec of ["backend", "frontend", "qa"]) {
-    const title = `Jury need — ${spec}`;
-    let need = db
-      .prepare("SELECT id FROM employer_needs WHERE employer_user_id = ? AND title = ?")
-      .get(employerId, title);
-    if (!need) {
-      const id = newId();
-      db.prepare(
-        `INSERT INTO employer_needs (id, employer_user_id, title, specialization, grade, stack_json, domain_text, notes, active)
-         VALUES (?, ?, ?, ?, 'middle', '[]', '', '', 1)`
-      ).run(id, employerId, title, spec);
-      need = { id };
-    }
-    needs[spec] = need.id;
-
-    let test = db
-      .prepare(
-        "SELECT id FROM employer_tests WHERE employer_user_id = ? AND need_id = ? AND status = 'published' LIMIT 1"
-      )
-      .get(employerId, need.id);
-    if (!test) {
-      const tplKey = TEMPLATE_BY_SPEC[spec];
-      const tpl = getTemplate(tplKey);
-      const testId = newId();
-      const now = new Date().toISOString();
-      db.prepare(
-        `INSERT INTO employer_tests (id, employer_user_id, need_id, title, intro, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'published', ?, ?)`
-      ).run(testId, employerId, need.id, tpl.title, tpl.intro, now, now);
-      let pos = 0;
-      for (const item of tpl.items) {
-        insertItem(
-          db,
-          testId,
-          {
-            kind: item.kind,
-            prompt: item.prompt,
-            options: item.options || [],
-            answerKey: item.answerKey || {},
-            rubricKeys: item.rubricKeys || {},
-            timeLimitSec: item.timeLimitSec,
-          },
-          pos
-        );
-        pos += 1;
-      }
-      test = { id: testId };
-    }
-    needs[`${spec}Test`] = test.id;
+    const needId = ensureNeed(db, employerId, spec);
+    needs[spec] = needId;
+    needs[`${spec}Test`] = ensurePublishedTest(db, employerId, needId, spec);
   }
 
   for (const c of CANDIDATES) {
-    const cid = ensureUser(db, c.email, "candidate");
+    const cid = ensureUser(db, c.email, "candidate", { isTest: 1 });
     if (!db.prepare("SELECT 1 FROM candidate_profiles WHERE user_id = ?").get(cid)) {
       db.prepare(
         `INSERT INTO candidate_profiles (user_id, display_name, stack_json, phone, contact_email, consent_at, availability)
          VALUES (?, ?, '[]', '', ?, datetime('now'), 'open')`
-      ).run(cid, c.email.split("@")[0], c.email);
+      ).run(cid, c.name, c.email);
+    } else {
+      db.prepare("UPDATE candidate_profiles SET display_name = ? WHERE user_id = ?").run(c.name, cid);
+    }
+    if (!db.prepare("SELECT 1 FROM candidate_private WHERE candidate_user_id = ?").get(cid)) {
+      db.prepare(
+        `INSERT INTO candidate_private (candidate_user_id, integrity, trust_ok) VALUES (?, 0.9, 1)`
+      ).run(cid);
     }
     if (!db.prepare("SELECT 1 FROM candidate_categories WHERE candidate_user_id = ?").get(cid)) {
       db.prepare(
@@ -121,10 +164,21 @@ function seedJuryCompanyTests(db) {
       ).run(cid, c.cat, c.spec);
     }
 
+    const needId = needs[c.spec];
     const testId = needs[`${c.spec}Test`];
+    const invId = `${MARKER_INV}${c.spec}`;
+    let inv = db.prepare("SELECT id, status FROM invitations WHERE id = ?").get(invId);
+    if (!inv) {
+      db.prepare(
+        `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status, created_at)
+         VALUES (?, ?, ?, ?, 220000, 300000, 'Жюри: демо-приглашение для просмотра ответов на тест', 'email', 'accepted', datetime('now', '-1 days'))`
+      ).run(invId, employerId, needId, cid);
+      inv = { id: invId, status: "accepted" };
+    }
+
     const existingAssign = db
       .prepare(
-        "SELECT id FROM employer_test_assignments WHERE test_id = ? AND candidate_user_id = ? AND status = 'submitted' LIMIT 1"
+        `SELECT id FROM employer_test_assignments WHERE test_id = ? AND candidate_user_id = ? AND status = 'submitted' LIMIT 1`
       )
       .get(testId, cid);
     if (existingAssign) continue;
@@ -134,8 +188,8 @@ function seedJuryCompanyTests(db) {
     due.setDate(due.getDate() + 3);
     db.prepare(
       `INSERT INTO employer_test_assignments (id, test_id, candidate_user_id, invitation_id, status, due_at, started_at, submitted_at)
-       VALUES (?, ?, ?, NULL, 'submitted', ?, datetime('now'), datetime('now'))`
-    ).run(assignId, testId, cid, due.toISOString());
+       VALUES (?, ?, ?, ?, 'submitted', ?, datetime('now'), datetime('now'))`
+    ).run(assignId, testId, cid, inv.id, due.toISOString());
 
     const items = db
       .prepare("SELECT * FROM employer_test_items WHERE test_id = ? ORDER BY position")
@@ -173,4 +227,4 @@ if (require.main === module) {
   console.log(JSON.stringify(result, null, 2));
 }
 
-module.exports = { seedJuryCompanyTests, JURY_EMPLOYER };
+module.exports = { seedJuryCompanyTests, JURY_EMPLOYER, needTitleForSpec };

@@ -99,7 +99,7 @@
                 : "";
             const assignTestBtn =
               i.status === "accepted" && !i.companyTestAssignmentId
-                ? `<button type="button" class="btn-ghost btn-sm" data-assign-test data-candidate-id="${esc(i.candidateId)}" data-need-title="${esc(i.needTitle)}">Назначить тест</button>`
+                ? `<button type="button" class="btn-ghost btn-sm" data-assign-test data-candidate-id="${esc(i.candidateId)}" data-need-id="${esc(i.needId)}" data-need-title="${esc(i.needTitle)}">Назначить тест</button>`
                 : "";
             return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
               <div class="invite-card-top">
@@ -139,18 +139,20 @@
               it.choiceMark === "ok"
                 ? '<span class="status-pill accepted">✓</span>'
                 : it.choiceMark === "bad"
-                  ? '<span class="status-pill declined">✗</span>'
-                  : "";
+                  ? `<span class="status-pill declined">✗${it.timedOut ? ' <span class="invite-meta">время вышло</span>' : ""}</span>`
+                  : it.timedOut
+                    ? '<span class="invite-meta">время вышло</span>'
+                    : "";
             const chips = (it.keywordHits || [])
               .map((k) => `<span class="chip chip-skill">${esc(k)}</span>`)
               .join("");
-            const paste = it.pasteInputMark
-              ? `<span class="chip chip-paste-indicator">${esc(it.pasteInputMark.label)}</span>`
-              : "";
+            const paste = it.pasteInputMark ? HandCheck.renderPasteInputMark(it.pasteInputMark) : "";
+            const choiceText = (it.choiceLabels && it.choiceLabels.length
+              ? it.choiceLabels
+              : it.choiceIds || []
+            ).join(", ");
             const answer =
-              it.kind === "single" || it.kind === "multi"
-                ? esc((it.choiceIds || []).join(", "))
-                : esc(it.answerText || "");
+              it.kind === "single" || it.kind === "multi" ? esc(choiceText) : esc(it.answerText || "");
             return `<article class="employer-test-preview-card"><p><strong>${esc(it.prompt)}</strong> ${mark}</p>
               <p class="invite-meta">${answer}</p>
               <div class="chip-row">${chips}${paste}</div></article>`;
@@ -160,13 +162,28 @@
 
       async function assignTestToCandidate(btn) {
         const candidateId = btn.dataset.candidateId;
-        const testsRes = await HandCheck.api("/api/employer/tests?status=published");
+        const needId = btn.dataset.needId || "";
+        const qs = needId
+          ? `?status=published&needId=${encodeURIComponent(needId)}`
+          : "?status=published";
+        const testsRes = await HandCheck.api(`/api/employer/tests${qs}`);
         const tests = (testsRes.groups || []).flatMap((g) => g.tests || []);
         if (!tests.length) {
-          HandCheck.toast("Нет опубликованных тестов", "error");
+          HandCheck.toast("Нет опубликованных тестов для этой потребности", "error");
           return;
         }
-        const testId = tests[0].id;
+        let testId = tests[0].id;
+        if (tests.length > 1) {
+          const lines = tests.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
+          const raw = window.prompt(`Выберите тест (номер):\n${lines}`, "1");
+          if (raw === null) return;
+          const idx = Number.parseInt(String(raw).trim(), 10) - 1;
+          if (!Number.isInteger(idx) || idx < 0 || idx >= tests.length) {
+            HandCheck.toast("Некорректный номер теста", "error");
+            return;
+          }
+          testId = tests[idx].id;
+        }
         await HandCheck.api(`/api/employer/tests/${testId}/assign`, {
           method: "POST",
           body: JSON.stringify({ candidateId }),

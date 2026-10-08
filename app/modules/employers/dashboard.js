@@ -4,6 +4,9 @@ const { getDb } = require("../../db");
 const { loadCandidatesForNeed } = require("../matching/pool");
 const { loadOpenBank } = require("../matching/open-bank");
 const { dbDateToIso } = require("../../lib/db-datetime");
+const { formatSpecGradeLabel } = require("../../lib/spec-grade-label");
+const { invitationStatusLabel } = require("../../lib/invitation-status");
+const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
 
 function poolGroupCounts(items, need) {
   let exact = 0;
@@ -70,7 +73,7 @@ function buildInvitationFunnel(db, employerUserId) {
   });
   const totalOut = funnel.sent + funnel.viewed + funnel.accepted + funnel.declined;
   const acceptanceShare =
-    totalOut > 0 ? Math.round((funnel.accepted / totalOut) * 100) : 0;
+    totalOut > 0 ? Math.round((funnel.accepted / totalOut) * 100) : null;
   return {
     ...funnel,
     acceptanceShare,
@@ -78,21 +81,26 @@ function buildInvitationFunnel(db, employerUserId) {
   };
 }
 
-function buildBankComposition(db) {
-  return db
-    .prepare(
-      `SELECT cc.specialization AS spec, cc.grade AS grade, COUNT(*) AS c
-       FROM candidate_categories cc
-       JOIN candidate_profiles cp ON cp.user_id = cc.candidate_user_id
-       JOIN candidate_private priv ON priv.candidate_user_id = cc.candidate_user_id
-       JOIN users u ON u.id = cc.candidate_user_id
-       WHERE cp.availability = 'open' AND priv.trust_ok = 1
-         AND u.email_confirmed_at IS NOT NULL
-       GROUP BY cc.specialization, cc.grade
-       ORDER BY c DESC`
-    )
-    .all()
-    .map((r) => ({ spec: r.spec, grade: r.grade, count: r.c }));
+function buildBankComposition(employerUserId) {
+  const tallies = new Map();
+  for (const row of loadOpenBank(employerUserId)) {
+    const spec = row.specialization;
+    const grade = row.grade || row.confirmedGrade;
+    if (!spec || !grade) continue;
+    const key = `${spec}\0${grade}`;
+    tallies.set(key, (tallies.get(key) || 0) + 1);
+  }
+  return [...tallies.entries()]
+    .map(([key, count]) => {
+      const [spec, grade] = key.split("\0");
+      return {
+        spec,
+        grade,
+        label: formatSpecGradeLabel(spec, grade),
+        count,
+      };
+    })
+    .sort((a, b) => b.count - a.count);
 }
 
 function buildEvents(db, employerUserId) {
@@ -111,8 +119,8 @@ function buildEvents(db, employerUserId) {
     events.push({
       at: dbDateToIso(r.created_at),
       kind: "invitation",
-      label: `Приглашение · ${r.status}`,
-      name: r.display_name || r.email,
+      label: `Приглашение · ${invitationStatusLabel(r.status)}`,
+      name: publicCandidateDisplayName(r.display_name, r.email),
     });
   }
   const calls = db
@@ -141,9 +149,10 @@ function buildNextActions(db, employerUserId) {
   const actions = [];
   const stale = db
     .prepare(
-      `SELECT i.id, cp.display_name, i.created_at
+      `SELECT i.id, cp.display_name, u.email, i.created_at
        FROM invitations i
        JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       JOIN users u ON u.id = i.candidate_user_id
        WHERE i.employer_user_id = ?
          AND i.status IN ('sent', 'viewed')
          AND datetime(i.created_at) < datetime('now', '-3 days')
@@ -153,7 +162,7 @@ function buildNextActions(db, employerUserId) {
   for (const r of stale) {
     actions.push({
       type: "stale_invite",
-      label: `Нет ответа на приглашение · ${r.display_name}`,
+      label: `Нет ответа на приглашение · ${publicCandidateDisplayName(r.display_name, r.email)}`,
       href: "/employer/invitations",
     });
   }
@@ -176,9 +185,10 @@ function buildNextActions(db, employerUserId) {
   }
   const deferred = db
     .prepare(
-      `SELECT nr.candidate_user_id, cp.display_name, n.id AS need_id
+      `SELECT nr.candidate_user_id, cp.display_name, u.email, n.id AS need_id
        FROM need_reviews nr
        JOIN candidate_profiles cp ON cp.user_id = nr.candidate_user_id
+       JOIN users u ON u.id = nr.candidate_user_id
        JOIN employer_needs n ON n.id = nr.need_id
        WHERE nr.employer_user_id = ? AND nr.decision = 'later'
        ORDER BY nr.updated_at DESC LIMIT 5`
@@ -187,7 +197,7 @@ function buildNextActions(db, employerUserId) {
   for (const r of deferred) {
     actions.push({
       type: "deferred",
-      label: `Отложенный кандидат · ${r.display_name}`,
+      label: `Отложенный кандидат · ${publicCandidateDisplayName(r.display_name, r.email)}`,
       href: `/employer/candidates?need=${r.need_id}&status=later`,
     });
   }
@@ -250,7 +260,7 @@ function buildEmployerDashboard(employerUserId) {
     funnel,
     calls: callCounts,
     needs: needSummaries,
-    bankComposition: buildBankComposition(db),
+    bankComposition: buildBankComposition(employerUserId),
     events: buildEvents(db, employerUserId),
     nextActions: buildNextActions(db, employerUserId),
   };

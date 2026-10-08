@@ -2334,6 +2334,133 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
   }
   );
 
+  it("round81: drawer invite sheet stacks above drawer and submits at 1280", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    const needId = await page.evaluate(async () => {
+      const r = await HandCheck.api("/api/employer/needs");
+      return r.items?.[0]?.id || "";
+    });
+    assert.ok(needId, "employer need required");
+    await page.goto(`${BASE}/employer/candidates?need=${needId}`, {
+      waitUntil: "networkidle",
+      timeout: 60000,
+    });
+    await page.waitForSelector(".candidates-table tbody tr", { timeout: 30000 });
+    await page.locator(".candidates-row").first().click();
+    await page.waitForSelector(".candidates-drawer.open", { timeout: 10000 });
+    await page.click("[data-invite-drawer]");
+    await page.waitForSelector("#sheet:not(.hidden)", { timeout: 10000 });
+    const z = await page.evaluate(() => ({
+      sheet: Number.parseInt(getComputedStyle(document.getElementById("sheet")).zIndex, 10),
+      drawer: Number.parseInt(getComputedStyle(document.getElementById("detail-drawer")).zIndex, 10),
+    }));
+    assert.ok(z.sheet > z.drawer, `sheet z-index ${z.sheet} vs drawer ${z.drawer}`);
+    await page.fill("#salary-from", "210000");
+    await page.fill("#salary-to", "290000");
+    await page.fill("#offer-text", "Round81 browser invite");
+    await page.fill("#contact-channel", "email");
+    const [resp] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes("/api/employer/invitations") && r.request().method() === "POST",
+        { timeout: 30000 }
+      ),
+      page.click("#invite-send"),
+    ]);
+    assert.ok(resp.ok(), `invite POST status ${resp.status()}`);
+    await context.close();
+  });
+
+  it("round81: candidates table has no inner horizontal scroll at 1280 and 1440", async () => {
+    for (const width of [1280, 1440]) {
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await context.newPage();
+      await login(page, "cafe@demo.local");
+      await page.goto(`${BASE}/employer/candidates`, { waitUntil: "networkidle", timeout: 60000 });
+      await page.waitForSelector(".candidates-table-wrap", { timeout: 30000 });
+      const metrics = await page.evaluate(() => {
+        const wrap = document.querySelector(".candidates-table-wrap");
+        const btn = document.querySelector(".candidates-table [data-invite]");
+        const wrapOk = wrap ? wrap.scrollWidth <= wrap.clientWidth + 1 : true;
+        const btnOk = btn
+          ? btn.getBoundingClientRect().right <= window.innerWidth && btn.getBoundingClientRect().width > 0
+          : false;
+        return { wrapOk, btnOk };
+      });
+      assert.equal(metrics.wrapOk, true, `table wrap overflow at ${width}px`);
+      assert.equal(metrics.btnOk, true, `invite column not visible at ${width}px`);
+      await context.close();
+    }
+  });
+
+  it("round81: company test choice controls stay inline at 390", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await login(page, "anna@demo.local");
+    await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "networkidle", timeout: 60000 });
+    const startBtn = page.locator('button[data-company-test-action="assigned"]').first();
+    if ((await startBtn.count()) === 0) {
+      await context.close();
+      return;
+    }
+    await startBtn.click();
+    await page.waitForSelector('input[name="ct-choice"]', { timeout: 30000 });
+    const layout = await page.evaluate(() => {
+      const input = document.querySelector('input[name="ct-choice"]');
+      const label = input?.closest("label");
+      if (!input || !label) return null;
+      const ir = input.getBoundingClientRect();
+      const lr = label.getBoundingClientRect();
+      return {
+        display: getComputedStyle(label).display,
+        inputWidth: ir.width,
+        inlineRow: ir.top < lr.bottom - 2 && ir.width < 48,
+      };
+    });
+    assert.ok(layout, "choice label missing");
+    assert.ok(layout.inlineRow, JSON.stringify(layout));
+    assert.ok(layout.inputWidth < 48, `radio width ${layout.inputWidth}`);
+    await context.close();
+  });
+
+  it("round81: mobile tab bar fixed and candidates search sticky at 390", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/overview`, { waitUntil: "networkidle", timeout: 60000 });
+    await page.waitForSelector("#kpi-host .stat-tile-grid-compact", { timeout: 30000 });
+    const kpiGrid = await page.evaluate(() => {
+      const grid = document.querySelector("#kpi-host .stat-tile-grid-compact");
+      if (!grid) return null;
+      return getComputedStyle(grid).gridTemplateColumns;
+    });
+    const kpiCols = kpiGrid ? kpiGrid.split(" ").filter(Boolean).length : 0;
+    assert.equal(kpiCols, 2, `expected 2-column KPI grid, got ${kpiGrid}`);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const tabs = await page.evaluate(() => {
+      const el = document.getElementById("cabinet-tabs");
+      if (!el) return null;
+      const s = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return { position: s.position, bottom: r.bottom, vh: window.innerHeight };
+    });
+    assert.equal(tabs?.position, "fixed");
+    assert.ok(tabs.bottom <= tabs.vh + 2, `tabs bottom ${tabs.bottom} vs vh ${tabs.vh}`);
+    await page.goto(`${BASE}/employer/candidates`, { waitUntil: "networkidle", timeout: 60000 });
+    const sticky = await page.evaluate(() => {
+      const el = document.getElementById("candidates-sticky");
+      if (!el) return null;
+      const top0 = el.getBoundingClientRect().top;
+      window.scrollBy(0, 500);
+      const top1 = el.getBoundingClientRect().top;
+      return { top0, top1, position: getComputedStyle(el).position };
+    });
+    assert.equal(sticky?.position, "sticky");
+    assert.ok(sticky.top1 <= sticky.top0 + 2, `sticky moved ${sticky.top0} -> ${sticky.top1}`);
+    await context.close();
+  });
+
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

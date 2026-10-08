@@ -34,4 +34,33 @@ describe("GET /api/employer/dashboard", () => {
     assert.ok(res.body.funnel);
     assert.equal(res.body.test_score, undefined);
   });
+
+  it("activity uses Russian invitation statuses", async () => {
+    const agent = request.agent(app);
+    await agent
+      .post("/api/auth/login")
+      .send({ email: "cafe@demo.local", password: "demo-demo-demo" });
+    const res = await agent.get("/api/employer/dashboard");
+    assert.equal(res.status, 200);
+    for (const ev of res.body.events || []) {
+      if (ev.kind === "invitation") {
+        assert.ok(!/\b(sent|viewed|accepted|declined)\b/.test(ev.label));
+      }
+    }
+  });
+
+  it("bank composition labels are titled spec × grade", async () => {
+    const agent = request.agent(app);
+    await agent
+      .post("/api/auth/login")
+      .send({ email: "cafe@demo.local", password: "demo-demo-demo" });
+    const res = await agent.get("/api/employer/dashboard");
+    for (const row of res.body.bankComposition || []) {
+      if (row.label) {
+        assert.match(row.label, /×/);
+        assert.match(row.label, /^[A-Z]/, `expected titled label, got ${row.label}`);
+        assert.ok(!/^backend × middle$/.test(row.label));
+      }
+    }
+  });
 });

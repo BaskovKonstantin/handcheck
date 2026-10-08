@@ -809,7 +809,7 @@ textarea:focus {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 20;
+  z-index: 60;
   animation: backdrop-in var(--dur-fast) var(--ease-out) both;
 }
 
@@ -3626,7 +3626,7 @@ body.has-cabinet-chrome {
 
 @media (max-width: 599px) {
   .stat-tile-grid-compact {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
   }
 
@@ -3836,10 +3836,6 @@ textarea {
   z-index: 1;
 }
 
-.cabinet-tabs {
-  position: relative;
-}
-
 .cabinet-tabs-indicator {
   position: absolute;
   left: 0;
@@ -3920,7 +3916,12 @@ textarea {
 
 .candidates-layout {
   max-width: 100%;
-  overflow-x: hidden;
+}
+
+@media (min-width: 900px) {
+  body.candidates-page.has-cabinet-chrome main.column.cabinet-content.candidates-layout {
+    max-width: none;
+  }
 }
 
 .candidates-sticky {
@@ -4036,12 +4037,175 @@ textarea {
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
   background: var(--card);
+  max-width: 100%;
+}
+
+@media (min-width: 900px) {
+  .candidates-table-wrap {
+    overflow-x: hidden;
+  }
 }
 
 .candidates-table {
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
   font-size: 0.88rem;
+}
+
+@media (min-width: 900px) and (max-width: 1599px) {
+  .candidates-table .col-category,
+  .candidates-table .col-stack,
+  .candidates-table .col-domain,
+  .candidates-table .col-fsp,
+  .candidates-table .col-optional,
+  .candidates-table .col-assigned {
+    display: none;
+  }
+
+  .candidates-table th,
+  .candidates-table td {
+    padding: 0.4rem 0.4rem;
+    font-size: 0.82rem;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1439px) {
+  .candidates-body {
+    grid-template-columns: 1fr;
+  }
+
+  .candidates-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.65rem;
+  }
+}
+
+.candidates-table .col-status,
+.candidates-table .col-invite,
+.candidates-table .candidates-col-actions {
+  width: 6.5rem;
+  white-space: nowrap;
+}
+
+.candidates-table td:nth-child(2) {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.candidates-table .chip-row-skills {
+  max-height: 2.6rem;
+  overflow: hidden;
+}
+
+.candidates-col-check {
+  width: 2rem;
+}
+
+.candidates-col-check input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.candidates-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.candidates-card-head input[type="checkbox"] {
+  width: auto;
+  flex-shrink: 0;
+  margin: 0.15rem 0 0;
+}
+
+label.choice-option {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: auto;
+  margin-bottom: 0.45rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+label.choice-option input[type="radio"],
+label.choice-option input[type="checkbox"] {
+  width: auto;
+  flex-shrink: 0;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+
+.company-test-choice-list label {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-bottom: 0.45rem;
+  color: var(--ink);
+}
+
+.company-test-choice-list input[type="radio"],
+.company-test-choice-list input[type="checkbox"] {
+  width: auto;
+  flex-shrink: 0;
+  margin: 0.2rem 0 0;
+}
+
+.employer-test-preview-choices label,
+.employer-test-opt-correct {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  margin-bottom: 0;
+}
+
+.employer-test-preview-choices input[type="radio"],
+.employer-test-preview-choices input[type="checkbox"],
+.employer-test-opt-correct input[type="radio"],
+.employer-test-opt-correct input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+.grade-relation-bar {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--line) 42%, var(--paper));
+}
+
+.grade-relation-bar > span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  transition: width var(--dur) var(--ease-spring);
+}
+
+.grade-bar-exact {
+  background: var(--clay);
+}
+
+.grade-bar-other {
+  background: var(--accent, #7c3aed);
+}
+
+.grade-bar-unconfirmed {
+  background: color-mix(in srgb, var(--muted) 55%, var(--line));
+}
+
+@media (min-width: 900px) {
+  .cabinet-tabs {
+    position: relative;
+  }
 }
 
 .candidates-table th,

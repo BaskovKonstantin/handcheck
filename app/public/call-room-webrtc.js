@@ -20,6 +20,35 @@
   const CHUNK_UPLOAD_MS = 3_000;
   /** Chromium keepalive fetch body limit (~64 KB). */
   const KEEPALIVE_BODY_LIMIT = 60 * 1024;
+  const FINALIZE_RETRY_STATUSES = new Set([502, 503, 504]);
+  const FINALIZE_MAX_ATTEMPTS = 5;
+  const FINALIZE_RETRY_BASE_MS = 600;
+  const FINALIZE_RETRY_MAX_MS = 8_000;
+
+  function shouldAttachFinalizeTail(attemptIndex, tailSize, tailSentOnPriorAttempt) {
+    if (!tailSize) return false;
+    if (attemptIndex === 0) return true;
+    return !tailSentOnPriorAttempt;
+  }
+
+  function finalizeRetryDelayMs(attemptIndex) {
+    const exp = Math.min(
+      FINALIZE_RETRY_BASE_MS * 2 ** Math.max(0, attemptIndex - 1),
+      FINALIZE_RETRY_MAX_MS
+    );
+    return exp;
+  }
+
+  function finalizeNeedsTailAgain(status, body, tailSentOnPriorAttempt) {
+    if (!tailSentOnPriorAttempt) return false;
+    if (status !== 400) return false;
+    const code = body?.error;
+    return code === "file_required" || code === "invalid_recording";
+  }
+
+  function sleepMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
   function wsUrl(callId) {
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
     return `${proto}//${location.host}/ws/calls/${callId}`;
@@ -549,17 +578,44 @@
         const mime = pickRecorderMime() || "video/webm";
         const tail = chunkQueue ? chunkQueue.drainRemainingBlobs(mime) : null;
         const durationMs = liveDurationMs();
-      const form = new FormData();
-      if (tail?.size) {
-        form.append("file", tail, "recording.webm");
-      }
-      form.append("durationMs", String(durationMs));
-      const bodySize = tail?.size || 0;
-      const res = await postMultipart(`/api/calls/${callId}/recording`, form, bodySize, {
-        keepalive: false,
-      });
-        if (!res.ok) {
+        const tailSize = tail?.size || 0;
+        let tailSentOnPriorAttempt = false;
+        let forceTailAgain = false;
+        let lastErr = null;
+        for (let attempt = 0; attempt < FINALIZE_MAX_ATTEMPTS; attempt += 1) {
+          if (attempt > 0) {
+            await sleepMs(finalizeRetryDelayMs(attempt));
+          }
+          const attachTail =
+            tailSize > 0 &&
+            (forceTailAgain || shouldAttachFinalizeTail(attempt, tailSize, tailSentOnPriorAttempt));
+          const form = new FormData();
+          if (attachTail) {
+            form.append("file", tail, "recording.webm");
+          }
+          form.append("durationMs", String(durationMs));
+          const bodySize = attachTail ? tailSize : 0;
+          let res;
+          try {
+            res = await postMultipart(`/api/calls/${callId}/recording`, form, bodySize, {
+              keepalive: false,
+            });
+          } catch (err) {
+            lastErr = err;
+            if (attempt < FINALIZE_MAX_ATTEMPTS - 1) continue;
+            break;
+          }
+          if (res.ok) return;
           const err = await res.json().catch(() => ({}));
+          lastErr = err;
+          if (attachTail) tailSentOnPriorAttempt = true;
+          if (finalizeNeedsTailAgain(res.status, err, tailSentOnPriorAttempt)) {
+            forceTailAgain = true;
+            if (attempt < FINALIZE_MAX_ATTEMPTS - 1) continue;
+          }
+          if (FINALIZE_RETRY_STATUSES.has(res.status) && attempt < FINALIZE_MAX_ATTEMPTS - 1) {
+            continue;
+          }
           const code = err?.error || `recording_upload_${res.status}`;
           const message =
             res.status === 413
@@ -568,6 +624,10 @@
           if (typeof onUploadError === "function") onUploadError(message);
           throw new Error(code);
         }
+        if (typeof onUploadError === "function") {
+          onUploadError("Не удалось сохранить запись");
+        }
+        throw lastErr || new Error("recording_upload_failed");
       };
       uploadRecordingLock = uploadRecordingLock.then(run, run);
       return uploadRecordingLock;
@@ -673,6 +733,10 @@
     RECORDING_LIMIT_BYTES,
     RECORDING_TARGET_SECONDS,
     KEEPALIVE_BODY_LIMIT,
+    shouldAttachFinalizeTail,
+    finalizeRetryDelayMs,
+    finalizeNeedsTailAgain,
+    FINALIZE_MAX_ATTEMPTS,
     _WS_SIGNAL: WS_SIGNAL,
   };
 })(window);

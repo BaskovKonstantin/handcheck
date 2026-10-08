@@ -17,6 +17,14 @@
 - Decline clears `pending_employer_test_id`.
 - Tests: `test/round93-pending-company-test.test.js`.
 
+## 2026-10-08 — round 106 recording finalize 502 / keep-alive
+
+- Branch: `cursor/recording-finalize-keepalive-761a`
+- Root cause: Node default `keepAliveTimeout` 5s + sync ffmpeg merge blocking event loop → Caddy pooled connection EOF mid `POST /recording`.
+- Server: `keepAliveTimeout` 65s / `headersTimeout` 66s; `finalizeOrphanChunkSides` after `end` response; idempotent `writeFinalRecording` + chunk cleanup; duration-only finalize when playable file exists.
+- Client: finalize retries on 502/503/504/network; tail once then duration-only; `recording-finalize-retry.js` policy module.
+- Tests: `test/round106-recording-finalize.test.js`.
+
 ## 2026-10-08 — round 94 queued test invite UI
 
 - Branch: `cursor/queued-test-invite-ui-3f12`

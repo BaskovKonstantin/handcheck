@@ -121,26 +121,55 @@ function totalChunkBytes(callId, side) {
   return listChunkFiles(callId, side).reduce((sum, p) => sum + fs.statSync(p).size, 0);
 }
 
+function clearChunkFiles(callId, side) {
+  for (const chunkPath of listChunkFiles(callId, side)) {
+    try {
+      fs.unlinkSync(chunkPath);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 function mergeChunksToFinal(callId, side, tailBuffer, durationMs) {
+  const finalPath = path.join(callDir(callId), `${side}.webm`);
+  const hasTail = Boolean(tailBuffer?.length);
+  if (!hasTail && isPlayableRecordingFile(finalPath)) {
+    return finalPath;
+  }
   const parts = listChunkFiles(callId, side).map((p) => fs.readFileSync(p));
   if (tailBuffer?.length) parts.push(tailBuffer);
-  if (!parts.length) return null;
+  if (!parts.length) {
+    if (isPlayableRecordingFile(finalPath)) return finalPath;
+    return null;
+  }
   const merged = finalizeMergedWebm(parts, durationMs);
   if (!merged) return null;
-  const finalPath = path.join(callDir(callId), `${side}.webm`);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
   if (merged.length < MIN_PLAYABLE_RECORDING_BYTES) return null;
   fs.writeFileSync(finalPath, merged);
+  clearChunkFiles(callId, side);
   return finalPath;
 }
 
 function writeFinalRecording(callId, side, buffer, durationMs) {
-  const parts = listChunkFiles(callId, side).map((p) => fs.readFileSync(p));
+  const finalPath = path.join(callDir(callId), `${side}.webm`);
+  const hasTail = Boolean(buffer?.length);
+  if (!hasTail && isPlayableRecordingFile(finalPath)) {
+    return finalPath;
+  }
+  const chunkPaths = listChunkFiles(callId, side);
+  if (hasTail && isPlayableRecordingFile(finalPath) && chunkPaths.length === 0) {
+    return finalPath;
+  }
+  const parts = chunkPaths.map((p) => fs.readFileSync(p));
   if (buffer?.length) parts.push(buffer);
-  if (!parts.length) return null;
+  if (!parts.length) {
+    if (isPlayableRecordingFile(finalPath)) return finalPath;
+    return null;
+  }
   const merged = finalizeMergedWebm(parts, durationMs);
   if (!merged) return null;
-  const finalPath = path.join(callDir(callId), `${side}.webm`);
   fs.mkdirSync(path.dirname(finalPath), { recursive: true });
   if (merged.length < MIN_PLAYABLE_RECORDING_BYTES) {
     if (fs.existsSync(finalPath) && !isPlayableRecordingFile(finalPath)) {
@@ -153,6 +182,7 @@ function writeFinalRecording(callId, side, buffer, durationMs) {
     return null;
   }
   fs.writeFileSync(finalPath, merged);
+  clearChunkFiles(callId, side);
   return finalPath;
 }
 

@@ -27,9 +27,9 @@
 ## Tasks
 
 - [x] Spec written (`docs/superpowers/specs/2026-10-08-opencode-zen-llm-design.md`)
-- [ ] Config + llm-client + employer-test-llm
-- [ ] Call analyze LLM path
-- [ ] UI error toast
-- [ ] Tests
-- [ ] Server `.env` from host secrets (no commit)
-- [ ] Commit
+- [x] Config + llm-client + employer-test-llm
+- [x] Call analyze LLM path
+- [x] UI error toast
+- [x] Tests (`test/opencode-zen-llm.test.js` 5/5)
+- [x] Server `.env` from host secrets (no commit)
+- [x] Commit `0036f92` (local docker rebuilt; push for CI if needed)

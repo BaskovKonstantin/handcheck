@@ -133,8 +133,8 @@
           steps.push({
             tone: "muted",
             title: "Пересдача теста",
-            meta: retakeDate ? `Следующая попытка с ${retakeDate} (Москва)` : "Срок ожидания ещё не истёк",
-            cta: `<button class="btn-improve-locked btn-sm" type="button" disabled><span class="btn-lock" aria-hidden="true">🔒</span> Пересдача с ${retakeDate || "…"}</button>`,
+            meta: "Между попытками — 30 дней (Москва).",
+            cta: "",
           });
         } else if (!onCooldown) {
           steps.push({

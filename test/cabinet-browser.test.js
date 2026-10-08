@@ -2528,6 +2528,81 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await page.close();
   });
 
+  it("round95: compact stat tiles use three columns at 390 when count is three", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+
+    async function assertCompactThreeTileGrid(path) {
+      await page.goto(`${BASE}${path}`, { waitUntil: "commit", timeout: 30000 });
+      await page.waitForSelector(".stat-tile-grid-compact .stat-tile", { timeout: 30000 });
+      const layout = await page.evaluate(() => {
+        const grid = document.querySelector(".stat-tile-grid-compact");
+        const tiles = grid ? [...grid.querySelectorAll(":scope > .stat-tile")] : [];
+        const cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean) : [];
+        const labels = tiles.map((t) => {
+          const label = t.querySelector(".stat-tile-label");
+          const r = label?.getBoundingClientRect();
+          return {
+            text: label?.textContent?.trim() || "",
+            overflow: label ? label.scrollWidth > label.clientWidth + 1 : false,
+          };
+        });
+        return { colCount: cols.length, tileCount: tiles.length, labels };
+      });
+      assert.equal(layout.tileCount, 3, `${path} expected 3 stat tiles`);
+      assert.equal(layout.colCount, 3, `${path} expected 3-column grid, got ${layout.colCount}`);
+      for (const lb of layout.labels) {
+        assert.equal(lb.overflow, false, `${path} label overflow: ${lb.text}`);
+      }
+      await assertNoHorizontalScroll(page, `${path}@390`);
+    }
+
+    await login(page, "cafe@demo.local");
+    for (const path of ["/employer/calls", "/employer/invitations"]) {
+      await assertCompactThreeTileGrid(path);
+    }
+    await login(page, "anna@demo.local");
+    await assertCompactThreeTileGrid("/candidate/calls");
+    await context.close();
+  });
+
+  it("round95: candidate today shows retake date once on cooldown", async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
+    const Database = require("better-sqlite3");
+    const db = new Database(dbPath);
+    const boris = db.prepare("SELECT id FROM users WHERE email = 'boris@demo.local'").get();
+    const { newId } = require("../app/lib/ids");
+    const now = new Date().toISOString();
+    db.prepare("DELETE FROM batteries WHERE candidate_user_id = ?").run(boris.id);
+    db.prepare(
+      `INSERT INTO batteries (id, candidate_user_id, specialization, claimed_grade, form_key, started_at, completed_at)
+       VALUES (?, ?, 'backend', 'middle', 'demo', ?, ?)`
+    ).run(newId(), boris.id, now, now);
+    db.close();
+    await login(page, "boris@demo.local");
+    await page.goto(`${BASE}/candidate/today`, { waitUntil: "commit", timeout: 30000 });
+    await page.waitForSelector(".stat-tile-grid-today .btn-improve-locked", { timeout: 20000 });
+    const copy = await page.evaluate(() => {
+      const pill = document.querySelector(".stat-tile-grid-today .btn-improve-locked");
+      const timeline = document.querySelector(".timeline-section");
+      const pillText = pill?.textContent?.replace(/\s+/g, " ").trim() || "";
+      const timelineText = timeline?.textContent?.replace(/\s+/g, " ").trim() || "";
+      const dateMatches = (document.body.innerText.match(/Пересдача с/g) || []).length;
+      const nextAttemptMatches = (document.body.innerText.match(/Следующая попытка с/g) || []).length;
+      return { pillText, timelineText, dateMatches, nextAttemptMatches };
+    });
+    assert.match(copy.pillText, /Пересдача с/);
+    assert.ok(copy.timelineText.includes("30 дней"), copy.timelineText);
+    assert.ok(copy.timelineText.includes("Москва"), copy.timelineText);
+    assert.equal(copy.dateMatches, 1, "retake date pill should appear once");
+    assert.equal(copy.nextAttemptMatches, 0, "duplicate next-attempt line should be removed");
+    const timelinePills = await page.locator(".timeline-section .btn-improve-locked").count();
+    assert.equal(timelinePills, 0);
+    await context.close();
+  });
+
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

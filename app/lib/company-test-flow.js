@@ -9,9 +9,10 @@ const {
   assertEmployerOwnsTest,
   candidateHasConfirmedCategory,
   gradeChoiceAnswer,
-  keywordHits,
   mostlyPasted,
 } = require("../modules/employer-tests/service");
+const { keywordHits } = require("./russian-keyword-match");
+const { COMPANY_ITEM_GRACE_MS, isItemExpired } = require("./company-test-timing");
 
 const DEFAULT_DUE_DAYS = 3;
 
@@ -40,11 +41,22 @@ function resolveInvitationForAssignment(db, employerUserId, candidateId, test, i
   const inferred = db
     .prepare(
       `SELECT id FROM invitations
-       WHERE employer_user_id = ? AND candidate_user_id = ? AND need_id = ? AND status = 'accepted'
+       WHERE employer_user_id = ? AND candidate_user_id = ? AND need_id = ?
+         AND status IN ('sent', 'viewed', 'accepted')
        ORDER BY created_at DESC LIMIT 1`
     )
     .get(employerUserId, candidateId, test.need_id);
   return inferred?.id || null;
+}
+
+function findSubmittedAssignmentForTest(db, testId, candidateId) {
+  return db
+    .prepare(
+      `SELECT id FROM employer_test_assignments
+       WHERE test_id = ? AND candidate_user_id = ? AND status = 'submitted'
+       LIMIT 1`
+    )
+    .get(testId, candidateId);
 }
 
 function findOpenAssignmentForTest(db, testId, candidateId) {
@@ -78,6 +90,14 @@ function assignCompanyTest(db, employerUserId, testId, { candidateId, invitation
       status: existing.status,
     });
   }
+  const submitted = findSubmittedAssignmentForTest(db, testId, candidateId);
+  if (submitted) {
+    throw httpError(409, "assignment_duplicate", {
+      message: "Этот тест кандидат уже прошёл",
+      assignmentId: submitted.id,
+      status: "submitted",
+    });
+  }
   const linkedInvitationId = resolveInvitationForAssignment(
     db,
     employerUserId,
@@ -85,6 +105,11 @@ function assignCompanyTest(db, employerUserId, testId, { candidateId, invitation
     test,
     invitationId
   );
+  if (!linkedInvitationId) {
+    throw httpError(409, "invitation_required", {
+      message: "Сначала отправьте приглашение кандидату по этой потребности",
+    });
+  }
   const due = dueAt ? String(dueAt) : defaultDueAtIso();
   const id = newId();
   db.prepare(
@@ -132,17 +157,6 @@ function assertAssignmentActive(db, assignment) {
     db.prepare("UPDATE employer_test_assignments SET status = 'expired' WHERE id = ?").run(assignment.id);
     throw httpError(409, "deadline_passed", { message: "Срок выполнения теста истёк" });
   }
-}
-
-function itemDeadlineMs(item, openedAt) {
-  if (!openedAt || !item.time_limit_sec) return null;
-  return new Date(openedAt).getTime() + item.time_limit_sec * 1000;
-}
-
-function isItemExpired(item, answerRow) {
-  if (!answerRow?.opened_at || answerRow.submitted_at) return false;
-  const deadline = itemDeadlineMs(item, answerRow.opened_at);
-  return Boolean(deadline && Date.now() > deadline);
 }
 
 function openCurrentItem(db, assignment, items) {
@@ -255,8 +269,20 @@ function submitItemAnswer(db, assignment, item, body) {
   }
 
   const expired = isItemExpired(item, answerRow);
+  if (expired) {
+    const pasteChars = Math.max(0, Number(body.pasteChars) || 0);
+    const typedChars = Math.max(0, Number(body.typedChars) || 0);
+    return finalizeItemAnswer(db, assignment, item, {
+      answerText: "",
+      choiceJson: "[]",
+      autoOk: null,
+      pasteChars,
+      typedChars,
+      timedOut: true,
+    });
+  }
   const parsed = parseAnswerPayload(item, body);
-  return finalizeItemAnswer(db, assignment, item, { ...parsed, timedOut: expired });
+  return finalizeItemAnswer(db, assignment, item, { ...parsed, timedOut: false });
 }
 
 function expireCurrentItemIfNeeded(db, assignment, items) {
@@ -377,6 +403,8 @@ module.exports = {
   assignCompanyTest,
   resolveInvitationForAssignment,
   findOpenAssignmentForTest,
+  findSubmittedAssignmentForTest,
+  COMPANY_ITEM_GRACE_MS,
   loadAssignmentForCandidate,
   loadAssignmentForEmployer,
   listItems,

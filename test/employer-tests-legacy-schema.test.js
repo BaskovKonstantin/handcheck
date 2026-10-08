@@ -58,8 +58,18 @@ describe("employer_test_answers opened_at patch (legacy #52 DB)", () => {
     });
     const testId = created.body.id;
     await agent.post(`/api/employer/tests/${testId}/publish`);
+    const cafeId = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get().id;
     const annaId = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get().id;
-    const assign = await agent.post(`/api/employer/tests/${testId}/assign`).send({ candidateId: annaId });
+    const { newId } = require("../app/lib/ids");
+    const invId = newId();
+    db.prepare(
+      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+       VALUES (?, ?, ?, ?, 100000, 150000, 'legacy', 'email', 'accepted')`
+    ).run(invId, cafeId, need.id, annaId);
+    const assign = await agent
+      .post(`/api/employer/tests/${testId}/assign`)
+      .send({ candidateId: annaId, invitationId: invId });
+    assert.equal(assign.status, 201);
     const anna = request.agent(app);
     await anna.post("/api/auth/login").send({ email: "anna@demo.local", password: "demo-demo-demo" });
     const start = await anna.post(`/api/candidate/company-tests/${assign.body.id}/start`).send({});

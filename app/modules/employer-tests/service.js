@@ -164,15 +164,7 @@ function gradeChoiceAnswer(kind, answerKey, choiceIds) {
   return null;
 }
 
-function keywordHits(text, keywords) {
-  const lower = String(text || "").toLowerCase();
-  const hits = [];
-  for (const kw of keywords || []) {
-    const k = String(kw).toLowerCase().trim();
-    if (k && lower.includes(k)) hits.push(kw);
-  }
-  return hits;
-}
+const { keywordHits } = require("../../lib/russian-keyword-match");
 
 function mostlyPasted(pasteChars, typedChars) {
   const p = Number(pasteChars) || 0;

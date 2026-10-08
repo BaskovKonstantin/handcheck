@@ -75,6 +75,13 @@ function reviewDecisionFor(db, employerUserId, needId, userId) {
     )
     .get(employerUserId, needId, userId);
   if (lastInv?.status === "declined") decision = "declined";
+  if (
+    !decision &&
+    lastInv &&
+    ["sent", "viewed", "accepted"].includes(lastInv.status)
+  ) {
+    decision = "invited";
+  }
   return decision || null;
 }
 

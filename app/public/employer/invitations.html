@@ -102,18 +102,34 @@
             const offer = i.offerText
               ? `<p class="invite-offer-text">${esc(i.offerText)}</p>`
               : "";
-            const testReview =
-              i.companyTestAssignmentId && i.companyTestAssignmentStatus === "submitted"
-                ? `<button type="button" class="btn-ghost btn-sm" data-review-test="${esc(i.companyTestAssignmentId)}">Ответы на тест</button>`
-                : "";
-            const assignStatus =
-              i.companyTestAssignmentId && i.companyTestAssignmentStatusLabel
-                ? `<span class="invite-meta">Тест: ${esc(i.companyTestAssignmentStatusLabel)}</span>`
-                : "";
+            const companyTests = i.companyTests || [];
+            const testReview = companyTests
+              .filter((ct) => ct.status === "submitted")
+              .map(
+                (ct) =>
+                  `<button type="button" class="btn-ghost btn-sm" data-review-test="${esc(ct.id)}">Ответы: ${esc(ct.title)}</button>`
+              )
+              .join(" ");
+            const assignStatus = companyTests
+              .map(
+                (ct) =>
+                  `<span class="invite-meta">Тест «${esc(ct.title)}»: ${esc(ct.statusLabel)}</span>`
+              )
+              .join(" ");
+            const assignedTestIds = companyTests
+              .filter((ct) => ["assigned", "started", "submitted"].includes(ct.status))
+              .map((ct) => ct.testId)
+              .join(",");
             const assignTestBtn =
-              i.status === "accepted" && !i.companyTestAssignmentId
-                ? `<button type="button" class="btn-ghost btn-sm" data-assign-test data-invitation-id="${esc(i.id)}" data-candidate-id="${esc(i.candidateId)}" data-need-id="${esc(i.needId)}" data-need-title="${esc(i.needTitle)}" data-candidate-name="${esc(i.candidateName)}">Назначить тест</button>`
+              i.status === "accepted" && i.hasAssignableCompanyTest
+                ? `<button type="button" class="btn-ghost btn-sm" data-assign-test data-invitation-id="${esc(i.id)}" data-candidate-id="${esc(i.candidateId)}" data-need-id="${esc(i.needId)}" data-need-title="${esc(i.needTitle)}" data-candidate-name="${esc(i.candidateName)}" data-assigned-test-ids="${esc(assignedTestIds)}">Назначить тест</button>`
                 : "";
+            const reviewPanels = companyTests
+              .map(
+                (ct) =>
+                  `<div class="employer-test-review-panel" id="review-${esc(ct.id)}" hidden></div>`
+              )
+              .join("");
             return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
               <div class="invite-card-top">
                 <h3>${esc(i.candidateName)}</h3>
@@ -126,8 +142,9 @@
               ${channel}
               ${priorDecline}
               ${contacts}
-              <div class="invite-actions">${call} ${testReview} ${assignTestBtn} ${assignStatus}</div>
-              <div class="employer-test-review-panel" id="review-${esc(i.companyTestAssignmentId || "")}" hidden></div>
+              <div class="invite-actions">${call} ${testReview} ${assignTestBtn}</div>
+              ${assignStatus ? `<div class="invite-meta-row">${assignStatus}</div>` : ""}
+              ${reviewPanels}
             </article>`;
           })
           .join("")}</div>`;
@@ -148,14 +165,16 @@
         const st = data.statusLabel ? ` · ${esc(data.statusLabel)}` : "";
         panel.innerHTML = `<h4 class="h4">Ответы: ${esc(data.testTitle)}${st}</h4>${(data.items || [])
           .map((it) => {
-            const mark =
+            const markCore =
               it.choiceMark === "ok"
                 ? '<span class="status-pill accepted">✓</span>'
                 : it.choiceMark === "bad"
-                  ? `<span class="status-pill declined">✗${it.timedOut ? ' <span class="invite-meta">время вышло</span>' : ""}</span>`
-                  : it.timedOut
-                    ? '<span class="invite-meta">время вышло</span>'
-                    : "";
+                  ? '<span class="status-pill declined">✗</span>'
+                  : "";
+            const timeoutNote = it.timedOut
+              ? '<span class="invite-meta">время вышло</span>'
+              : "";
+            const mark = [markCore, timeoutNote].filter(Boolean).join(" ");
             const chips = (it.keywordHits || [])
               .map((k) => `<span class="chip chip-skill">${esc(k)}</span>`)
               .join("");
@@ -188,7 +207,13 @@
           ? `?status=published&needId=${encodeURIComponent(needId)}`
           : "?status=published";
         const testsRes = await HandCheck.api(`/api/employer/tests${qs}`);
-        const tests = (testsRes.groups || []).flatMap((g) => g.tests || []);
+        const assignedRaw = btn.dataset.assignedTestIds || "";
+        const assignedSet = new Set(
+          assignedRaw.split(",").map((x) => x.trim()).filter(Boolean)
+        );
+        const tests = (testsRes.groups || [])
+          .flatMap((g) => g.tests || [])
+          .filter((t) => !assignedSet.has(t.id));
         if (!tests.length) {
           HandCheck.toast("Нет опубликованных тестов для этой потребности", "error");
           return;

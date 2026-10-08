@@ -71,9 +71,11 @@ function createInvitation(employerUserId, body, actionSource = "web") {
   assertCandidateInNeedPool(employerUserId, need, candidateId);
   const existing = findActiveInvitation(db, needId, candidateId);
   if (existing) {
-    throw httpError(409, "invitation_duplicate", {
-      message: "Приглашение по этой потребности уже отправлено — дождитесь ответа кандидата",
-    });
+    const message =
+      existing.status === "accepted"
+        ? "Кандидат уже принял приглашение по этой потребности — контакты в разделе «Приглашения»"
+        : "Приглашение по этой потребности уже отправлено — дождитесь ответа кандидата";
+    throw httpError(409, "invitation_duplicate", { message });
   }
   const id = newId();
   const src = actionSource === "mcp" ? "mcp" : "web";

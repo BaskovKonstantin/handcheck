@@ -183,6 +183,37 @@ function applyPatches(db) {
           AND i.status = 'accepted'
       );
   `);
+
+  const { newId } = require("../lib/ids");
+  const openInvites = db
+    .prepare(
+      `SELECT i.employer_user_id, i.need_id, i.candidate_user_id
+       FROM invitations i
+       WHERE i.status IN ('sent', 'viewed', 'accepted')`
+    )
+    .all();
+  const upsertInvitedReview = db.prepare(
+    `INSERT INTO need_reviews (id, employer_user_id, need_id, candidate_user_id, decision, updated_at)
+     VALUES (?, ?, ?, ?, 'invited', datetime('now'))
+     ON CONFLICT(employer_user_id, need_id, candidate_user_id) DO NOTHING`
+  );
+  for (const row of openInvites) {
+    const existing = db
+      .prepare(
+        `SELECT decision FROM need_reviews
+         WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?`
+      )
+      .get(row.employer_user_id, row.need_id, row.candidate_user_id);
+    if (existing && ["rejected", "later"].includes(existing.decision)) continue;
+    if (!existing) {
+      upsertInvitedReview.run(
+        newId(),
+        row.employer_user_id,
+        row.need_id,
+        row.candidate_user_id
+      );
+    }
+  }
 }
 
 module.exports = { applyPatches };

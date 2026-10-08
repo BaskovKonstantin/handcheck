@@ -14,23 +14,41 @@ const { companyTestStatusLabel } = require("../../lib/company-test-status");
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
 
-function findCompanyTestAssignment(db, invitationRow) {
-  let assignment = db
+function listCompanyTestAssignments(db, invitationRow) {
+  let rows = db
     .prepare(
-      `SELECT id, status FROM employer_test_assignments WHERE invitation_id = ? ORDER BY due_at DESC LIMIT 1`
+      `SELECT a.id, a.status, a.due_at, t.id AS test_id, t.title AS test_title
+       FROM employer_test_assignments a
+       JOIN employer_tests t ON t.id = a.test_id
+       WHERE a.invitation_id = ?
+       ORDER BY a.due_at ASC`
     )
-    .get(invitationRow.id);
-  if (!assignment) {
-    assignment = db
+    .all(invitationRow.id);
+  if (!rows.length) {
+    rows = db
       .prepare(
-        `SELECT a.id, a.status FROM employer_test_assignments a
+        `SELECT a.id, a.status, a.due_at, t.id AS test_id, t.title AS test_title
+         FROM employer_test_assignments a
          JOIN employer_tests t ON t.id = a.test_id
          WHERE a.candidate_user_id = ? AND t.need_id = ?
-         ORDER BY a.due_at DESC LIMIT 1`
+         ORDER BY a.due_at ASC`
       )
-      .get(invitationRow.candidate_user_id, invitationRow.need_id);
+      .all(invitationRow.candidate_user_id, invitationRow.need_id);
   }
-  return assignment;
+  return rows;
+}
+
+function hasAssignableCompanyTest(db, needId, assignments) {
+  const published = db
+    .prepare(`SELECT id FROM employer_tests WHERE need_id = ? AND status = 'published'`)
+    .all(needId);
+  const blocked = new Set();
+  for (const a of assignments) {
+    if (["assigned", "started", "submitted"].includes(a.status)) {
+      blocked.add(a.test_id);
+    }
+  }
+  return published.some((t) => !blocked.has(t.id));
 }
 
 router.post("/invitations", (req, res, next) => {
@@ -62,7 +80,16 @@ router.get("/invitations", (req, res) => {
     .all(req.user.id, req.user.id);
   res.json({
     items: rows.map((r) => {
-      const assignment = findCompanyTestAssignment(getDb(), r);
+      const db = getDb();
+      const assignments = listCompanyTestAssignments(db, r);
+      const assignment = assignments.length ? assignments[assignments.length - 1] : null;
+      const companyTests = assignments.map((a) => ({
+        id: a.id,
+        testId: a.test_id,
+        title: a.test_title,
+        status: a.status,
+        statusLabel: companyTestStatusLabel(a.status),
+      }));
       const item = {
         id: r.id,
         candidateId: r.candidate_user_id,
@@ -82,6 +109,8 @@ router.get("/invitations", (req, res) => {
         companyTestAssignmentStatusLabel: assignment?.status
           ? companyTestStatusLabel(assignment.status)
           : null,
+        companyTests,
+        hasAssignableCompanyTest: hasAssignableCompanyTest(db, r.need_id, assignments),
       };
       if (r.status === "accepted") {
         item.candidatePhone = r.phone;

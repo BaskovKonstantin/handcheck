@@ -8,29 +8,14 @@ const { loadOpenBank } = require("./open-bank");
 const { buildExplanation } = require("./explain");
 const { summarizeAiUsageForEmployer } = require("../../lib/ai-usage-summary");
 const { getEmployerPasteInputMark } = require("../../lib/employer-paste-indicator");
+const {
+  reviewStatusKey,
+  matchesEmployerReviewStatusFilter,
+} = require("../../lib/employer-review-status");
 
 const PAGE_SIZE = 30;
 
 const STATUS_ORDER = { invited: 0, later: 1, declined: 2, rejected: 3, new: 4 };
-
-function reviewStatusKey(decision) {
-  if (!decision) return "new";
-  if (decision === "invited") return "invited";
-  if (decision === "later") return "later";
-  if (decision === "declined") return "declined";
-  if (decision === "rejected") return "rejected";
-  return "new";
-}
-
-function matchesStatusFilter(item, statusFilter) {
-  if (!statusFilter) return true;
-  const key = reviewStatusKey(item.reviewDecision);
-  if (statusFilter === "new") return key === "new";
-  if (statusFilter === "later") return key === "later";
-  if (statusFilter === "invited") return key === "invited";
-  if (statusFilter === "rejected") return key === "rejected" || key === "declined";
-  return true;
-}
 
 function matchesDomainFilter(item, domainQ) {
   if (!domainQ) return true;
@@ -84,7 +69,7 @@ function applyCandidateFilters(items, filters, parsed) {
   }
   if (filters.fsp === "1") list = list.filter((c) => c.hasFsp);
   if (filters.fsp === "0") list = list.filter((c) => !c.hasFsp);
-  if (filters.status) list = list.filter((c) => matchesStatusFilter(c, filters.status));
+  if (filters.status) list = list.filter((c) => matchesEmployerReviewStatusFilter(c, filters.status));
   if (filters.domain) list = list.filter((c) => matchesDomainFilter(c, filters.domain));
   const leftover = (parsed && parsed.text) || filters.text || "";
   if (leftover) list = list.filter((c) => matchesFreeText(c, leftover));

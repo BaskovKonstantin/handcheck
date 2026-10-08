@@ -10,6 +10,13 @@
 
 ## 2026-10-07 — post-PR48 layout fixes
 
+## 2026-10-08 — round 89 UI polish
+
+- Branch: `cursor/ui-polish-round89-17a0`
+- Invitations: `companyTests[]` → rows (title + status pill + «Ответы»), no glued meta line.
+- CSS: `button`/`.btn-*` inherit Manrope; `.invite-company-tests` layout.
+- Candidates: `declined` → «Отказался», filter `status=declined` separate from `rejected`.
+
 ## 2026-10-07 — employer candidates + overview (PR #54 / #55)
 
 ### PR #54 — Кандидаты + Обзор

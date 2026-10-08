@@ -10,6 +10,7 @@
   <body class="login-gate-page">
     <div class="aw-bg" aria-hidden="true">
       <div class="aw-grid"></div>
+      <div class="aw-kenburns"></div>
       <div class="aw-aurora aw-aurora-a"></div>
       <div class="aw-aurora aw-aurora-b"></div>
       <div class="aw-grain"></div>
@@ -20,22 +21,26 @@
     </div>
 
     <main class="login-gate" aria-labelledby="login-title">
-      <a class="logo login-gate-logo" href="/" id="logo">HandCheck</a>
+      <a class="logo login-gate-logo aw-enter aw-enter-1" href="/" id="logo">HandCheck</a>
 
-      <p class="aw-pill">
-        <span class="aw-pill-dot" aria-hidden="true"></span>
+      <p class="aw-pill aw-enter aw-enter-2">
+        <span class="aw-pill-dot-wrap" aria-hidden="true">
+          <span class="aw-pill-dot"></span>
+          <span class="aw-pill-ping"></span>
+        </span>
         HANDCHECK · КАТЕГОРИЯ ПО НАВЫКУ
       </p>
 
       <h1 class="login-gate-title" id="login-title">
-        Тест, который <span class="aw-accent">считается.</span><br />
-        Приглашение с <span class="aw-accent">вилкой.</span>
+        <span class="aw-line"><span class="aw-line-inner aw-rise-1">Тест, который <span class="aw-accent">считается.</span></span></span>
+        <span class="aw-line"><span class="aw-line-inner aw-rise-2">Приглашение с <span class="aw-accent">вилкой.</span></span></span>
       </h1>
-      <p class="login-gate-lede">
+
+      <p class="login-gate-lede aw-enter aw-enter-3">
         Быстрый демо-вход в кабинет. Контакты скрыты до принятия приглашения.
       </p>
 
-      <div class="login-gate-quick" id="quick-wrap">
+      <div class="login-gate-quick aw-enter aw-enter-4" id="quick-wrap">
         <button type="button" class="aw-btn aw-btn-primary login-gate-btn" id="btn-employer">
           <span>Войти как работодатель</span>
           <span class="aw-btn-shine" aria-hidden="true"></span>
@@ -45,18 +50,22 @@
         </button>
       </div>
 
-      <details class="login-gate-manual">
+      <details class="login-gate-manual aw-enter aw-enter-5">
         <summary>Вход по email</summary>
         <div class="login-gate-panel">
           <label>Email <input type="email" id="email" autocomplete="username" /></label>
           <label>Пароль <input type="password" id="password" autocomplete="current-password" /></label>
           <p class="field-error" id="err" hidden></p>
-          <button class="aw-btn aw-btn-primary" type="button" id="btn-login">Войти</button>
+          <button class="aw-btn aw-btn-primary" type="button" id="btn-login">
+            <span>Войти</span>
+            <span class="aw-btn-shine" aria-hidden="true"></span>
+          </button>
         </div>
       </details>
 
       <p class="field-error" id="quick-err" hidden></p>
-      <p class="login-gate-footer">
+
+      <p class="login-gate-footer aw-enter aw-enter-6">
         <a href="/privacy">Уведомление по 152-ФЗ</a>
       </p>
     </main>

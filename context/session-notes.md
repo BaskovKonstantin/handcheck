@@ -1,5 +1,9 @@
 # Session notes
 
+## 2026-10-08 — AlphaWave animations on login
+
+- Ported keyframes: aurora-drift-a/b, grain-shift, ken-burns, hero-rise, hero-fade-up, hero-shine, shine-slide, marquee-x, ping (blue accents).
+
 ## 2026-10-08 — login gate (no landing) + AlphaWave blue skin
 
 - `/` = login only; `/auth` → `/` (register stays at `/auth?mode=register`).

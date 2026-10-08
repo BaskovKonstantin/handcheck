@@ -1219,7 +1219,7 @@ button.assign-test-option:hover {
   border-bottom: 4px solid var(--clay);
 }
 
-/* —— Login gate: AlphaWave-inspired dark + blue accent —— */
+/* —— Login gate: AlphaWave motions (gold→blue) —— */
 
 .login-gate-page {
   --aw-bg: #040405;
@@ -1232,6 +1232,7 @@ button.assign-test-option:hover {
   --aw-blue-deep: #2b6fd6;
   --aw-blue-glow: rgba(91, 157, 255, 0.45);
   --aw-blue-soft: rgba(91, 157, 255, 0.12);
+  --aw-ease: cubic-bezier(0.22, 1, 0.36, 1);
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -1262,39 +1263,50 @@ button.assign-test-option:hover {
   mask-image: radial-gradient(ellipse 75% 70% at 50% 40%, #000 35%, transparent 85%);
 }
 
+.aw-kenburns {
+  position: absolute;
+  inset: -8%;
+  background:
+    radial-gradient(ellipse 55% 45% at 30% 25%, rgba(91, 157, 255, 0.16), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 78% 70%, rgba(43, 111, 214, 0.12), transparent 72%);
+  animation: ken-burns 24s ease-in-out infinite alternate;
+  transform-origin: 40% 40%;
+}
+
 .aw-aurora {
   position: absolute;
   border-radius: 50%;
-  filter: blur(64px);
-  opacity: 0.55;
+  filter: blur(72px);
+  opacity: 0.62;
   will-change: transform;
+  mix-blend-mode: screen;
 }
 
 .aw-aurora-a {
-  width: min(58vw, 520px);
-  height: min(58vw, 520px);
-  left: 8%;
-  top: -8%;
-  background: radial-gradient(circle, rgba(91, 157, 255, 0.35), transparent 68%);
-  animation: aw-aurora-a 14s ease-in-out infinite;
+  width: min(70vw, 640px);
+  height: min(70vw, 640px);
+  left: -6%;
+  top: -14%;
+  background: radial-gradient(circle, rgba(91, 157, 255, 0.42), transparent 68%);
+  animation: aurora-drift-a 18s ease-in-out infinite;
 }
 
 .aw-aurora-b {
-  width: min(48vw, 420px);
-  height: min(48vw, 420px);
-  right: -4%;
-  bottom: 4%;
-  background: radial-gradient(circle, rgba(43, 111, 214, 0.28), transparent 70%);
-  animation: aw-aurora-b 18s ease-in-out infinite;
+  width: min(60vw, 520px);
+  height: min(60vw, 520px);
+  right: -10%;
+  bottom: -8%;
+  background: radial-gradient(circle, rgba(43, 111, 214, 0.34), transparent 70%);
+  animation: aurora-drift-b 22s ease-in-out infinite;
 }
 
 .aw-grain {
   position: absolute;
-  inset: -20%;
-  opacity: 0.07;
+  inset: -25%;
+  opacity: 0.085;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 180px 180px;
-  animation: aw-grain 8s steps(6) infinite;
+  animation: grain-shift 0.9s steps(4, end) infinite;
   mix-blend-mode: soft-light;
 }
 
@@ -1335,59 +1347,96 @@ button.assign-test-option:hover {
   border-right-width: 1px;
 }
 
-@keyframes aw-aurora-a {
+@keyframes aurora-drift-a {
   0%,
   100% {
-    transform: translate(0, 0) scale(1);
+    transform: translate(0) scale(1);
   }
-  50% {
-    transform: translate(6%, 8%) scale(1.08);
+  33% {
+    transform: translate(8vw, 6vh) scale(1.15);
+  }
+  66% {
+    transform: translate(-6vw, -4vh) scale(0.92);
   }
 }
 
-@keyframes aw-aurora-b {
+@keyframes aurora-drift-b {
   0%,
   100% {
-    transform: translate(0, 0) scale(1);
+    transform: translate(0) scale(1);
   }
   50% {
-    transform: translate(-8%, -6%) scale(1.1);
+    transform: translate(-10vw, 8vh) scale(1.2);
   }
 }
 
-@keyframes aw-grain {
+@keyframes grain-shift {
   0% {
-    transform: translate(0, 0);
+    transform: translate(0);
   }
-  20% {
+  25% {
     transform: translate(-2%, 1%);
   }
-  40% {
+  50% {
     transform: translate(1%, -2%);
   }
-  60% {
+  75% {
     transform: translate(-1%, 2%);
   }
-  80% {
-    transform: translate(2%, -1%);
-  }
   100% {
-    transform: translate(0, 0);
+    transform: translate(2%, -1%);
   }
 }
 
-@keyframes aw-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(22px);
+@keyframes ken-burns {
+  0% {
+    transform: scale(1);
   }
-  to {
+  100% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes hero-rise {
+  0% {
+    transform: translateY(110%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-rise-soft {
+  0% {
+    transform: translateY(24px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  100% {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-@keyframes aw-shine-slide {
+@keyframes hero-shine {
+  0%,
+  100% {
+    background-position: 0 0;
+  }
+  50% {
+    background-position: 100% 0;
+  }
+}
+
+@keyframes shine-slide {
   0%,
   100% {
     background-position: 110% 0;
@@ -1397,14 +1446,45 @@ button.assign-test-option:hover {
   }
 }
 
+@keyframes ping {
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
 .login-gate {
   position: relative;
   z-index: 1;
-  width: min(480px, 100%);
+  width: min(520px, 100%);
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  animation: aw-fade-up 0.7s ease-out both;
+}
+
+.aw-enter {
+  opacity: 0;
+  animation: hero-fade-up 0.8s var(--aw-ease) both;
+}
+
+.aw-enter-1 {
+  animation-delay: 0.05s;
+}
+.aw-enter-2 {
+  animation-delay: 0.12s;
+}
+.aw-enter-3 {
+  animation-delay: 0.38s;
+}
+.aw-enter-4 {
+  animation-delay: 0.48s;
+}
+.aw-enter-5 {
+  animation-delay: 0.58s;
+}
+.aw-enter-6 {
+  animation-delay: 0.68s;
 }
 
 .login-gate-logo {
@@ -1421,10 +1501,10 @@ button.assign-test-option:hover {
 .aw-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   align-self: flex-start;
   margin: 0;
-  padding: 0.35rem 0.75rem;
+  padding: 0.35rem 0.8rem;
   border-radius: 999px;
   border: 1px solid rgba(91, 157, 255, 0.28);
   background: rgba(12, 13, 14, 0.72);
@@ -1435,30 +1515,76 @@ button.assign-test-option:hover {
   backdrop-filter: blur(10px);
 }
 
+.aw-pill-dot-wrap {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .aw-pill-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--aw-blue);
   box-shadow: 0 0 10px var(--aw-blue-glow);
+  position: relative;
+  z-index: 1;
+}
+
+.aw-pill-ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(91, 157, 255, 0.55);
+  animation: ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 .login-gate-title {
   margin: 0.15rem 0 0;
   font-family: var(--display);
-  font-size: clamp(1.85rem, 5.5vw, 2.65rem);
+  font-size: clamp(1.85rem, 5.5vw, 2.7rem);
   font-weight: 700;
   line-height: 1.12;
   letter-spacing: -0.02em;
   color: #fff;
-  text-wrap: balance;
+}
+
+.aw-line {
+  display: block;
+  overflow: hidden;
+}
+
+.aw-line-inner {
+  display: block;
+  animation: hero-rise 1s var(--aw-ease) both;
+}
+
+.aw-rise-1 {
+  animation-delay: 0.16s;
+}
+
+.aw-rise-2 {
+  animation-delay: 0.28s;
 }
 
 .aw-accent {
-  color: var(--aw-blue-hot);
-  text-shadow:
-    0 0 18px rgba(91, 157, 255, 0.55),
-    0 0 42px rgba(43, 111, 214, 0.28);
+  color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    var(--aw-blue-deep) 0%,
+    var(--aw-blue-hot) 35%,
+    #dcecff 50%,
+    var(--aw-blue-hot) 65%,
+    var(--aw-blue) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow: 0 0 28px rgba(91, 157, 255, 0.35);
+  animation: hero-shine 6.5s ease-in-out infinite;
 }
 
 .login-gate-lede {
@@ -1528,11 +1654,11 @@ button.assign-test-option:hover {
   background: linear-gradient(
     105deg,
     transparent 35%,
-    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0.38) 50%,
     transparent 65%
   );
   background-size: 220% 100%;
-  animation: aw-shine-slide 4.5s ease-in-out infinite;
+  animation: shine-slide 5s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -1576,7 +1702,7 @@ button.assign-test-option:hover {
   border: 1px solid var(--aw-line);
   background: rgba(12, 13, 14, 0.72);
   backdrop-filter: blur(14px);
-  animation: aw-fade-up 0.35s ease-out both;
+  animation: hero-fade-up 0.45s var(--aw-ease) both;
 }
 
 .login-gate-panel label {
@@ -1605,9 +1731,32 @@ button.assign-test-option:hover {
   color: #ff8b8d;
 }
 
+.aw-marquee {
+  margin-top: 0.35rem;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  border-top: 1px solid var(--aw-line);
+  padding-top: 0.85rem;
+}
+
+.aw-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 1.75rem;
+  animation: marquee-x 36s linear infinite;
+  color: rgba(155, 161, 166, 0.85);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.aw-marquee-track span {
+  white-space: nowrap;
+}
+
 .login-gate-footer {
   text-align: center;
-  margin: 0.35rem 0 0;
+  margin: 0.15rem 0 0;
   font-size: 0.85rem;
 }
 
@@ -1624,9 +1773,19 @@ button.assign-test-option:hover {
   .aw-aurora-a,
   .aw-aurora-b,
   .aw-grain,
+  .aw-kenburns,
   .aw-btn-shine,
-  .login-gate {
+  .aw-accent,
+  .aw-pill-ping,
+  .aw-marquee-track,
+  .aw-enter,
+  .aw-line-inner,
+  .login-gate-panel {
     animation: none !important;
+  }
+
+  .aw-enter {
+    opacity: 1;
   }
 }
 

@@ -3696,6 +3696,40 @@ body.has-cabinet-chrome {
     gap: 0.5rem;
   }
 
+  .stat-tile-grid-compact:has(> .stat-tile:first-child:nth-last-child(3)) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .stat-tile-grid:not(.stat-tile-grid-today):not(.stat-tile-grid-compact):has(
+      > .stat-tile:first-child:nth-last-child(3)
+    ) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .stat-tile-grid:not(.stat-tile-grid-today):not(.stat-tile-grid-compact):has(
+      > .stat-tile:first-child:nth-last-child(3)
+    )
+    .stat-tile {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .stat-tile-grid:not(.stat-tile-grid-today):not(.stat-tile-grid-compact):has(
+      > .stat-tile:first-child:nth-last-child(3)
+    )
+    .stat-tile-label {
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    white-space: normal;
+  }
+
+  .stat-tile-grid:not(.stat-tile-grid-today):not(.stat-tile-grid-compact):has(
+      > .stat-tile:first-child:nth-last-child(3)
+    )
+    .stat-tile-value {
+    font-size: 1.15rem;
+  }
+
   .stat-tile-grid-compact .stat-tile {
     padding: 0.65rem 0.45rem;
   }

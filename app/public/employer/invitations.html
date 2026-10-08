@@ -20,6 +20,15 @@
       <div id="stats" class="invite-stats-block"></div>
       <div id="list" class="invite-list-block"></div>
     </main>
+    <div class="invite-sheet hidden" id="assign-test-sheet">
+      <div class="invite-panel assign-test-panel">
+        <h2 id="assign-test-title">Назначить тест</h2>
+        <p class="invite-meta" id="assign-test-sub" hidden></p>
+        <div id="assign-test-list" class="assign-test-list"></div>
+        <p class="field-error" id="assign-test-err" hidden></p>
+        <button class="btn-ghost" type="button" id="assign-test-cancel">Отмена</button>
+      </div>
+    </div>
     <script src="/app.js"></script>
     <script>
       const list = document.getElementById("list");
@@ -97,9 +106,13 @@
               i.companyTestAssignmentId && i.companyTestAssignmentStatus === "submitted"
                 ? `<button type="button" class="btn-ghost btn-sm" data-review-test="${esc(i.companyTestAssignmentId)}">Ответы на тест</button>`
                 : "";
+            const assignStatus =
+              i.companyTestAssignmentId && i.companyTestAssignmentStatusLabel
+                ? `<span class="invite-meta">Тест: ${esc(i.companyTestAssignmentStatusLabel)}</span>`
+                : "";
             const assignTestBtn =
               i.status === "accepted" && !i.companyTestAssignmentId
-                ? `<button type="button" class="btn-ghost btn-sm" data-assign-test data-candidate-id="${esc(i.candidateId)}" data-need-id="${esc(i.needId)}" data-need-title="${esc(i.needTitle)}">Назначить тест</button>`
+                ? `<button type="button" class="btn-ghost btn-sm" data-assign-test data-invitation-id="${esc(i.id)}" data-candidate-id="${esc(i.candidateId)}" data-need-id="${esc(i.needId)}" data-need-title="${esc(i.needTitle)}" data-candidate-name="${esc(i.candidateName)}">Назначить тест</button>`
                 : "";
             return `<article class="invite-card invite-card-expressive ${cardStatusClass(i.status)}">
               <div class="invite-card-top">
@@ -113,7 +126,7 @@
               ${channel}
               ${priorDecline}
               ${contacts}
-              <div class="invite-actions">${call} ${testReview} ${assignTestBtn}</div>
+              <div class="invite-actions">${call} ${testReview} ${assignTestBtn} ${assignStatus}</div>
               <div class="employer-test-review-panel" id="review-${esc(i.companyTestAssignmentId || "")}" hidden></div>
             </article>`;
           })
@@ -160,9 +173,17 @@
           .join("")}`;
       }
 
-      async function assignTestToCandidate(btn) {
+      let assignContext = null;
+
+      function closeAssignSheet() {
+        document.getElementById("assign-test-sheet").classList.add("hidden");
+        assignContext = null;
+      }
+
+      async function openAssignTestSheet(btn) {
         const candidateId = btn.dataset.candidateId;
         const needId = btn.dataset.needId || "";
+        const invitationId = btn.dataset.invitationId || "";
         const qs = needId
           ? `?status=published&needId=${encodeURIComponent(needId)}`
           : "?status=published";
@@ -172,25 +193,65 @@
           HandCheck.toast("Нет опубликованных тестов для этой потребности", "error");
           return;
         }
-        let testId = tests[0].id;
-        if (tests.length > 1) {
-          const lines = tests.map((t, i) => `${i + 1}. ${t.title}`).join("\n");
-          const raw = window.prompt(`Выберите тест (номер):\n${lines}`, "1");
-          if (raw === null) return;
-          const idx = Number.parseInt(String(raw).trim(), 10) - 1;
-          if (!Number.isInteger(idx) || idx < 0 || idx >= tests.length) {
-            HandCheck.toast("Некорректный номер теста", "error");
-            return;
-          }
-          testId = tests[idx].id;
+        assignContext = { candidateId, invitationId };
+        const titleEl = document.getElementById("assign-test-title");
+        const subEl = document.getElementById("assign-test-sub");
+        titleEl.textContent = "";
+        titleEl.append("Назначить тест · ", btn.dataset.candidateName || "кандидат");
+        if (btn.dataset.needTitle) {
+          subEl.textContent = "";
+          subEl.append("Потребность: ", btn.dataset.needTitle);
+          subEl.hidden = false;
+        } else {
+          subEl.hidden = true;
         }
-        await HandCheck.api(`/api/employer/tests/${testId}/assign`, {
-          method: "POST",
-          body: JSON.stringify({ candidateId }),
+        const listEl = document.getElementById("assign-test-list");
+        listEl.innerHTML = tests
+          .map((t) => {
+            const need = t.needTitle ? esc(t.needTitle) : "—";
+            const qn = t.questionCount != null ? t.questionCount : "—";
+            return `<button type="button" class="assign-test-option" data-test-id="${esc(t.id)}">
+              <strong>${esc(t.title)}</strong>
+              <span class="invite-meta">${need} · ${qn} вопр.</span>
+            </button>`;
+          })
+          .join("");
+        document.getElementById("assign-test-err").hidden = true;
+        document.getElementById("assign-test-sheet").classList.remove("hidden");
+        listEl.querySelectorAll("[data-test-id]").forEach((opt) => {
+          opt.addEventListener("click", () => submitAssignTest(opt.dataset.testId));
         });
-        HandCheck.toast("Тест назначен", "success");
-        await loadInvitations();
       }
+
+      async function submitAssignTest(testId) {
+        if (!assignContext) return;
+        const errEl = document.getElementById("assign-test-err");
+        errEl.hidden = true;
+        try {
+          await HandCheck.api(`/api/employer/tests/${testId}/assign`, {
+            method: "POST",
+            body: JSON.stringify({
+              candidateId: assignContext.candidateId,
+              invitationId: assignContext.invitationId,
+            }),
+          });
+          HandCheck.toast("Тест назначен", "success");
+          closeAssignSheet();
+          await loadInvitations();
+        } catch (e) {
+          errEl.hidden = false;
+          errEl.textContent = HandCheck.formatApiError(e);
+        }
+      }
+
+      async function assignTestToCandidate(btn) {
+        await openAssignTestSheet(btn);
+      }
+
+      document.getElementById("assign-test-cancel")?.addEventListener("click", closeAssignSheet);
+      document.getElementById("assign-test-sheet")?.addEventListener("click", (e) => {
+        if (e.target.id === "assign-test-sheet") closeAssignSheet();
+      });
 
       HandCheck.bootCabinetPage("employer", () =>
         loadInvitations().catch(() => {

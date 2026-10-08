@@ -3,6 +3,7 @@
 const { getDb } = require("../../db");
 const { loadCandidatesForNeed } = require("../matching/pool");
 const { loadOpenBank } = require("../matching/open-bank");
+const { CATEGORY_STATUS_UNCONFIRMED } = require("../../lib/category-status");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { formatSpecGradeLabel } = require("../../lib/spec-grade-label");
 const { invitationStatusLabel } = require("../../lib/invitation-status");
@@ -83,14 +84,19 @@ function buildInvitationFunnel(db, employerUserId) {
 
 function buildBankComposition(employerUserId) {
   const tallies = new Map();
+  let unconfirmed = 0;
   for (const row of loadOpenBank(employerUserId)) {
+    if (row.categoryStatus === CATEGORY_STATUS_UNCONFIRMED) {
+      unconfirmed += 1;
+      continue;
+    }
     const spec = row.specialization;
     const grade = row.grade || row.confirmedGrade;
     if (!spec || !grade) continue;
     const key = `${spec}\0${grade}`;
     tallies.set(key, (tallies.get(key) || 0) + 1);
   }
-  return [...tallies.entries()]
+  const rows = [...tallies.entries()]
     .map(([key, count]) => {
       const [spec, grade] = key.split("\0");
       return {
@@ -101,6 +107,15 @@ function buildBankComposition(employerUserId) {
       };
     })
     .sort((a, b) => b.count - a.count);
+  if (unconfirmed > 0) {
+    rows.push({
+      spec: "",
+      grade: "",
+      label: "Без подтверждённой категории",
+      count: unconfirmed,
+    });
+  }
+  return rows;
 }
 
 function buildEvents(db, employerUserId) {
@@ -168,9 +183,11 @@ function buildNextActions(db, employerUserId) {
   }
   const analyzed = db
     .prepare(
-      `SELECT c.id
+      `SELECT c.id, cp.display_name, u.email
        FROM calls c
        JOIN invitations i ON i.id = c.invitation_id
+       JOIN candidate_profiles cp ON cp.user_id = i.candidate_user_id
+       JOIN users u ON u.id = i.candidate_user_id
        JOIN call_analyses a ON a.call_id = c.id
        WHERE i.employer_user_id = ? AND c.status = 'ended'
        ORDER BY c.ended_at DESC LIMIT 3`
@@ -179,7 +196,7 @@ function buildNextActions(db, employerUserId) {
   for (const r of analyzed) {
     actions.push({
       type: "call_analysis",
-      label: "Разбор завершённого звонка",
+      label: `Разбор завершённого звонка · ${publicCandidateDisplayName(r.display_name, r.email)}`,
       href: `/employer/calls`,
     });
   }

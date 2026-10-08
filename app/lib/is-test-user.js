@@ -9,13 +9,19 @@ function displayNameLooksLikeRoundTest(name) {
   return /^Тест Р\d+/i.test(String(name || "").trim());
 }
 
+function juryDemoAccount(email) {
+  return /^jury-(backend|frontend|qa)@demo\.local$/i.test(String(email || ""));
+}
+
 function shouldMarkUserAsTest(email, displayName) {
   if (!String(email || "").endsWith("@demo.local")) return false;
+  if (juryDemoAccount(email)) return true;
   return emailLooksLikeRoundTest(email) || displayNameLooksLikeRoundTest(displayName);
 }
 
 module.exports = {
   emailLooksLikeRoundTest,
   displayNameLooksLikeRoundTest,
+  juryDemoAccount,
   shouldMarkUserAsTest,
 };

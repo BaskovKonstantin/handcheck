@@ -150,6 +150,17 @@ function shapePublicRow(c, db, employerId, need) {
   base.stack = c.stack || [];
   if (need) {
     base.explanation = c.explanation || buildExplanation(c, need);
+    if (base.reviewStatus === "invited") {
+      const inv = db
+        .prepare(
+          `SELECT id FROM invitations
+           WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?
+             AND status IN ('sent', 'viewed', 'accepted')
+           ORDER BY created_at DESC LIMIT 1`
+        )
+        .get(employerId, need.id, c.id);
+      if (inv) base.openInvitationId = inv.id;
+    }
   }
   base.aiUsage = summarizeAiUsageForEmployer(employerId, c.id);
   const pasteInputMark = getEmployerPasteInputMark(db, c.id);

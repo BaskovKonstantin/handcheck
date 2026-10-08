@@ -21,6 +21,42 @@ function defaultDueAtIso() {
   return d.toISOString();
 }
 
+function resolveInvitationForAssignment(db, employerUserId, candidateId, test, invitationId) {
+  let resolved = invitationId ? String(invitationId) : "";
+  if (resolved) {
+    const inv = db
+      .prepare(
+        `SELECT * FROM invitations WHERE id = ? AND employer_user_id = ? AND candidate_user_id = ?`
+      )
+      .get(resolved, employerUserId, candidateId);
+    if (!inv) throw httpError(404, "not_found");
+    if (inv.need_id !== test.need_id) {
+      throw httpError(400, "invalid_body", {
+        fields: { testId: "Тест привязан к другой потребности" },
+      });
+    }
+    return resolved;
+  }
+  const inferred = db
+    .prepare(
+      `SELECT id FROM invitations
+       WHERE employer_user_id = ? AND candidate_user_id = ? AND need_id = ? AND status = 'accepted'
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(employerUserId, candidateId, test.need_id);
+  return inferred?.id || null;
+}
+
+function findOpenAssignmentForTest(db, testId, candidateId) {
+  return db
+    .prepare(
+      `SELECT id, status FROM employer_test_assignments
+       WHERE test_id = ? AND candidate_user_id = ? AND status IN ('assigned', 'started')
+       ORDER BY due_at DESC LIMIT 1`
+    )
+    .get(testId, candidateId);
+}
+
 function assignCompanyTest(db, employerUserId, testId, { candidateId, invitationId, dueAt }) {
   if (!candidateId) {
     throw httpError(400, "invalid_body", { fields: { candidateId: "Укажите кандидата" } });
@@ -34,26 +70,28 @@ function assignCompanyTest(db, employerUserId, testId, { candidateId, invitation
   if (test.status !== "published") {
     throw httpError(409, "test_not_published", { message: "Опубликуйте тест перед назначением" });
   }
-  if (invitationId) {
-    const inv = db
-      .prepare(
-        `SELECT * FROM invitations WHERE id = ? AND employer_user_id = ? AND candidate_user_id = ?`
-      )
-      .get(invitationId, employerUserId, candidateId);
-    if (!inv) throw httpError(404, "not_found");
-    if (inv.need_id !== test.need_id) {
-      throw httpError(400, "invalid_body", {
-        fields: { testId: "Тест привязан к другой потребности" },
-      });
-    }
+  const existing = findOpenAssignmentForTest(db, testId, candidateId);
+  if (existing) {
+    throw httpError(409, "assignment_duplicate", {
+      message: "Этот тест уже назначен кандидату",
+      assignmentId: existing.id,
+      status: existing.status,
+    });
   }
+  const linkedInvitationId = resolveInvitationForAssignment(
+    db,
+    employerUserId,
+    candidateId,
+    test,
+    invitationId
+  );
   const due = dueAt ? String(dueAt) : defaultDueAtIso();
   const id = newId();
   db.prepare(
     `INSERT INTO employer_test_assignments (id, test_id, candidate_user_id, invitation_id, status, due_at)
      VALUES (?, ?, ?, ?, 'assigned', ?)`
-  ).run(id, testId, candidateId, invitationId || null, due);
-  return { id };
+  ).run(id, testId, candidateId, linkedInvitationId, due);
+  return { id, status: "assigned", invitationId: linkedInvitationId };
 }
 
 function loadAssignmentForCandidate(db, assignmentId, candidateUserId) {
@@ -337,6 +375,8 @@ function buildEmployerReview(db, assignment) {
 
 module.exports = {
   assignCompanyTest,
+  resolveInvitationForAssignment,
+  findOpenAssignmentForTest,
   loadAssignmentForCandidate,
   loadAssignmentForEmployer,
   listItems,

@@ -32,6 +32,7 @@ const ERROR_MESSAGES = {
   need_inactive: "Потребность неактивна — новые приглашения отправить нельзя",
   candidate_unconfirmed: "Сначала нужен подтверждённый грейд-тест платформы",
   test_not_published: "Опубликуйте тест перед назначением",
+  assignment_duplicate: "Этот тест уже назначен кандидату",
   quick_time_expired: "Время на этот вопрос истекло",
 };
 
@@ -1067,8 +1068,8 @@ function callStatusClass(status) {
   return "ready";
 }
 
-function formatDateTimeMoscow(iso) {
-  if (!iso) return "";
+function normalizeIsoForDisplay(iso) {
+  if (!iso) return null;
   let normalized = iso;
   if (/^\d{4}-\d{2}-\d{2} \d{2}:/.test(iso)) {
     normalized = `${iso.replace(" ", "T")}Z`;
@@ -1076,7 +1077,13 @@ function formatDateTimeMoscow(iso) {
     normalized = `${iso}Z`;
   }
   const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return "";
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function formatDateTimeMoscow(iso) {
+  const d = normalizeIsoForDisplay(iso);
+  if (!d) return "";
   return d.toLocaleString("ru-RU", {
     timeZone: "Europe/Moscow",
     day: "numeric",
@@ -1085,6 +1092,17 @@ function formatDateTimeMoscow(iso) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDateShortMoscow(iso) {
+  const d = normalizeIsoForDisplay(iso);
+  if (!d) return "";
+  const raw = d.toLocaleDateString("ru-RU", {
+    timeZone: "Europe/Moscow",
+    day: "numeric",
+    month: "short",
+  });
+  return raw.replace(/\s*г\.?\s*$/i, "").trim();
 }
 
 function formatSalaryRange(from, to) {
@@ -1215,6 +1233,7 @@ window.HandCheck = {
   callStatusClass,
   formatSalaryRange,
   formatDateTimeMoscow,
+  formatDateShortMoscow,
   formatTimeMoscow,
   formatAuditLogTime,
   formatRetakeDateMoscow,

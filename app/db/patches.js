@@ -160,6 +160,29 @@ function applyPatches(db) {
   ensureColumn(db, "employer_test_assignments", "current_item_id", "TEXT");
   ensureColumn(db, "employer_test_answers", "opened_at", "TEXT");
   ensureColumn(db, "employer_test_answers", "timed_out", "INTEGER NOT NULL DEFAULT 0");
+
+  db.exec(`
+    UPDATE employer_test_assignments AS a
+    SET invitation_id = (
+      SELECT i.id FROM invitations i
+      INNER JOIN employer_tests t ON t.id = a.test_id
+      WHERE i.employer_user_id = t.employer_user_id
+        AND i.candidate_user_id = a.candidate_user_id
+        AND i.need_id = t.need_id
+        AND i.status = 'accepted'
+      ORDER BY i.created_at DESC
+      LIMIT 1
+    )
+    WHERE a.invitation_id IS NULL
+      AND EXISTS (
+        SELECT 1 FROM invitations i
+        INNER JOIN employer_tests t ON t.id = a.test_id
+        WHERE i.employer_user_id = t.employer_user_id
+          AND i.candidate_user_id = a.candidate_user_id
+          AND i.need_id = t.need_id
+          AND i.status = 'accepted'
+      );
+  `);
 }
 
 module.exports = { applyPatches };

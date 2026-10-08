@@ -117,7 +117,10 @@ async function loadOverview() {
   if (kpiHost && !kpiHost.querySelector(".overview-quick-links")) {
     kpiHost.insertAdjacentHTML(
       "beforeend",
-      `<p class="overview-quick-links"><a class="btn-ghost btn-sm" href="/employer/tests">Тесты вакансии</a></p>`
+      `<p class="overview-quick-links">
+        <a class="btn-ghost btn-sm" href="/employer/tests">Тесты вакансии</a>
+        <a class="btn-ghost btn-sm" href="/employer/invitations">Ответы на тесты</a>
+      </p>`
     );
   }
   document.getElementById("funnel-host").innerHTML = renderFunnel(data.funnel || {});

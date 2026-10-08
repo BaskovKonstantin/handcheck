@@ -441,6 +441,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
         await page.goto(`${BASE}${path}`, { waitUntil: "commit" });
       }
       assert.equal(new URL(page.url()).pathname, path);
+      await page.waitForSelector("#cabinet-aside", { timeout: 15000 });
       assert.ok(await page.locator("#cabinet-aside").count());
     }
     await context.close();

@@ -230,14 +230,16 @@ router.post("/:id/end", (req, res, next) => {
   const durationMs = call.started_at
     ? Math.max(0, new Date(now).getTime() - new Date(call.started_at).getTime())
     : 0;
-  try {
-    finalizeOrphanChunkSides(call.id, durationMs);
-  } catch {
-    /* keep ended even if merge fails */
-  }
   broadcastCallEnded(call.id);
   queueAnalyzeCall(call.id);
   res.json({ ok: true });
+  setImmediate(() => {
+    try {
+      finalizeOrphanChunkSides(call.id, durationMs);
+    } catch {
+      /* keep ended even if merge fails */
+    }
+  });
 });
 
 router.post(
@@ -319,7 +321,15 @@ router.post(
   if (!side) return next(httpError(403, "forbidden"));
   const chunkFiles = listChunkFiles(callId, side);
   const hasChunks = chunkFiles.length > 0;
-  if (!req.file?.buffer?.length && !hasChunks) return next(httpError(400, "file_required"));
+  let hasPlayableFinal = false;
+  try {
+    hasPlayableFinal = isPlayableRecordingFile(recordingFilePath(callDir(callId), side));
+  } catch {
+    /* invalid_path handled below */
+  }
+  if (!req.file?.buffer?.length && !hasChunks && !hasPlayableFinal) {
+    return next(httpError(400, "file_required"));
+  }
   if (req.file?.buffer?.length) {
     const tailOk =
       assertWebmUpload(req.file) || (hasChunks && assertRecordingChunkUpload(req.file, true));

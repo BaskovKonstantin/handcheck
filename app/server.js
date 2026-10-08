@@ -20,6 +20,16 @@ const { attachSignaling } = require("./modules/calls/signaling");
 
 const STARTED_AT = new Date().toISOString();
 
+/** Behind Caddy pooled upstreams; must exceed proxy idle time and event-loop stalls from ffmpeg merge. */
+const HTTP_KEEP_ALIVE_TIMEOUT_MS = 65_000;
+const HTTP_HEADERS_TIMEOUT_MS = 66_000;
+
+function configureHttpServerTimeouts(server, overrides = {}) {
+  server.keepAliveTimeout =
+    overrides.keepAliveTimeoutMs ?? HTTP_KEEP_ALIVE_TIMEOUT_MS;
+  server.headersTimeout = overrides.headersTimeoutMs ?? HTTP_HEADERS_TIMEOUT_MS;
+}
+
 function createApp() {
   seed(getDb());
 
@@ -74,6 +84,17 @@ function createApp() {
     });
   });
   app.use("/mcp", require("./modules/mcp/router"));
+
+  if (process.env.HANDCHECK_TEST_HOOKS === "1") {
+    app.post("/api/test-hooks/block-ms", express.json({ limit: "4kb" }), (req, res) => {
+      const ms = Math.min(Math.max(0, Number(req.body?.ms) || 0), 10_000);
+      const deadline = Date.now() + ms;
+      while (Date.now() < deadline) {
+        /* intentional event-loop block for keep-alive regression tests */
+      }
+      res.json({ ok: true });
+    });
+  }
 
   app.use("/api", (req, res) => {
     res.status(404).json({ error: "not_found" });
@@ -151,11 +172,12 @@ function createApp() {
   return app;
 }
 
-function start() {
+function start(options = {}) {
   const app = createApp();
   const server = http.createServer(app);
+  configureHttpServerTimeouts(server, options);
   attachSignaling(server);
-  server.listen(config.PORT, "0.0.0.0", () => {
+  server.listen(options.port ?? config.PORT, "0.0.0.0", () => {
     // eslint-disable-next-line no-console
     console.log(`handcheck listening on :${config.PORT}`);
   });
@@ -166,4 +188,10 @@ if (require.main === module) {
   start();
 }
 
-module.exports = { createApp, start };
+module.exports = {
+  createApp,
+  start,
+  configureHttpServerTimeouts,
+  HTTP_KEEP_ALIVE_TIMEOUT_MS,
+  HTTP_HEADERS_TIMEOUT_MS,
+};

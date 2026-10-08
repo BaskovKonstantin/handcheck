@@ -7,6 +7,23 @@ const path = require("path");
 const os = require("os");
 const request = require("supertest");
 
+function ensureOpenInvitation(db, employerId, needId, candidateId) {
+  const row = db
+    .prepare(
+      `SELECT id FROM invitations
+       WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?
+         AND status IN ('sent', 'viewed', 'accepted')`
+    )
+    .get(employerId, needId, candidateId);
+  if (row) return row.id;
+  const id = require("../app/lib/ids").newId();
+  db.prepare(
+    `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+     VALUES (?, ?, ?, ?, 100000, 150000, 'test', 'email', 'accepted')`
+  ).run(id, employerId, needId, candidateId);
+  return id;
+}
+
 describe("employer vacancy tests (constructor)", () => {
   let app;
   let agent;
@@ -103,7 +120,9 @@ describe("employer vacancy tests (constructor)", () => {
         "SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')"
       )
       .get();
+    const cafeId = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get().id;
     const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    ensureOpenInvitation(db, cafeId, need.id, anna.id);
     const created = await agent.post("/api/employer/tests").send({
       needId: need.id,
       title: "Timed",
@@ -135,6 +154,13 @@ describe("employer vacancy tests (constructor)", () => {
       .send({ itemId: item1.body.id, answerText: "x" });
     assert.equal(late.status, 200);
     assert.equal(late.body.timedOut, true);
+    const timedRow = db
+      .prepare(
+        "SELECT auto_ok, timed_out FROM employer_test_answers WHERE assignment_id = ? AND item_id = ?"
+      )
+      .get(assign.body.id, item1.body.id);
+    assert.equal(timedRow.timed_out, 1);
+    assert.notEqual(timedRow.auto_ok, 1);
     const view = await annaAgent.get(`/api/candidate/company-tests/${assign.body.id}`);
     assert.equal(view.body.currentItemId, item2.body.id);
     await annaAgent
@@ -152,7 +178,9 @@ describe("employer vacancy tests (constructor)", () => {
         "SELECT id FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'cafe@demo.local')"
       )
       .get();
+    const cafeId = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get().id;
     const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    ensureOpenInvitation(db, cafeId, need.id, anna.id);
     const created = await agent.post("/api/employer/tests").send({
       needId: need.id,
       title: "No auto start",

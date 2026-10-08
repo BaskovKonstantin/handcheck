@@ -33,6 +33,7 @@ const ERROR_MESSAGES = {
   candidate_unconfirmed: "Сначала нужен подтверждённый грейд-тест платформы",
   test_not_published: "Опубликуйте тест перед назначением",
   assignment_duplicate: "Этот тест уже назначен кандидату",
+  invitation_required: "Сначала отправьте приглашение кандидату по этой потребности",
   quick_time_expired: "Время на этот вопрос истекло",
 };
 

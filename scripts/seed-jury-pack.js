@@ -109,8 +109,24 @@ function seedJuryPack() {
   for (const inv of inviteSpecs) {
     db.prepare(
       `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status, created_at)
-       VALUES (?, ?, ?, ?, 200000, 280000, 'Жюри-пакет: приглашение для демо обзора', 'email', ?, datetime('now', '-2 days'))`
+       VALUES (?, ?, ?, ?, 200000, 280000, 'Жюри-пакет: приглашение для демо обзора', 'email', ?, datetime('now', '-2 days'))
+       ON CONFLICT(id) DO NOTHING`
     ).run(inv.id, employerId, need.id, inv.candidate.id, inv.status);
+    if (["viewed", "accepted"].includes(inv.status)) {
+      const hasReview = db
+        .prepare(
+          `SELECT decision FROM need_reviews
+           WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?`
+        )
+        .get(employerId, need.id, inv.candidate.id);
+      if (!hasReview) {
+        db.prepare(
+          `INSERT INTO need_reviews (id, employer_user_id, need_id, candidate_user_id, decision, updated_at)
+           VALUES (?, ?, ?, ?, 'invited', datetime('now'))
+           ON CONFLICT(employer_user_id, need_id, candidate_user_id) DO NOTHING`
+        ).run(`${MARKER_PREFIX}rev-${inv.status}`, employerId, need.id, inv.candidate.id);
+      }
+    }
   }
 
   db.prepare(

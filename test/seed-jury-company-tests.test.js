@@ -15,6 +15,31 @@ function countRows(db, table) {
   return db.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c;
 }
 
+function snapshotState(db) {
+  const needs = db
+    .prepare(
+      `SELECT id, title, specialization FROM employer_needs WHERE employer_user_id = (SELECT id FROM users WHERE email = 'jury@demo.local') ORDER BY id`
+    )
+    .all();
+  const tests = db
+    .prepare(
+      `SELECT id, need_id, title, status FROM employer_tests WHERE employer_user_id = (SELECT id FROM users WHERE email = 'jury@demo.local') ORDER BY id`
+    )
+    .all();
+  const assignments = db
+    .prepare(
+      `SELECT id, test_id, candidate_user_id, invitation_id, status FROM employer_test_assignments ORDER BY id`
+    )
+    .all();
+  const invitations = db
+    .prepare(`SELECT id, need_id, candidate_user_id, status FROM invitations ORDER BY id`)
+    .all();
+  const reviews = db
+    .prepare(`SELECT need_id, candidate_user_id, decision FROM need_reviews ORDER BY need_id, candidate_user_id`)
+    .all();
+  return JSON.stringify({ needs, tests, assignments, invitations, reviews });
+}
+
 function ensureJuryEmployer(db) {
   let row = db.prepare("SELECT id FROM users WHERE email = ?").get("jury@demo.local");
   if (row) return row.id;
@@ -116,10 +141,21 @@ describe("seed-jury-company-tests idempotency (prod-shaped)", () => {
     assert.equal(needsAfter1, needsBefore, "run 1 should not add needs");
     assert.equal(testsAfter1, testsBefore, "run 1 should not add tests");
 
+    const snap1 = snapshotState(db);
     seedJuryCompanyTests(db);
     const needsAfter2 = countRows(db, "employer_needs");
     const testsAfter2 = countRows(db, "employer_tests");
+    const snap2 = snapshotState(db);
     assert.equal(needsAfter2, needsBefore, "run 2 should not add needs");
     assert.equal(testsAfter2, testsBefore, "run 2 should not add tests");
+    assert.equal(snap2, snap1, "run 2 should not change snapshot");
+    for (const a of db
+      .prepare(
+        `SELECT id, invitation_id FROM employer_test_assignments
+         WHERE id LIKE 'jury-company-asg-%' AND status = 'submitted'`
+      )
+      .all()) {
+      assert.ok(a.invitation_id, `assignment ${a.id} should link invitation after run 1`);
+    }
   });
 });

@@ -198,6 +198,21 @@ function seedJuryCompanyTests(db) {
       ).run(invId, employerId, needId, cid);
       inv = { id: invId, status: "accepted" };
     }
+    const hasReview = db
+      .prepare(
+        `SELECT 1 FROM need_reviews WHERE employer_user_id = ? AND need_id = ? AND candidate_user_id = ?`
+      )
+      .get(employerId, needId, cid);
+    if (!hasReview) {
+      db.prepare(
+        `INSERT INTO need_reviews (id, employer_user_id, need_id, candidate_user_id, decision, updated_at)
+         VALUES (?, ?, ?, ?, 'invited', datetime('now'))`
+      ).run(`${MARKER_INV}rev-${c.spec}`, employerId, needId, cid);
+    }
+    db.prepare(
+      `UPDATE employer_test_assignments SET invitation_id = ?
+       WHERE candidate_user_id = ? AND test_id = ? AND (invitation_id IS NULL OR invitation_id = '')`
+    ).run(inv.id, cid, testId);
 
     const assignId = `${MARKER_ASSIGN}${c.spec}`;
     const existingAssign = db

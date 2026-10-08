@@ -5,6 +5,7 @@ const COMPANY_TEST_STATUS_LABELS = {
   started: "В процессе",
   submitted: "Сдан",
   expired: "Истёк",
+  cancelled: "Отменён",
 };
 
 function companyTestStatusLabel(status) {

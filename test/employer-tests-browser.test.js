@@ -73,22 +73,36 @@ async function employerSeedInviteWithTest(page) {
         employerTestId: created.id,
       }),
     });
-    const invitations = await HandCheck.api("/api/employer/invitations");
-    const row = (invitations.items || []).find((i) => i.id === inv.id);
     return {
-      assignmentId: row?.companyTestAssignmentId,
       invitationId: inv.id,
       testId: created.id,
     };
   });
-  if (!setupCache?.assignmentId) throw new Error("assignment not created");
+  const annaPage = await browser.newPage();
+  await login(annaPage, "anna@demo.local");
+  await annaPage.goto(`${BASE}/candidate/tasks`, { waitUntil: "domcontentloaded" });
+  await annaPage.waitForFunction(() => typeof HandCheck !== "undefined" && HandCheck.api, {
+    timeout: 20000,
+  });
+  const assignmentId = await annaPage.evaluate(async (invitationId) => {
+    await HandCheck.api(`/api/candidate/invitations/${invitationId}/accept`, {
+      method: "POST",
+      body: "{}",
+    });
+    const list = await HandCheck.api("/api/candidate/company-tests");
+    const row = (list.items || []).find((x) => x.status === "assigned") || (list.items || [])[0];
+    return row?.id || null;
+  }, setupCache.invitationId);
+  await annaPage.close();
+  setupCache = { ...setupCache, assignmentId };
+  if (!setupCache?.assignmentId) throw new Error("assignment not created after accept");
   return setupCache;
 }
 
 async function employerSeedSingleTextTest(page) {
   await login(page, "cafe@demo.local");
   await page.goto(`${BASE}/employer/need`, { waitUntil: "domcontentloaded" });
-  return page.evaluate(async (pasteText) => {
+  const seed = await page.evaluate(async (pasteText) => {
     const needs = await HandCheck.api("/api/employer/needs");
     const needId = needs.items[0].id;
     const created = await HandCheck.api("/api/employer/tests", {
@@ -107,12 +121,40 @@ async function employerSeedSingleTextTest(page) {
     await HandCheck.api(`/api/employer/tests/${created.id}/publish`, { method: "POST", body: "{}" });
     const matches = await HandCheck.api(`/api/employer/needs/${needId}/matches`);
     const anna = (matches.items || []).find((x) => x.displayName === "Анна");
-    const assign = await HandCheck.api(`/api/employer/tests/${created.id}/assign`, {
+    const inv = await HandCheck.api("/api/employer/invitations", {
       method: "POST",
-      body: JSON.stringify({ candidateId: anna.id }),
+      body: JSON.stringify({
+        needId,
+        candidateId: anna.id,
+        salaryFrom: 120000,
+        salaryTo: 180000,
+        offerText: "Paste probe invite",
+        contactChannel: "telegram",
+      }),
     });
-    return { assignmentId: assign.id, pasteText };
+    return { invitationId: inv.id, testId: created.id, candidateId: anna.id, pasteText };
   }, PASTE_120);
+  const annaPage = await browser.newPage();
+  await login(annaPage, "anna@demo.local");
+  await annaPage.goto(`${BASE}/candidate/tasks`, { waitUntil: "domcontentloaded" });
+  await annaPage.waitForFunction(() => typeof HandCheck !== "undefined" && HandCheck.api, {
+    timeout: 20000,
+  });
+  await annaPage.evaluate(async (invitationId) => {
+    await HandCheck.api(`/api/candidate/invitations/${invitationId}/accept`, {
+      method: "POST",
+      body: "{}",
+    });
+  }, seed.invitationId);
+  await annaPage.close();
+  const assignmentId = await page.evaluate(async ({ testId, candidateId, invitationId }) => {
+    const assign = await HandCheck.api(`/api/employer/tests/${testId}/assign`, {
+      method: "POST",
+      body: JSON.stringify({ candidateId, invitationId }),
+    });
+    return assign.id;
+  }, seed);
+  return { assignmentId, pasteText: seed.pasteText };
 }
 
 async function completeCompanyTestOnPage(page, assignmentId) {

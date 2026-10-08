@@ -22,6 +22,18 @@ function defaultDueAtIso() {
   return d.toISOString();
 }
 
+function invitationNotAcceptedError() {
+  return httpError(409, "invitation_not_accepted", {
+    message: "Назначить тест можно только после принятия приглашения кандидатом",
+  });
+}
+
+function assertInvitationAcceptedForAssign(inv) {
+  if (!inv || inv.status !== "accepted") {
+    throw invitationNotAcceptedError();
+  }
+}
+
 function resolveInvitationForAssignment(db, employerUserId, candidateId, test, invitationId) {
   let resolved = invitationId ? String(invitationId) : "";
   if (resolved) {
@@ -36,17 +48,48 @@ function resolveInvitationForAssignment(db, employerUserId, candidateId, test, i
         fields: { testId: "Тест привязан к другой потребности" },
       });
     }
+    assertInvitationAcceptedForAssign(inv);
     return resolved;
   }
-  const inferred = db
+  const latest = db
     .prepare(
-      `SELECT id FROM invitations
+      `SELECT id, status FROM invitations
        WHERE employer_user_id = ? AND candidate_user_id = ? AND need_id = ?
          AND status IN ('sent', 'viewed', 'accepted')
        ORDER BY created_at DESC LIMIT 1`
     )
     .get(employerUserId, candidateId, test.need_id);
-  return inferred?.id || null;
+  if (!latest) return null;
+  assertInvitationAcceptedForAssign(latest);
+  return latest.id;
+}
+
+function cancelOpenAssignmentsForInvitation(db, invitationId) {
+  db.prepare(
+    `UPDATE employer_test_assignments
+     SET status = 'cancelled', current_item_id = NULL
+     WHERE invitation_id = ? AND status IN ('assigned', 'started')`
+  ).run(invitationId);
+}
+
+function loadInvitationForAssignment(db, assignment) {
+  if (!assignment.invitation_id) return null;
+  return db.prepare("SELECT id, status FROM invitations WHERE id = ?").get(assignment.invitation_id);
+}
+
+function assertAssignmentPlayable(db, assignment) {
+  if (assignment.status === "cancelled") {
+    throw httpError(409, "assignment_closed", {
+      message: "Приглашение закрыто — тест больше недоступен",
+    });
+  }
+  if (assignment.status === "submitted" || assignment.status === "expired") return;
+  const inv = loadInvitationForAssignment(db, assignment);
+  if (inv && inv.status !== "accepted") {
+    throw httpError(409, "assignment_closed", {
+      message: "Приглашение закрыто — тест больше недоступен",
+    });
+  }
 }
 
 function findSubmittedAssignmentForTest(db, testId, candidateId) {
@@ -152,6 +195,7 @@ function listItems(db, testId) {
 }
 
 function assertAssignmentActive(db, assignment) {
+  assertAssignmentPlayable(db, assignment);
   if (assignment.status === "submitted" || assignment.status === "expired") return;
   if (new Date(assignment.due_at).getTime() < Date.now()) {
     db.prepare("UPDATE employer_test_assignments SET status = 'expired' WHERE id = ?").run(assignment.id);
@@ -402,6 +446,8 @@ function buildEmployerReview(db, assignment) {
 module.exports = {
   assignCompanyTest,
   resolveInvitationForAssignment,
+  cancelOpenAssignmentsForInvitation,
+  assertAssignmentPlayable,
   findOpenAssignmentForTest,
   findSubmittedAssignmentForTest,
   COMPANY_ITEM_GRACE_MS,

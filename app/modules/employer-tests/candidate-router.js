@@ -14,6 +14,7 @@ const {
   submitItemAnswer,
   buildCandidateAssignmentJson,
   expireCurrentItemIfNeeded,
+  assertAssignmentPlayable,
 } = require("../../lib/company-test-flow");
 
 const router = express.Router();
@@ -23,17 +24,27 @@ router.get("/company-tests", (req, res) => {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT a.id, a.status, a.due_at, a.started_at, a.submitted_at, t.title, t.intro,
+      `SELECT a.id, a.status, a.due_at, a.started_at, a.submitted_at, a.invitation_id, t.title, t.intro,
               e.company_name
        FROM employer_test_assignments a
        JOIN employer_tests t ON t.id = a.test_id
        JOIN employer_profiles e ON e.user_id = t.employer_user_id
        WHERE a.candidate_user_id = ?
+         AND a.status != 'cancelled'
        ORDER BY a.due_at ASC`
     )
     .all(req.user.id);
   res.json({
-    items: rows.map((r) => ({
+    items: rows
+      .filter((r) => {
+        if (r.status === "submitted") return true;
+        if (!r.invitation_id) return true;
+        const inv = db
+          .prepare("SELECT status FROM invitations WHERE id = ?")
+          .get(r.invitation_id);
+        return inv?.status === "accepted";
+      })
+      .map((r) => ({
       id: r.id,
       status: r.status,
       statusLabel: companyTestStatusLabel(r.status),
@@ -51,6 +62,7 @@ router.get("/company-tests/:assignmentId", (req, res, next) => {
   try {
     const db = getDb();
     let assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
+    assertAssignmentPlayable(db, assignment);
     const payload = buildCandidateAssignmentJson(db, assignment, {
       syncExpiry: assignment.status === "started",
     });
@@ -70,6 +82,7 @@ router.post("/company-tests/:assignmentId/start", (req, res, next) => {
     if (assignment.status === "submitted") {
       return res.json({ ok: true, status: "submitted", statusLabel: companyTestStatusLabel("submitted") });
     }
+    assertAssignmentPlayable(db, assignment);
     const items = listItems(db, assignment.test_id);
     if (!items.length) throw httpError(409, "invalid_state", { message: "В тесте нет вопросов" });
     openCurrentItem(db, assignment, items);
@@ -86,6 +99,7 @@ router.post("/company-tests/:assignmentId/answers", (req, res, next) => {
     if (assignment.status === "submitted") {
       throw httpError(409, "already_submitted", { message: "Тест уже сдан" });
     }
+    assertAssignmentPlayable(db, assignment);
     const items = listItems(db, assignment.test_id);
     const itemId = String(req.body?.itemId || assignment.current_item_id || "");
     const item = items.find((x) => x.id === itemId);
@@ -105,6 +119,7 @@ router.post("/company-tests/:assignmentId/submit", (req, res, next) => {
     const db = getDb();
     let assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
     if (assignment.status === "submitted") return res.json({ ok: true });
+    assertAssignmentPlayable(db, assignment);
     const items = listItems(db, assignment.test_id);
     assignment = expireCurrentItemIfNeeded(db, assignment, items);
     const pending = items.filter((it) => {

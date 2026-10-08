@@ -150,9 +150,11 @@ describe("round 20 findings", () => {
   });
 
   describe("item 3 — tasks spec chip field", () => {
-    it("recognizes spec field for backend availability", () => {
+    it("exposes all specialization chips without скоро gate", () => {
       const src = fs.readFileSync(path.join(ROOT, "app/public/candidate/tasks.html"), "utf8");
-      assert.match(src, /field === "spec"/);
+      assert.match(src, /data-field="\$\{name\}"/);
+      assert.doesNotMatch(src, /isChoiceAvailable/);
+      assert.doesNotMatch(src, /скоро/);
     });
   });
 });

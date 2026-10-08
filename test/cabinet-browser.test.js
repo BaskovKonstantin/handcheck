@@ -579,7 +579,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
-  it("candidate tasks start form hides battery steps and labels Backend without скоро", async () => {
+  it("candidate tasks start form enables all spec/grade chips without скоро", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
     const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
@@ -594,8 +594,13 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await page.goto(`${BASE}/candidate/tasks`, { waitUntil: "commit", timeout: 30000 });
     await page.waitForSelector('.choice-chip[data-choice="backend"]', { timeout: 20000 });
     assert.equal(await page.locator(".battery-steps").count(), 0);
-    const text = (await page.locator('.choice-chip[data-choice="backend"]').textContent()) || "";
-    assert.ok(!/скоро/i.test(text), `backend chip should not say скоро: ${text}`);
+    for (const choice of ["backend", "frontend", "qa", "junior", "middle", "senior"]) {
+      const chip = page.locator(`.choice-chip[data-choice="${choice}"]`);
+      assert.equal(await chip.count(), 1);
+      assert.ok(!(await chip.getAttribute("disabled")), `${choice} should be enabled`);
+      const text = (await chip.textContent()) || "";
+      assert.ok(!/скоро/i.test(text), `${choice} chip should not say скоро: ${text}`);
+    }
     await context.close();
   });
 

@@ -135,7 +135,7 @@ function applyPatches(db) {
       test_id TEXT NOT NULL REFERENCES employer_tests(id) ON DELETE CASCADE,
       candidate_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       invitation_id TEXT REFERENCES invitations(id) ON DELETE SET NULL,
-      status TEXT NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned', 'started', 'submitted', 'expired')),
+      status TEXT NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned', 'started', 'submitted', 'expired', 'cancelled')),
       due_at TEXT NOT NULL,
       started_at TEXT,
       submitted_at TEXT
@@ -160,6 +160,70 @@ function applyPatches(db) {
   ensureColumn(db, "employer_test_assignments", "current_item_id", "TEXT");
   ensureColumn(db, "employer_test_answers", "opened_at", "TEXT");
   ensureColumn(db, "employer_test_answers", "timed_out", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "invitations", "pending_employer_test_id", "TEXT REFERENCES employer_tests(id) ON DELETE SET NULL");
+
+  const assignDdl = db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'employer_test_assignments'"
+    )
+    .get();
+  if (assignDdl?.sql && !assignDdl.sql.includes("'cancelled'")) {
+    // SQLite fires ON DELETE CASCADE when DROP TABLE runs with foreign_keys=ON.
+    // Rebuild per documented procedure: disable FKs, swap table, verify, re-enable.
+    db.pragma("foreign_keys = OFF");
+    try {
+      db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE employer_test_assignments_mig (
+          id TEXT PRIMARY KEY,
+          test_id TEXT NOT NULL REFERENCES employer_tests(id) ON DELETE CASCADE,
+          candidate_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          invitation_id TEXT REFERENCES invitations(id) ON DELETE SET NULL,
+          status TEXT NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned', 'started', 'submitted', 'expired', 'cancelled')),
+          due_at TEXT NOT NULL,
+          started_at TEXT,
+          submitted_at TEXT,
+          current_item_id TEXT
+        );
+        INSERT INTO employer_test_assignments_mig
+          (id, test_id, candidate_user_id, invitation_id, status, due_at, started_at, submitted_at, current_item_id)
+        SELECT id, test_id, candidate_user_id, invitation_id, status, due_at, started_at, submitted_at, current_item_id
+        FROM employer_test_assignments;
+        DROP TABLE employer_test_assignments;
+        ALTER TABLE employer_test_assignments_mig RENAME TO employer_test_assignments;
+        CREATE INDEX IF NOT EXISTS idx_employer_test_assignments_candidate ON employer_test_assignments(candidate_user_id, status);
+        CREATE INDEX IF NOT EXISTS idx_employer_test_assignments_test ON employer_test_assignments(test_id);
+        COMMIT;
+      `);
+    } catch (err) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {
+        /* connection may already be out of transaction */
+      }
+      db.pragma("foreign_keys = ON");
+      throw err;
+    }
+    const fkViolations = db.pragma("foreign_key_check");
+    if (fkViolations.length > 0) {
+      db.pragma("foreign_keys = ON");
+      throw new Error(
+        `employer_test_assignments migration: foreign_key_check failed: ${JSON.stringify(fkViolations)}`
+      );
+    }
+    db.pragma("foreign_keys = ON");
+  }
+
+  db.exec(`
+    UPDATE employer_test_assignments AS a
+    SET status = 'cancelled'
+    WHERE a.status IN ('assigned', 'started')
+      AND a.invitation_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM invitations i
+        WHERE i.id = a.invitation_id AND i.status != 'accepted'
+      );
+  `);
 
   db.exec(`
     UPDATE employer_test_assignments AS a

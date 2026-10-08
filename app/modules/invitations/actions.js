@@ -91,11 +91,24 @@ function createInvitation(employerUserId, body, actionSource = "web") {
      DO UPDATE SET decision = 'invited', updated_at = excluded.updated_at`
   ).run(newId(), employerUserId, needId, candidateId, now);
   if (employerTestId) {
-    const { assignCompanyTest } = require("../../lib/company-test-flow");
-    assignCompanyTest(db, employerUserId, String(employerTestId), {
-      candidateId,
-      invitationId: id,
-    });
+    const test = db
+      .prepare(
+        "SELECT id, need_id, status FROM employer_tests WHERE id = ? AND employer_user_id = ?"
+      )
+      .get(String(employerTestId), employerUserId);
+    if (!test) throw httpError(404, "not_found");
+    if (test.need_id !== needId) {
+      throw httpError(400, "invalid_body", {
+        fields: { employerTestId: "Тест привязан к другой потребности" },
+      });
+    }
+    if (test.status !== "published") {
+      throw httpError(409, "test_not_published", { message: "Опубликуйте тест перед назначением" });
+    }
+    db.prepare("UPDATE invitations SET pending_employer_test_id = ? WHERE id = ?").run(
+      test.id,
+      id
+    );
   }
   return { id };
 }
@@ -112,11 +125,22 @@ function respondToInvitation(candidateUserId, invitationId, decision, actionSour
   }
   const status = decision === "accept" ? "accepted" : "declined";
   const src = actionSource === "mcp" ? "mcp" : "web";
+  const pendingTestId = inv.pending_employer_test_id || null;
   db.prepare("UPDATE invitations SET status = ?, action_source = ? WHERE id = ?").run(
     status,
     src,
     inv.id
   );
+  const { assignCompanyTest, cancelOpenAssignmentsForInvitation } = require("../../lib/company-test-flow");
+  if (status === "declined") {
+    cancelOpenAssignmentsForInvitation(db, inv.id);
+  } else if (pendingTestId) {
+    assignCompanyTest(db, inv.employer_user_id, pendingTestId, {
+      candidateId: inv.candidate_user_id,
+      invitationId: inv.id,
+    });
+    db.prepare("UPDATE invitations SET pending_employer_test_id = NULL WHERE id = ?").run(inv.id);
+  }
   return { ok: true, status };
 }
 

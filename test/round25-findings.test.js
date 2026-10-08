@@ -235,6 +235,11 @@ describe("round 25 findings", () => {
   });
 
   it("P2-9: battery_incomplete REST message", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    db.prepare(
+      `UPDATE tasks SET status = 'draft' WHERE specialization = 'frontend' AND grade = 'middle' AND status = 'published'`
+    ).run();
     const agent = await registerCandidate(app, `r25bat-${Date.now()}@demo.local`);
     const res = await agent.post("/api/assessment/battery/start").send({
       specialization: "frontend",

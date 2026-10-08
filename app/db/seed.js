@@ -4,11 +4,7 @@ const bcrypt = require("bcryptjs");
 const { newId } = require("../lib/ids");
 const config = require("../config");
 
-const {
-  QUICK_RUBRIC,
-  WORK_RUBRIC,
-  seedBatteryTasks,
-} = require("./task-battery-content");
+const { QUICK_RUBRIC, WORK_RUBRIC } = require("./task-battery-content");
 
 function seedCategories(db) {
   const specs = ["backend", "frontend", "qa"];
@@ -27,11 +23,8 @@ function seedCategories(db) {
 }
 
 function seedTasks(db) {
-  const ins = db.prepare(
-    `INSERT INTO tasks (id, type, specialization, grade, form_key, prompt, rubric_json, status, origin)
-     VALUES (?, ?, 'backend', 'middle', ?, ?, ?, 'published', 'manual')`
-  );
-  seedBatteryTasks(db, ins);
+  const { seedAllPlatformBatteries } = require("./task-battery-content");
+  seedAllPlatformBatteries(db);
 }
 
 function seedDemoUsers(db) {
@@ -222,10 +215,13 @@ function topUpDemoCandidates(db) {
 }
 
 function seed(db) {
-  const count = db.prepare("SELECT COUNT(*) AS c FROM categories").get().c;
-  if (count === 0) {
-    seedCategories(db);
+  seedCategories(db);
+  const taskCount = db.prepare("SELECT COUNT(*) AS c FROM tasks WHERE status = 'published'").get().c;
+  if (taskCount === 0) {
     seedTasks(db);
+  }
+  const hasDemoAnna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+  if (!hasDemoAnna) {
     seedDemoUsers(db);
   }
   topUpDemoCandidates(db);

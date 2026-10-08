@@ -62,8 +62,20 @@ module.exports = {
   COOKIE_SECURE: cookieSecureFromAppUrl(APP_BASE_URL),
   DEMO_MODE: envBool("DEMO_MODE", false),
   DEMO_PASSWORD: process.env.DEMO_PASSWORD || "demo-demo-demo",
-  LLM_BASE_URL: process.env.LLM_BASE_URL || "",
   LLM_API_KEY: process.env.LLM_API_KEY || "",
+  LLM_BASE_URL: (() => {
+    const raw = String(process.env.LLM_BASE_URL || "")
+      .trim()
+      .replace(/\/+$/, "");
+    if (raw) return raw;
+    if (process.env.LLM_API_KEY) return "https://opencode.ai/zen/v1";
+    return "";
+  })(),
+  LLM_MODEL: process.env.LLM_MODEL || "glm-5.3-flash",
+  LLM_FALLBACK_MODELS: String(process.env.LLM_FALLBACK_MODELS || "space-bunny-free,deepseek-v4.1-flash")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
   COOKIE_NAME: "handcheck_sid",
   CALLS_DIR: path.join(DATA_DIR, "calls"),
   MCP_RATE_LIMIT_PER_MIN: Number(process.env.MCP_RATE_LIMIT_PER_MIN || 120),

@@ -503,13 +503,22 @@
   }
 
   async function generateLlm() {
-    await HandCheck.api(`/api/employer/tests/${activeTestId}/generate`, {
-      method: "POST",
-      body: "{}",
-      headers: { "x-demo-admin": "1" },
-    });
-    HandCheck.toast("Вопросы добавлены", "success");
-    await openEditor(activeTestId);
+    try {
+      await HandCheck.api(`/api/employer/tests/${activeTestId}/generate`, {
+        method: "POST",
+        body: "{}",
+        headers: { "x-demo-admin": "1" },
+      });
+      HandCheck.toast("Вопросы добавлены", "success");
+      await openEditor(activeTestId);
+    } catch (e) {
+      const msg =
+        e?.data?.message ||
+        (e?.data?.error === "llm_not_configured"
+          ? "Генерация недоступна без LLM"
+          : "Не удалось сгенерировать черновик");
+      HandCheck.toast(msg, "error");
+    }
   }
 
   async function boot() {

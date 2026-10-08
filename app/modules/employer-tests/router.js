@@ -22,6 +22,7 @@ const {
   mapTestRow,
 } = require("./service");
 const { generateEmployerTestItems } = require("../../lib/employer-test-llm");
+const { isLlmConfigured } = require("../../lib/llm-client");
 const {
   assignCompanyTest,
   loadAssignmentForEmployer,
@@ -33,7 +34,7 @@ router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
 
 router.get("/tests/config", (_req, res) => {
   res.json({
-    llmConfigured: Boolean(config.LLM_BASE_URL),
+    llmConfigured: isLlmConfigured(),
     templates: listTemplateMeta(),
   });
 });
@@ -201,7 +202,7 @@ router.post("/tests/:id/clone-template", (req, res, next) => {
 
 router.post("/tests/:id/generate", async (req, res, next) => {
   try {
-    if (!config.LLM_BASE_URL) {
+    if (!isLlmConfigured()) {
       return res.status(501).json({
         error: "llm_not_configured",
         message: "Генерация недоступна без LLM",
@@ -214,12 +215,23 @@ router.post("/tests/:id/generate", async (req, res, next) => {
     const test = assertEmployerOwnsTest(db, req.params.id, req.user.id);
     assertDraftEditable(test);
     const need = db.prepare("SELECT * FROM employer_needs WHERE id = ?").get(test.need_id);
-    const gen = await generateEmployerTestItems({
-      needTitle: need.title,
-      specialization: need.specialization,
-      grade: need.grade,
-      intro: test.intro,
-    });
+    let gen;
+    try {
+      gen = await generateEmployerTestItems({
+        needTitle: need.title,
+        specialization: need.specialization,
+        grade: need.grade,
+        intro: test.intro,
+      });
+    } catch (e) {
+      if (e?.message === "llm_failed" || e?.message === "llm_invalid_json") {
+        return res.status(502).json({
+          error: "llm_failed",
+          message: "Не удалось сгенерировать черновик. Попробуйте позже.",
+        });
+      }
+      throw e;
+    }
     if (gen.error) {
       return res.status(501).json({ error: gen.error, message: "Генерация недоступна без LLM" });
     }

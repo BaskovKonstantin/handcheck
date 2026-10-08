@@ -1,5 +1,13 @@
 # Session notes
 
+## 2026-10-08 — OpenCode Zen LLM wiring
+
+- Approved scope: Zen → employer test generate, bank task drafts, call LLM summary (keyword fallback).
+- Spec: `docs/superpowers/specs/2026-10-08-opencode-zen-llm-design.md`
+- Plan: `docs/superpowers/plans/2026-10-08-opencode-zen-llm.md`
+- Shared `app/lib/llm-client.js` (model fallbacks); server `.env` LLM_* from host secrets (not git).
+- Tests: `test/opencode-zen-llm.test.js`.
+
 ## 2026-10-07 — platform batteries 9 categories
 
 - Branch: `cursor/nine-category-batteries-9d5e`

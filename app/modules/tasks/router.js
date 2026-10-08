@@ -7,13 +7,13 @@ const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireNotCandidate } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
 const config = require("../../config");
-const { generateTask } = require("../../lib/llm-client");
+const { generateTask, isLlmConfigured } = require("../../lib/llm-client");
 
 const router = express.Router();
 
 router.post("/generate", requireAuth, requireConfirmedEmail, requireNotCandidate, async (req, res, next) => {
   try {
-    if (!config.LLM_BASE_URL) {
+    if (!isLlmConfigured()) {
       return res.status(501).json({
         error: "llm_not_configured",
         message: "Генерация заданий недоступна без LLM",
@@ -28,7 +28,24 @@ router.post("/generate", requireAuth, requireConfirmedEmail, requireNotCandidate
     const count = Math.min(10, Math.max(1, Number(req.body?.count) || 1));
     const created = [];
     for (let i = 0; i < count; i++) {
-      const gen = await generateTask({ specialization, grade, type });
+      let gen;
+      try {
+        gen = await generateTask({ specialization, grade, type });
+      } catch (e) {
+        if (e?.message === "llm_failed" || e?.message === "llm_invalid_json") {
+          return res.status(502).json({
+            error: "llm_failed",
+            message: "Не удалось сгенерировать задание. Попробуйте позже.",
+          });
+        }
+        throw e;
+      }
+      if (gen.error) {
+        return res.status(501).json({
+          error: gen.error,
+          message: "Генерация заданий недоступна без LLM",
+        });
+      }
       const id = newId();
       getDb()
         .prepare(

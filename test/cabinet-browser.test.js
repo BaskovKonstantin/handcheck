@@ -2531,13 +2531,13 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
   it("round95: compact stat tiles use three columns at 390 when count is three", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page = await context.newPage();
-    await login(page, "cafe@demo.local");
-    for (const path of ["/employer/calls", "/employer/invitations", "/candidate/calls"]) {
+
+    async function assertCompactThreeTileGrid(path) {
       await page.goto(`${BASE}${path}`, { waitUntil: "commit", timeout: 30000 });
       await page.waitForSelector(".stat-tile-grid-compact .stat-tile", { timeout: 30000 });
       const layout = await page.evaluate(() => {
         const grid = document.querySelector(".stat-tile-grid-compact");
-        const tiles = grid ? [...grid.querySelectorAll(".stat-tile")] : [];
+        const tiles = grid ? [...grid.querySelectorAll(":scope > .stat-tile")] : [];
         const cols = grid ? getComputedStyle(grid).gridTemplateColumns.split(" ").filter(Boolean) : [];
         const labels = tiles.map((t) => {
           const label = t.querySelector(".stat-tile-label");
@@ -2556,6 +2556,13 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       }
       await assertNoHorizontalScroll(page, `${path}@390`);
     }
+
+    await login(page, "cafe@demo.local");
+    for (const path of ["/employer/calls", "/employer/invitations"]) {
+      await assertCompactThreeTileGrid(path);
+    }
+    await login(page, "anna@demo.local");
+    await assertCompactThreeTileGrid("/candidate/calls");
     await context.close();
   });
 

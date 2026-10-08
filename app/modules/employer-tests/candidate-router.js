@@ -6,28 +6,18 @@ const { requireAuth, requireConfirmedEmail } = require("../../middleware/auth");
 const { requireRole } = require("../../middleware/require-role");
 const { httpError } = require("../../middleware/errors");
 const { dbDateToIso } = require("../../lib/db-datetime");
+const { companyTestStatusLabel } = require("../../lib/company-test-status");
 const {
   loadAssignmentForCandidate,
   listItems,
   openCurrentItem,
   submitItemAnswer,
+  buildCandidateAssignmentJson,
+  expireCurrentItemIfNeeded,
 } = require("../../lib/company-test-flow");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("candidate"));
-
-function publicItemShape(item, includeKey) {
-  const base = {
-    id: item.id,
-    position: item.position,
-    kind: item.kind,
-    prompt: item.prompt,
-    options: JSON.parse(item.options_json || "[]"),
-    timeLimitSec: item.time_limit_sec,
-  };
-  if (!includeKey) return base;
-  return base;
-}
 
 router.get("/company-tests", (req, res) => {
   const db = getDb();
@@ -46,6 +36,7 @@ router.get("/company-tests", (req, res) => {
     items: rows.map((r) => ({
       id: r.id,
       status: r.status,
+      statusLabel: companyTestStatusLabel(r.status),
       dueAt: dbDateToIso(r.due_at),
       startedAt: dbDateToIso(r.started_at),
       submittedAt: dbDateToIso(r.submitted_at),
@@ -59,38 +50,13 @@ router.get("/company-tests", (req, res) => {
 router.get("/company-tests/:assignmentId", (req, res, next) => {
   try {
     const db = getDb();
-    const assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
-    const items = listItems(db, assignment.test_id);
-    const answers = db
-      .prepare("SELECT * FROM employer_test_answers WHERE assignment_id = ?")
-      .all(assignment.id);
-    const byItem = new Map(answers.map((a) => [a.item_id, a]));
-    let currentId = assignment.current_item_id;
-    if (assignment.status === "started" || assignment.status === "assigned") {
-      currentId = openCurrentItem(db, assignment, items);
-    }
-    const refreshed = loadAssignmentForCandidate(db, assignment.id, req.user.id);
+    let assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
+    const payload = buildCandidateAssignmentJson(db, assignment, {
+      syncExpiry: assignment.status === "started",
+    });
     res.json({
-      id: refreshed.id,
-      status: refreshed.status,
-      dueAt: dbDateToIso(refreshed.due_at),
-      title: refreshed.title,
-      intro: refreshed.intro,
-      currentItemId: currentId,
-      items: items.map((it) => {
-        const ans = byItem.get(it.id);
-        const opened = ans?.opened_at;
-        const deadline =
-          opened && it.time_limit_sec
-            ? new Date(new Date(opened).getTime() + it.time_limit_sec * 1000).toISOString()
-            : null;
-        return {
-          ...publicItemShape(it, false),
-          openedAt: opened ? dbDateToIso(opened) : null,
-          deadlineAt: deadline,
-          submitted: Boolean(ans?.submitted_at),
-        };
-      }),
+      ...payload,
+      dueAt: dbDateToIso(payload.dueAt),
     });
   } catch (e) {
     next(e);
@@ -102,12 +68,12 @@ router.post("/company-tests/:assignmentId/start", (req, res, next) => {
     const db = getDb();
     const assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
     if (assignment.status === "submitted") {
-      return res.json({ ok: true, status: "submitted" });
+      return res.json({ ok: true, status: "submitted", statusLabel: companyTestStatusLabel("submitted") });
     }
     const items = listItems(db, assignment.test_id);
     if (!items.length) throw httpError(409, "invalid_state", { message: "В тесте нет вопросов" });
     openCurrentItem(db, assignment, items);
-    res.json({ ok: true, status: "started" });
+    res.json({ ok: true, status: "started", statusLabel: companyTestStatusLabel("started") });
   } catch (e) {
     next(e);
   }
@@ -116,12 +82,12 @@ router.post("/company-tests/:assignmentId/start", (req, res, next) => {
 router.post("/company-tests/:assignmentId/answers", (req, res, next) => {
   try {
     const db = getDb();
-    const assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
+    let assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
     if (assignment.status === "submitted") {
       throw httpError(409, "already_submitted", { message: "Тест уже сдан" });
     }
-    const itemId = String(req.body?.itemId || assignment.current_item_id || "");
     const items = listItems(db, assignment.test_id);
+    const itemId = String(req.body?.itemId || assignment.current_item_id || "");
     const item = items.find((x) => x.id === itemId);
     if (!item) throw httpError(400, "invalid_body", { fields: { itemId: "Вопрос не найден" } });
     if (assignment.current_item_id && assignment.current_item_id !== itemId) {
@@ -137,9 +103,10 @@ router.post("/company-tests/:assignmentId/answers", (req, res, next) => {
 router.post("/company-tests/:assignmentId/submit", (req, res, next) => {
   try {
     const db = getDb();
-    const assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
+    let assignment = loadAssignmentForCandidate(db, req.params.assignmentId, req.user.id);
     if (assignment.status === "submitted") return res.json({ ok: true });
     const items = listItems(db, assignment.test_id);
+    assignment = expireCurrentItemIfNeeded(db, assignment, items);
     const pending = items.filter((it) => {
       const ans = db
         .prepare("SELECT submitted_at FROM employer_test_answers WHERE assignment_id = ? AND item_id = ?")

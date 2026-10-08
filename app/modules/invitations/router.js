@@ -9,6 +9,7 @@ const { dbDateToIso } = require("../../lib/db-datetime");
 const { httpError } = require("../../middleware/errors");
 const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
 const { hasAnyPlayableRecording } = require("../../lib/call-recording");
+const { companyTestStatusLabel } = require("../../lib/company-test-status");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
@@ -62,6 +63,9 @@ router.get("/invitations", (req, res) => {
         viaAiClient: r.action_source === "mcp",
         companyTestAssignmentId: assignment?.id || null,
         companyTestAssignmentStatus: assignment?.status || null,
+        companyTestAssignmentStatusLabel: assignment?.status
+          ? companyTestStatusLabel(assignment.status)
+          : null,
       };
       if (r.status === "accepted") {
         item.candidatePhone = r.phone;

@@ -132,7 +132,8 @@
         panel.hidden = false;
         panel.innerHTML = HandCheck.skeletonBlocks(1);
         const data = await HandCheck.api(`/api/employer/test-assignments/${assignmentId}`);
-        panel.innerHTML = `<h4 class="h4">Ответы: ${esc(data.testTitle)}</h4>${(data.items || [])
+        const st = data.statusLabel ? ` · ${esc(data.statusLabel)}` : "";
+        panel.innerHTML = `<h4 class="h4">Ответы: ${esc(data.testTitle)}${st}</h4>${(data.items || [])
           .map((it) => {
             const mark =
               it.choiceMark === "ok"

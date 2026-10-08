@@ -2491,6 +2491,43 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
+  it("round 89: ghost buttons inherit app font on employer invitations", async () => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/invitations`, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForSelector(".invite-card, .empty-state", { timeout: 45000 });
+    const fonts = await page.evaluate(() => {
+      const body = getComputedStyle(document.body).fontFamily;
+      const primary = document.querySelector(".invite-actions .btn-primary, .btn-primary");
+      const ghost = document.querySelector(".invite-actions .btn-ghost") || document.querySelector("#logout-btn-aside");
+      return {
+        body,
+        primary: primary ? getComputedStyle(primary).fontFamily : null,
+        ghost: ghost ? getComputedStyle(ghost).fontFamily : null,
+      };
+    });
+    assert.ok(fonts.ghost, "expected a ghost button on invitations");
+    assert.equal(fonts.ghost, fonts.body, "ghost button should match body font");
+    if (fonts.primary) assert.equal(fonts.primary, fonts.body, "primary button should match body font");
+    await page.close();
+  });
+
+  it("round 89: company test rows on invitation card without horizontal scroll", async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await login(page, "cafe@demo.local");
+    await page.goto(`${BASE}/employer/invitations`, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForSelector(".invite-card, .empty-state", { timeout: 45000 });
+    const hasRows = await page.locator(".invite-company-test-row").count();
+    if (hasRows > 0) {
+      const glued = await page.evaluate(
+        () => document.body.innerText.includes("Тест «") && document.body.innerText.includes("»: Сдан Тест")
+      );
+      assert.equal(glued, false, "should not show glued legacy status line");
+      await assertNoHorizontalScroll(page, "employer-invitations-company-tests-390");
+    }
+    await page.close();
+  });
+
   it("shows created API token once in integrations UI (P0-1)", async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();

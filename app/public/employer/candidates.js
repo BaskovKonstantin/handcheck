@@ -26,11 +26,16 @@ const GRADES = [
 ];
 
 function statusLabel(row) {
+  return HandCheck.employerReviewStatusLabel(row.reviewStatus);
+}
+
+function statusPillClass(row) {
   const st = row.reviewStatus;
-  if (st === "invited") return "Приглашён";
-  if (st === "later") return "Отложен";
-  if (st === "rejected" || st === "declined") return "Отказ";
-  return "Новый";
+  if (st === "declined") return "status-pill declined";
+  if (st === "rejected") return "status-pill declined";
+  if (st === "invited") return "status-pill sent";
+  if (st === "later") return "status-pill";
+  return "status-pill sent";
 }
 
 function rowHasMarks(r) {
@@ -135,6 +140,7 @@ function renderFiltersRail() {
           <option value="new"${s.status === "new" ? " selected" : ""}>Новый</option>
           <option value="later"${s.status === "later" ? " selected" : ""}>Отложен</option>
           <option value="invited"${s.status === "invited" ? " selected" : ""}>Приглашён</option>
+          <option value="declined"${s.status === "declined" ? " selected" : ""}>Отказался</option>
           <option value="rejected"${s.status === "rejected" ? " selected" : ""}>Отказ</option>
         </select>
       </label>
@@ -235,7 +241,7 @@ function rowHtml(r, showMarksCol) {
     ${domainCell}
     <td class="col-fsp">${fsp}</td>
     ${marksCell}
-    <td class="col-status"><span class="status-pill sent">${esc(statusLabel(r))}</span></td>
+    <td class="col-status"><span class="${statusPillClass(r)}">${esc(statusLabel(r))}</span></td>
     <td class="col-assigned">${esc(date)}</td>
     <td class="candidates-col-actions col-invite">${inviteActionHtml(r)}</td>
   </tr>`;

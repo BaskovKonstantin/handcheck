@@ -75,6 +75,13 @@ body {
   background: var(--paper);
 }
 
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 a {
   color: var(--forest);
   text-decoration: none;
@@ -309,6 +316,7 @@ a {
   min-height: 44px;
   background: var(--clay);
   color: var(--on-clay);
+  font-family: inherit;
   font-weight: 600;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out);
@@ -331,6 +339,7 @@ a {
   padding: 0.65rem 1.25rem;
   background: transparent;
   color: var(--ink);
+  font-family: inherit;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease-out);
 }
@@ -412,6 +421,33 @@ body.call-room-page {
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-4);
+}
+
+.invite-company-tests {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.invite-company-test-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.invite-company-test-title {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-size: 0.92rem;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.invite-company-test-row .btn-ghost {
+  flex: 0 0 auto;
 }
 
 .contacts-block {

@@ -17,6 +17,13 @@
 - Decline clears `pending_employer_test_id`.
 - Tests: `test/round93-pending-company-test.test.js`.
 
+## 2026-10-08 — round 94 queued test invite UI
+
+- Branch: `cursor/queued-test-invite-ui-3f12`
+- Employer pending row: title once + `status-pill waiting` (not `sent`); no `pendingMessage` in HTML.
+- Candidate: `.invite-pending-test-note` info strip on card.
+- Tests: extended `test/round89-ui-polish.test.js`.
+
 ## 2026-10-08 — round 89 UI polish
 
 - Branch: `cursor/ui-polish-round89-17a0`

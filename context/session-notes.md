@@ -10,6 +10,13 @@
 
 ## 2026-10-07 — post-PR48 layout fixes
 
+## 2026-10-08 — round 93 pending company test on invitation
+
+- Branch: `cursor/pending-company-test-invite-a3fa`
+- API: `companyTests[]` pending row (`pending_accept`), candidate `pendingCompanyTestNote`; MCP `decide_candidate.employerTestId`, `list_invitations.companyTests`.
+- Decline clears `pending_employer_test_id`.
+- Tests: `test/round93-pending-company-test.test.js`.
+
 ## 2026-10-08 — round 89 UI polish
 
 - Branch: `cursor/ui-polish-round89-17a0`

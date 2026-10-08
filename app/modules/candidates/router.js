@@ -17,6 +17,7 @@ const { normalizeStackInput } = require("../../lib/need-validation");
 const { dbDateToIso } = require("../../lib/db-datetime");
 const { sanitizeStoredDisplayName } = require("../../lib/public-candidate-name");
 const { formatSpecGradeLabel } = require("../../lib/category-labels");
+const { candidatePendingCompanyTestFields } = require("../../lib/invitation-company-tests");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("candidate"));
@@ -190,6 +191,7 @@ router.get("/invitations", (req, res) => {
   const rows = getDb()
     .prepare(
       `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.contact_channel, i.status, i.created_at,
+              i.pending_employer_test_id,
               e.company_name, e.contact_email AS employer_contact_email,
               n.title AS need_title, n.specialization, n.grade,
               c.status AS call_status
@@ -218,6 +220,7 @@ router.get("/invitations", (req, res) => {
       if (r.status === "accepted") {
         item.employerContactEmail = r.employer_contact_email;
       }
+      Object.assign(item, candidatePendingCompanyTestFields(getDb(), r));
       return item;
     }),
   });

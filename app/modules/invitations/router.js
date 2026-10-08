@@ -10,46 +10,10 @@ const { httpError } = require("../../middleware/errors");
 const { publicCandidateDisplayName } = require("../../lib/public-candidate-name");
 const { hasAnyPlayableRecording } = require("../../lib/call-recording");
 const { companyTestStatusLabel } = require("../../lib/company-test-status");
+const { buildEmployerInvitationCompanyTests } = require("../../lib/invitation-company-tests");
 
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
-
-function listCompanyTestAssignments(db, invitationRow) {
-  let rows = db
-    .prepare(
-      `SELECT a.id, a.status, a.due_at, t.id AS test_id, t.title AS test_title
-       FROM employer_test_assignments a
-       JOIN employer_tests t ON t.id = a.test_id
-       WHERE a.invitation_id = ?
-       ORDER BY a.due_at ASC`
-    )
-    .all(invitationRow.id);
-  if (!rows.length) {
-    rows = db
-      .prepare(
-        `SELECT a.id, a.status, a.due_at, t.id AS test_id, t.title AS test_title
-         FROM employer_test_assignments a
-         JOIN employer_tests t ON t.id = a.test_id
-         WHERE a.candidate_user_id = ? AND t.need_id = ?
-         ORDER BY a.due_at ASC`
-      )
-      .all(invitationRow.candidate_user_id, invitationRow.need_id);
-  }
-  return rows;
-}
-
-function hasAssignableCompanyTest(db, needId, assignments) {
-  const published = db
-    .prepare(`SELECT id FROM employer_tests WHERE need_id = ? AND status = 'published'`)
-    .all(needId);
-  const blocked = new Set();
-  for (const a of assignments) {
-    if (["assigned", "started", "submitted"].includes(a.status)) {
-      blocked.add(a.test_id);
-    }
-  }
-  return published.some((t) => !blocked.has(t.id));
-}
 
 router.post("/invitations", (req, res, next) => {
   try {
@@ -81,15 +45,11 @@ router.get("/invitations", (req, res) => {
   res.json({
     items: rows.map((r) => {
       const db = getDb();
-      const assignments = listCompanyTestAssignments(db, r);
-      const assignment = assignments.length ? assignments[assignments.length - 1] : null;
-      const companyTests = assignments.map((a) => ({
-        id: a.id,
-        testId: a.test_id,
-        title: a.test_title,
-        status: a.status,
-        statusLabel: companyTestStatusLabel(a.status),
-      }));
+      const {
+        assignment,
+        companyTests,
+        hasAssignableCompanyTest: canAssignTest,
+      } = buildEmployerInvitationCompanyTests(db, r);
       const item = {
         id: r.id,
         candidateId: r.candidate_user_id,
@@ -110,7 +70,7 @@ router.get("/invitations", (req, res) => {
           ? companyTestStatusLabel(assignment.status)
           : null,
         companyTests,
-        hasAssignableCompanyTest: hasAssignableCompanyTest(db, r.need_id, assignments),
+        hasAssignableCompanyTest: canAssignTest,
       };
       if (r.status === "accepted") {
         item.candidatePhone = r.phone;

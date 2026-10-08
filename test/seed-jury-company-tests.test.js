@@ -1,14 +1,15 @@
 "use strict";
 
+process.env.DEMO_MODE = "1";
+process.env.DEMO_PASSWORD = process.env.DEMO_PASSWORD || "demo-demo-demo";
+
 const { describe, it, before } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
-const { getDb } = require("../app/db");
-const { seed } = require("../app/db/seed");
 const { newId } = require("../app/lib/ids");
-const { seedJuryCompanyTests, needTitleForSpec } = require("../scripts/seed-jury-company-tests");
+const { needTitleForSpec } = require("../scripts/seed-jury-company-tests");
 
 function countRows(db, table) {
   return db.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c;
@@ -72,7 +73,9 @@ function setupProdShapedJuryDb(db) {
   const beTest = db
     .prepare("SELECT id FROM employer_tests WHERE need_id = ? AND status = 'published' LIMIT 1")
     .get(longNeedBySpec.backend);
+  assert.ok(beTest?.id, "prod-shaped fixture: published backend test missing");
   const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+  assert.ok(anna?.id, "prod-shaped fixture: anna@demo.local missing from seed");
   for (let i = 0; i < 4; i += 1) {
     db.prepare(
       `INSERT INTO employer_test_assignments (id, test_id, candidate_user_id, invitation_id, status, due_at)
@@ -82,18 +85,28 @@ function setupProdShapedJuryDb(db) {
 }
 
 describe("seed-jury-company-tests idempotency (prod-shaped)", () => {
-  const tmpDb = path.join(os.tmpdir(), `hc-jury-seed-${process.pid}.sqlite`);
+  let tmpDb;
 
   before(() => {
+    tmpDb = path.join(os.tmpdir(), `hc-jury-prodshape-${process.pid}-${Date.now()}.sqlite`);
     if (fs.existsSync(tmpDb)) fs.unlinkSync(tmpDb);
     process.env.DB_PATH = tmpDb;
     process.env.DEMO_MODE = "1";
     process.env.DEMO_PASSWORD = "demo-demo-demo";
+    for (const key of Object.keys(require.cache)) {
+      if (key.includes("/app/")) delete require.cache[key];
+    }
+    const { createApp } = require("../app/server");
+    createApp();
+    const { getDb } = require("../app/db");
+    const { seed } = require("../app/db/seed");
     seed(getDb());
     setupProdShapedJuryDb(getDb());
   });
 
   it("does not create extra needs or tests on two runs", () => {
+    const { getDb } = require("../app/db");
+    const { seedJuryCompanyTests } = require("../scripts/seed-jury-company-tests");
     const db = getDb();
     const needsBefore = countRows(db, "employer_needs");
     const testsBefore = countRows(db, "employer_tests");

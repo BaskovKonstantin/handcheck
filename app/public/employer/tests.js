@@ -513,7 +513,6 @@
   }
 
   async function boot() {
-    HandCheck.employerNav();
     needs = (await HandCheck.api("/api/employer/needs")).items || [];
     await loadList();
   }

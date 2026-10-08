@@ -19,8 +19,13 @@ const CABINET_PAGES = [
     role: "employer",
   },
   {
-    file: "employer/list.html",
-    apis: ["/api/employer/needs"],
+    file: "employer/candidates.js",
+    apis: ["/api/employer/candidates"],
+    role: "employer",
+  },
+  {
+    file: "employer/overview.js",
+    apis: ["/api/employer/dashboard"],
     role: "employer",
   },
   {

@@ -90,10 +90,11 @@ function createApp() {
     ["/candidate/calls", "candidate/calls.html"],
     ["/candidate/profile", "candidate/profile.html"],
     ["/candidate/integrations", "candidate/integrations.html"],
+    ["/employer/overview", "employer/overview.html"],
     ["/employer/need", "employer/need.html"],
     ["/employer/tests", "employer/tests.html"],
     ["/employer/deck", "employer/deck.html"],
-    ["/employer/list", "employer/list.html"],
+    ["/employer/candidates", "employer/candidates.html"],
     ["/employer/deferred", "employer/deferred.html"],
     ["/employer/invitations", "employer/invitations.html"],
     ["/employer/calls", "employer/calls.html"],
@@ -104,6 +105,10 @@ function createApp() {
   for (const [url, file] of routes) {
     app.get(url, (_req, res) => res.sendFile(path.join(publicDir, file)));
   }
+  app.get("/employer/list", (req, res) => {
+    const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    res.redirect(302, `/employer/candidates${q}`);
+  });
   app.get("/call/:invitationId", (_req, res) => {
     res.sendFile(path.join(publicDir, "call.html"));
   });

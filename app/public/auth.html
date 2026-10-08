@@ -204,7 +204,7 @@
               }),
             });
             cacheEmail(j.user?.email || email, j.user?.role);
-            location.href = j.user.role === "employer" ? "/employer/deck" : "/candidate/today";
+            location.href = j.user.role === "employer" ? "/employer/overview" : "/candidate/today";
             return;
           }
           const role = document.getElementById("role").value;
@@ -250,7 +250,7 @@
           });
           cacheEmail(loginRes.user?.email || email, loginRes.user?.role);
           location.href =
-            loginRes.user?.role === "employer" ? "/employer/deck" : "/candidate/today";
+            loginRes.user?.role === "employer" ? "/employer/overview" : "/candidate/today";
         } catch (e) {
           showErr(HandCheck.formatApiError(e));
         }

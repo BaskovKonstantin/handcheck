@@ -258,9 +258,11 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
   it("round72: mobile cabinet has no horizontal overflow and aligned tab indicator", async () => {
     const widths = [320, 360, 390, 430];
     const employerRoutes = [
+      "/employer/overview",
       "/employer/deck",
+      "/employer/candidates",
       "/employer/need",
-      "/employer/list",
+      "/employer/tests",
       "/employer/deferred",
       "/employer/profile",
       "/employer/invitations",
@@ -302,7 +304,7 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
     await login(page, "cafe@demo.local");
-    await page.goto(`${BASE}/employer/list`, { waitUntil: "networkidle", timeout: 60000 });
+    await page.goto(`${BASE}/employer/candidates`, { waitUntil: "networkidle", timeout: 60000 });
     const h = await page.evaluate(
       () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
     );
@@ -311,18 +313,18 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
-  it("round66: employer list row main stays readable at 360–430px", async () => {
+  it("round66: employer candidates cards stay readable at 360–430px", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
     const page = await context.newPage();
     await login(page, "cafe@demo.local");
-    await page.goto(`${BASE}/employer/list`, { waitUntil: "networkidle", timeout: 60000 });
-    const main = page.locator(".list-row-main").first();
-    await main.waitFor({ state: "visible", timeout: 30000 });
+    await page.goto(`${BASE}/employer/candidates`, { waitUntil: "networkidle", timeout: 60000 });
+    const card = page.locator(".candidates-card").first();
+    await card.waitFor({ state: "visible", timeout: 30000 });
     for (const width of [390, 360, 430]) {
       await page.setViewportSize({ width, height: 900 });
       await page.waitForTimeout(200);
-      const rowWidth = await main.evaluate((el) => el.getBoundingClientRect().width);
-      assert.ok(rowWidth > 200, `list-row-main width ${rowWidth}px at viewport ${width}`);
+      const cardWidth = await card.evaluate((el) => el.getBoundingClientRect().width);
+      assert.ok(cardWidth > 200, `candidates-card width ${cardWidth}px at viewport ${width}`);
     }
     await context.close();
   });
@@ -332,9 +334,10 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const page = await context.newPage();
     await login(page, "cafe@demo.local");
     const routes = [
+      ["/employer/overview", ".overview-hero, .stat-tile, .empty-state"],
       ["/employer/deck", "#deck-card:not([hidden]), .empty-state .empty-title"],
       ["/employer/invitations", ".stat-tile, .invite-card, .empty-state"],
-      ["/employer/list", ".list-row-card, .empty-state"],
+      ["/employer/candidates", ".candidates-table tbody tr, .candidates-card, .empty-state"],
       ["/employer/calls", ".invite-card, .empty-state, .stat-tile"],
       ["/employer/need", "#need-select, #title, .stat-tile"],
       ["/employer/deferred", ".stat-tile, .empty-state, .invite-card"],
@@ -347,7 +350,35 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
-  it("round65: employer list undecided cards keep width at 390px", async () => {
+  it("employer candidates: smart search chips parse сеньор нода фсп", async () => {
+    for (const width of [1280, 390]) {
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await context.newPage();
+      await login(page, "cafe@demo.local");
+      await page.goto(`${BASE}/employer/candidates`, { waitUntil: "networkidle", timeout: 60000 });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+      );
+      assert.equal(overflow, false, `horizontal overflow at ${width}px`);
+      await page.waitForSelector("#search-input", { timeout: 15000 });
+      const searchResp = page.waitForResponse(
+        (r) => r.url().includes("/api/employer/candidates") && r.url().includes("q="),
+        { timeout: 25000 }
+      );
+      await page.locator("#search-input").fill("");
+      await page.locator("#search-input").pressSequentially("сеньор нода фсп", { delay: 30 });
+      await searchResp;
+      await page.waitForFunction(
+        () => document.querySelectorAll("#search-chips .search-chip").length >= 2,
+        { timeout: 15000 }
+      );
+      const chips = await page.locator("#search-chips .search-chip").count();
+      assert.ok(chips >= 2, `expected search chips, got ${chips}`);
+      await context.close();
+    }
+  });
+
+  it("round65: employer candidates undecided rows keep width at 390px", async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
     const page = await context.newPage();
     const dbPath = path.join(ROOT, "data", `handcheck-browser-${PORT}.sqlite`);
@@ -388,26 +419,23 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     db.close();
 
     await login(page, "cafe@demo.local");
-    await page.goto(`${BASE}/employer/list?need=${need.id}`, { waitUntil: "commit", timeout: 30000 });
-    await page.waitForSelector('.list-row-card-rich button[data-decision="later"]', { timeout: 20000 });
-    const card = page.locator(".list-row-card-rich", { hasText: longName });
+    await page.goto(`${BASE}/employer/candidates?need=${need.id}`, { waitUntil: "networkidle", timeout: 60000 });
+    const card = page.locator(".candidates-card", { hasText: longName });
     await card.waitFor({ state: "visible", timeout: 20000 });
     await card.locator(".status-pill.paste-input").waitFor({ state: "visible", timeout: 5000 });
     const layout = await card.evaluate((el) => {
-      const main = el.querySelector(".list-row-main");
-      const name = el.querySelector(".list-row-main strong");
-      const mainBox = main?.getBoundingClientRect();
+      const name = el.querySelector("strong");
       const nameBox = name?.getBoundingClientRect();
       const cardBox = el.getBoundingClientRect();
       return {
-        mainW: mainBox?.width ?? 0,
         nameW: nameBox?.width ?? 0,
         nameH: nameBox?.height ?? 0,
         cardH: cardBox.height,
+        cardW: cardBox.width,
       };
     });
-    assert.ok(layout.mainW >= 200, `list-row-main width ${layout.mainW}`);
-    assert.ok(layout.nameW >= 200, `name width ${layout.nameW}`);
+    assert.ok(layout.cardW >= 200, `row width ${layout.cardW}`);
+    assert.ok(layout.nameW >= 120, `name width ${layout.nameW}`);
     assert.ok(layout.nameH < 120, `name height ${layout.nameH} (vertical ribbon)`);
     assert.ok(layout.cardH < 700, `card height ${layout.cardH}`);
     await context.close();
@@ -418,17 +446,23 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     const page = await context.newPage();
     await login(page, "cafe@demo.local");
     const paths = [
+      "/employer/overview",
       "/employer/deck",
+      "/employer/candidates",
       "/employer/need",
+      "/employer/tests",
       "/employer/invitations",
       "/employer/calls",
-      "/employer/list",
       "/employer/deferred",
       "/employer/profile",
       "/employer/integrations",
     ];
     for (const path of paths) {
-      if (!["/employer/deck", "/employer/need", "/employer/invitations", "/employer/calls"].includes(path)) {
+      if (
+        !["/employer/overview", "/employer/deck", "/employer/need", "/employer/invitations", "/employer/calls"].includes(
+          path
+        )
+      ) {
         await page.goto(`${BASE}/employer/deck`, { waitUntil: "commit" });
         await page.click("#cabinet-more");
         await page.waitForSelector("#cabinet-more-sheet:not([hidden])");

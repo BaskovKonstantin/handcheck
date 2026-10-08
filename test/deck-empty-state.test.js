@@ -14,7 +14,7 @@ describe("deck empty state", () => {
 
   it("offers list and deferred when nobody invited yet", () => {
     const s = getDeckEmptyState({ invitedInMatches: 0 });
-    assert.ok(s.actions.some((a) => a.href === "/employer/list" && a.primary));
+    assert.ok(s.actions.some((a) => a.href === "/employer/candidates" && a.primary));
     assert.ok(s.actions.some((a) => a.href === "/employer/deferred"));
   });
 });

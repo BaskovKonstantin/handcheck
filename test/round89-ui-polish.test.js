@@ -10,7 +10,10 @@ const {
   employerReviewStatusLabel,
   matchesEmployerReviewStatusFilter,
 } = require("../app/lib/employer-review-status");
-const { renderInvitationCompanyTestsHtml } = require("../app/lib/employer-invitation-company-tests");
+const {
+  renderInvitationCompanyTestsHtml,
+  companyTestStatusPillClass,
+} = require("../app/lib/employer-invitation-company-tests");
 
 const esc = (s) => String(s);
 
@@ -65,6 +68,29 @@ describe("round 89 UI polish", () => {
     );
     assert.match(rowsHtml, /Назначен/);
     assert.doesNotMatch(rowsHtml, /data-review-test/);
+  });
+
+  it("pending company test row shows title once and neutral waiting pill", () => {
+    const title = "Frontend: HTTP и работа с API";
+    const { rowsHtml } = renderInvitationCompanyTestsHtml(
+      [
+        {
+          id: "pending-1",
+          title,
+          status: "pending_accept",
+          statusLabel: "Назначится после принятия",
+          pendingMessage: `Тест «${title}» назначится после принятия`,
+        },
+      ],
+      esc
+    );
+    assert.equal(companyTestStatusPillClass("pending_accept"), "status-pill waiting");
+    assert.match(rowsHtml, /invite-company-test-row-pending/);
+    assert.equal((rowsHtml.match(new RegExp(title, "g")) || []).length, 1);
+    assert.equal((rowsHtml.match(/назначится после принятия/gi) || []).length, 1);
+    assert.match(rowsHtml, /status-pill waiting/);
+    assert.doesNotMatch(rowsHtml, /status-pill sent/);
+    assert.doesNotMatch(rowsHtml, /Тест «/);
   });
 });
 

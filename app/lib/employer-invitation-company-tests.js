@@ -3,6 +3,7 @@
 function companyTestStatusPillClass(status) {
   if (status === "submitted") return "status-pill accepted";
   if (status === "expired") return "status-pill declined";
+  if (status === "pending_accept") return "status-pill waiting";
   return "status-pill sent";
 }
 
@@ -18,10 +19,10 @@ function renderInvitationCompanyTestsHtml(companyTests, esc) {
   const rows = list
     .map((ct) => {
       if (ct.status === "pending_accept") {
-        const line = ct.pendingMessage || ct.title;
+        const pillCls = companyTestStatusPillClass(ct.status);
         return `<div class="invite-company-test-row invite-company-test-row-pending">
-  <span class="invite-company-test-title">${esc(line)}</span>
-  <span class="status-pill sent">${esc(ct.statusLabel)}</span>
+  <span class="invite-company-test-title">${esc(ct.title)}</span>
+  <span class="${pillCls}">${esc(ct.statusLabel)}</span>
 </div>`;
       }
       const pillCls = companyTestStatusPillClass(ct.status);

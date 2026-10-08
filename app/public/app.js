@@ -1084,6 +1084,13 @@ function renderInvitationCompanyTestsHtml(companyTests, esc) {
   }
   const rows = list
     .map((ct) => {
+      if (ct.status === "pending_accept") {
+        const line = ct.pendingMessage || ct.title;
+        return `<div class="invite-company-test-row invite-company-test-row-pending">
+  <span class="invite-company-test-title">${esc(line)}</span>
+  <span class="status-pill sent">${esc(ct.statusLabel)}</span>
+</div>`;
+      }
       const pillCls = companyTestStatusPillClass(ct.status);
       const reviewBtn =
         ct.status === "submitted"
@@ -1097,6 +1104,7 @@ function renderInvitationCompanyTestsHtml(companyTests, esc) {
     })
     .join("");
   const reviewPanels = list
+    .filter((ct) => ct.status !== "pending_accept")
     .map((ct) => `<div class="employer-test-review-panel" id="review-${esc(ct.id)}" hidden></div>`)
     .join("");
   return {

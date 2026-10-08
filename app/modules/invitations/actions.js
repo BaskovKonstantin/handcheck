@@ -134,6 +134,7 @@ function respondToInvitation(candidateUserId, invitationId, decision, actionSour
   const { assignCompanyTest, cancelOpenAssignmentsForInvitation } = require("../../lib/company-test-flow");
   if (status === "declined") {
     cancelOpenAssignmentsForInvitation(db, inv.id);
+    db.prepare("UPDATE invitations SET pending_employer_test_id = NULL WHERE id = ?").run(inv.id);
   } else if (pendingTestId) {
     assignCompanyTest(db, inv.employer_user_id, pendingTestId, {
       candidateId: inv.candidate_user_id,

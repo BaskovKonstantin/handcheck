@@ -293,9 +293,12 @@ function submitAttemptAnswer(userId, attemptId, answerText, actionSource = "web"
 
 function listCandidateInvitations(userId) {
   const { formatSpecGradeLabel } = require("../../lib/category-labels");
-  const rows = getDb()
+  const { candidatePendingCompanyTestFields } = require("../../lib/invitation-company-tests");
+  const db = getDb();
+  const rows = db
     .prepare(
       `SELECT i.id, i.salary_from, i.salary_to, i.offer_text, i.contact_channel, i.status, i.created_at,
+              i.pending_employer_test_id,
               e.company_name, n.title AS need_title, n.specialization, n.grade, c.status AS call_status
        FROM invitations i
        JOIN employer_profiles e ON e.user_id = i.employer_user_id
@@ -316,6 +319,7 @@ function listCandidateInvitations(userId) {
     needCategory: formatSpecGradeLabel(r.specialization, r.grade),
     callStatus: r.call_status || null,
     createdAt: dbDateToIso(r.created_at),
+    ...candidatePendingCompanyTestFields(db, r),
   }));
 }
 
@@ -528,6 +532,7 @@ function decideCandidate(userId, needId, payload, actionSource = "web") {
           salaryTo: payload.salaryTo,
           offerText: payload.offerText,
           contactChannel: payload.contactChannel || "email",
+          employerTestId: payload.employerTestId,
         },
         actionSource
       );
@@ -559,6 +564,7 @@ function listShortlist(userId, needId, filters = {}) {
 }
 
 function listEmployerInvitations(userId) {
+  const { buildEmployerInvitationCompanyTests } = require("../../lib/invitation-company-tests");
   const db = getDb();
   const rows = db
     .prepare(
@@ -573,6 +579,7 @@ function listEmployerInvitations(userId) {
     )
     .all(userId);
   return rows.map((r) => {
+    const { companyTests } = buildEmployerInvitationCompanyTests(db, r);
     const item = {
       id: r.id,
       candidateId: r.candidate_user_id,
@@ -586,6 +593,7 @@ function listEmployerInvitations(userId) {
       contactChannel: r.contact_channel,
       viaAiClient: r.action_source === "mcp",
       createdAt: dbDateToIso(r.created_at),
+      companyTests,
     };
     if (r.status === "accepted") {
       item.candidatePhone = r.phone;

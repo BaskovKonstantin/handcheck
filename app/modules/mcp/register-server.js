@@ -296,7 +296,8 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
     server.registerTool(
       "decide_candidate",
       {
-        description: "Решение по кандидату: reject, later или invite с вилкой ЗП.",
+        description:
+          "Решение по кандидату: reject, later или invite с вилкой ЗП. Для invite можно передать employerTestId — тест назначится после принятия.",
         ...writeToolExtra(z, {
           needId: z.string(),
           candidateId: z.string(),
@@ -305,6 +306,7 @@ function registerHandcheckTools(server, ctx, ResourceTemplate) {
           salaryTo: z.number().int().optional(),
           offerText: z.string().optional(),
           contactChannel: z.string().optional(),
+          employerTestId: z.string().optional(),
         }),
       },
       wrapTool(ctx, "decide_candidate", true, (args) => {

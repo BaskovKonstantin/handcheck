@@ -62,6 +62,9 @@
                   : "";
             const stCls = HandCheck.invitationStatusClass(i.status);
             const companyTitle = esc(i.companyName || "Компания");
+            const pendingTestNote = i.pendingCompanyTestNote
+              ? `<p class="invite-meta invite-pending-test-note">${esc(i.pendingCompanyTestNote)}</p>`
+              : "";
             return `<article class="invite-card invite-card-expressive">
               <div class="invite-card-top">
                 <h3>${companyTitle}</h3>
@@ -70,7 +73,7 @@
               ${needLine ? `<p class="invite-meta invite-need-line">${esc(needLine)}</p>` : ""}
               ${dateStr ? `<p class="invite-meta">${esc(dateStr)}</p>` : ""}
               <p class="salary-hero">${HandCheck.formatSalaryRange(i.salaryFrom, i.salaryTo)}</p>
-              <p class="invite-offer-text">${esc(i.offerText || "")}</p>${contacts}${actions}</article>`;
+              <p class="invite-offer-text">${esc(i.offerText || "")}</p>${pendingTestNote}${contacts}${actions}</article>`;
           })
           .join("")}</div>`;
         list.querySelectorAll("button[data-a]").forEach((b) => {

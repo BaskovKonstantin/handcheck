@@ -40,7 +40,7 @@
       body = `<ul class="company-test-choice-list">${(current.options || [])
         .map(
           (o) =>
-            `<li><label><input type="${input}" name="ct-choice" value="${esc(o.id)}" /> ${esc(o.label)}</label></li>`
+            `<li><label class="choice-option"><input type="${input}" name="ct-choice" value="${esc(o.id)}" /> <span>${esc(o.label)}</span></label></li>`
         )
         .join("")}</ul>`;
     } else if (current.kind === "code") {
@@ -118,6 +118,24 @@
     });
   }
 
+  function syncListActionForAssignment(assignmentId, hideStart) {
+    document.querySelectorAll(`[data-assignment-id="${assignmentId}"]`).forEach((btn) => {
+      if (!btn.matches("[data-company-test-action]")) return;
+      if (hideStart) {
+        btn.hidden = true;
+        return;
+      }
+      const status = btn.dataset.companyTestAction;
+      const label = actionLabel(status);
+      if (label) {
+        btn.textContent = label;
+        btn.hidden = false;
+      } else {
+        btn.hidden = true;
+      }
+    });
+  }
+
   async function loadTakeState(assignmentId, { start } = {}) {
     const active = document.getElementById("company-test-active");
     if (!active) return;
@@ -127,10 +145,12 @@
         method: "POST",
         body: "{}",
       });
+      syncListActionForAssignment(assignmentId, true);
     }
     const state = await HandCheck.api(`/api/candidate/company-tests/${assignmentId}`);
     active.innerHTML = renderTakeUi(state);
     bindTakeUi(assignmentId, state);
+    if (state.status === "started") syncListActionForAssignment(assignmentId, true);
   }
 
   function beginAssignment(id) {

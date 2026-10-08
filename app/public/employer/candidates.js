@@ -202,13 +202,13 @@ function rowHtml(r) {
   return `<tr class="candidates-row" data-id="${esc(r.id)}" tabindex="0">
     <td class="candidates-col-check"><input type="checkbox" class="compare-check" data-id="${esc(r.id)}"${checked} aria-label="Сравнить" /></td>
     <td><strong>${esc(r.displayName)}</strong></td>
-    <td>${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}</td>
-    <td><div class="chip-row chip-row-skills">${stack || "—"}</div></td>
-    <td>${esc(domain)}</td>
-    <td>${fsp}</td>
-    <td class="candidates-col-marks">${marks}</td>
-    <td><span class="status-pill sent">${esc(statusLabel(r))}</span></td>
-    <td>${esc(date)}</td>
+    <td class="col-category">${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}</td>
+    <td class="col-stack"><div class="chip-row chip-row-skills">${stack || "—"}</div></td>
+    <td class="col-domain">${esc(domain)}</td>
+    <td class="col-fsp">${fsp}</td>
+    <td class="candidates-col-marks col-optional">${marks}</td>
+    <td class="col-status"><span class="status-pill sent">${esc(statusLabel(r))}</span></td>
+    <td class="col-assigned">${esc(date)}</td>
     <td class="candidates-col-actions">
       <button type="button" class="btn-primary btn-sm" data-invite="${esc(r.id)}">Пригласить</button>
     </td>
@@ -248,9 +248,9 @@ function renderTable(items) {
     <div class="candidates-table-wrap">
       <table class="candidates-table">
         <thead><tr>
-          <th scope="col"></th><th scope="col">Имя</th><th scope="col">Категория</th><th scope="col">Стек</th>
-          <th scope="col">Домен</th><th scope="col">ФСП</th><th scope="col">Метки</th><th scope="col">Статус</th>
-          <th scope="col">В категории с</th><th scope="col"></th>
+          <th scope="col"></th><th scope="col">Имя</th><th scope="col" class="col-category">Категория</th><th scope="col" class="col-stack">Стек</th>
+          <th scope="col" class="col-domain">Домен</th><th scope="col" class="col-fsp">ФСП</th><th scope="col" class="col-optional">Метки</th><th scope="col" class="col-status">Статус</th>
+          <th scope="col" class="col-assigned">В категории с</th><th scope="col" class="col-invite"></th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -404,7 +404,27 @@ function openInvite(candidateId) {
     HandCheck.toast("Выберите потребность, чтобы отправить приглашение", "info");
     return;
   }
+  const row = cachedItems.find((r) => r.id === candidateId);
+  const needRow = cachedNeeds.find((n) => n.id === need);
   inviteCandidateId = candidateId;
+  const esc = HandCheck.escapeHtml;
+  const titleEl = document.getElementById("invite-sheet-title");
+  const subEl = document.getElementById("invite-sheet-sub");
+  if (titleEl) {
+    titleEl.textContent = "";
+    if (row) titleEl.append("Приглашение · ", row.displayName);
+    else titleEl.append("Приглашение");
+  }
+  if (subEl) {
+    if (needRow?.title) {
+      subEl.textContent = "";
+      subEl.append("Потребность: ", needRow.title);
+      subEl.hidden = false;
+    } else {
+      subEl.hidden = true;
+    }
+  }
+  closeDrawer();
   document.getElementById("invite-err").hidden = true;
   document.getElementById("salary-range-err")?.setAttribute("hidden", "");
   document.getElementById("sheet").classList.remove("hidden");

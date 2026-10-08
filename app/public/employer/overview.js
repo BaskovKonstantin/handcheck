@@ -20,7 +20,7 @@ function renderFunnel(funnel) {
     ${bar("Просмотрено", funnel.viewed, "grade-bar-other")}
     ${bar("Принято", funnel.accepted, "grade-bar-exact")}
     ${bar("Отклонено", funnel.declined, "grade-bar-unconfirmed")}
-    <p class="invite-meta">Доля принятий: ${funnel.acceptanceShare}% · Медиана ответа: ${median}</p>`;
+    <p class="invite-meta">Доля принятий: ${funnel.acceptanceShare != null ? `${funnel.acceptanceShare}%` : "—"} · Медиана ответа: ${median}</p>`;
 }
 
 function renderNeeds(needs) {
@@ -67,7 +67,7 @@ function renderBank(rows) {
     .map((r) => {
       const pct = Math.round((r.count / max) * 100);
       return `<div class="overview-bank-row">
-        <span class="overview-bank-label">${esc(r.spec)} × ${esc(r.grade)}</span>
+        <span class="overview-bank-label">${esc(r.label || `${r.spec} × ${r.grade}`)}</span>
         <div class="overview-bank-bar"><span style="width:${pct}%"></span></div>
         <span class="overview-bank-count">${r.count}</span>
       </div>`;

@@ -45,6 +45,49 @@ const EMPLOYER_TEST_TEMPLATES = {
       },
     ],
   },
+  "frontend-http-api": {
+    title: "Frontend: HTTP и работа с API",
+    intro:
+      "Скрининг для фронтенда: HTTP, работа с API и типичные ошибки интеграции. Без показа правильных ответов кандидату.",
+    items: [
+      {
+        kind: "single",
+        prompt: "Какой HTTP-метод обычно используют для безопасного чтения ресурса без изменения состояния?",
+        options: [
+          { id: "a", label: "GET" },
+          { id: "b", label: "POST" },
+          { id: "c", label: "DELETE" },
+          { id: "d", label: "PATCH" },
+        ],
+        answerKey: { correctIds: ["a"] },
+        timeLimitSec: 90,
+      },
+      {
+        kind: "single",
+        prompt: "Что из перечисленного чаще всего указывают в заголовке Authorization при Bearer-токене?",
+        options: [
+          { id: "a", label: "Bearer <token>" },
+          { id: "b", label: "Basic <user:pass>" },
+          { id: "c", label: "Cookie: session=…" },
+          { id: "d", label: "X-API-Key в теле запроса" },
+        ],
+        answerKey: { correctIds: ["a"] },
+        timeLimitSec: 90,
+      },
+      {
+        kind: "text",
+        prompt: "Как обработать на клиенте ответ 401 Unauthorized при запросе к защищённому API?",
+        rubricKeys: { keywords: ["refresh", "токен", "logout", "редирект", "401"] },
+        timeLimitSec: 180,
+      },
+      {
+        kind: "text",
+        prompt: "Назовите два риска при хранении access-токена только в localStorage.",
+        rubricKeys: { keywords: ["xss", "утеч", "скрипт", "безопас", "httpOnly"] },
+        timeLimitSec: 180,
+      },
+    ],
+  },
   "qa-test-design": {
     title: "QA: тест-дизайн",
     intro: "Проверка мышления тестировщика: граничные случаи, приоритеты, артефакты.",

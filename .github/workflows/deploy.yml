@@ -43,8 +43,24 @@ jobs:
           export GIT_COMMIT="$(git rev-parse HEAD)"
           docker compose up -d --build --remove-orphans
 
-          sleep 3
-          curl -fsS --max-time 15 http://127.0.0.1:8810/api/health
+          HEALTH_URL="http://127.0.0.1:8810/api/health"
+          HEALTH_DEADLINE=$(( $(date +%s) + 120 ))
+          HEALTH_OK=0
+          while [ "$(date +%s)" -lt "$HEALTH_DEADLINE" ]; do
+            if HEALTH_BODY="$(curl -fsS --max-time 8 "$HEALTH_URL" 2>/dev/null)"; then
+              if echo "$HEALTH_BODY" | grep -q "\"commit\"[[:space:]]*:[[:space:]]*\"${GIT_COMMIT}\""; then
+                HEALTH_OK=1
+                break
+              fi
+              echo "WARN: health responded but commit mismatch (got: ${HEALTH_BODY:0:200})"
+            fi
+            sleep 2
+          done
+          if [ "$HEALTH_OK" -ne 1 ]; then
+            echo "ERROR: /api/health did not return commit=${GIT_COMMIT} within 120s"
+            curl -v --max-time 10 "$HEALTH_URL" || true
+            exit 1
+          fi
 
           if ! docker compose ps --status running | grep -q web; then
             echo "ERROR: web service is not running after deploy"

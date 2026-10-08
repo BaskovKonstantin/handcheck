@@ -32,6 +32,7 @@ const {
   listChunkFiles,
   totalChunkBytes,
   finalizeOrphanChunkSides,
+  hasRecordingContinuationContext,
 } = require("../../lib/recording-store");
 const {
   listPlayableRecordingSides,
@@ -231,7 +232,6 @@ router.post("/:id/end", (req, res, next) => {
     ? Math.max(0, new Date(now).getTime() - new Date(call.started_at).getTime())
     : 0;
   broadcastCallEnded(call.id);
-  queueAnalyzeCall(call.id);
   res.json({ ok: true });
   setImmediate(() => {
     try {
@@ -239,6 +239,7 @@ router.post("/:id/end", (req, res, next) => {
     } catch {
       /* keep ended even if merge fails */
     }
+    queueAnalyzeCall(call.id);
   });
 });
 
@@ -266,7 +267,7 @@ router.post(
         : req.user.id === inv.employer_user_id
           ? "employer"
           : null;
-    const hasChunks = listChunkFiles(callId, side).length > 0;
+    const hasChunks = hasRecordingContinuationContext(callId, side);
     if (!assertRecordingChunkUpload(req.file, hasChunks)) {
       return next(httpError(400, "invalid_recording"));
     }
@@ -327,12 +328,14 @@ router.post(
   } catch {
     /* invalid_path handled below */
   }
-  if (!req.file?.buffer?.length && !hasChunks && !hasPlayableFinal) {
+  const hasContinuationContext = hasChunks || hasPlayableFinal;
+  if (!req.file?.buffer?.length && !hasContinuationContext) {
     return next(httpError(400, "file_required"));
   }
   if (req.file?.buffer?.length) {
     const tailOk =
-      assertWebmUpload(req.file) || (hasChunks && assertRecordingChunkUpload(req.file, true));
+      assertWebmUpload(req.file) ||
+      (hasContinuationContext && assertRecordingChunkUpload(req.file, true));
     if (!tailOk) {
       return next(
         httpError(400, "invalid_recording", {
@@ -380,6 +383,9 @@ router.post(
     return next(httpError(400, "invalid_path"));
   }
   db.prepare("UPDATE calls SET recording_path = ? WHERE id = ?").run(dir, call.id);
+  if (call.status === "ended") {
+    queueAnalyzeCall(call.id);
+  }
   res.json({ ok: true });
   }
 );

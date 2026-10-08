@@ -17,6 +17,14 @@
 - Decline clears `pending_employer_test_id`.
 - Tests: `test/round93-pending-company-test.test.js`.
 
+## 2026-10-08 — round 107 recording late chunk + analysis + deploy health
+
+- Branch: `cursor/round107-recording-regressions-c0d3`
+- Bug 1: after orphan merge cleared chunks, late continuation chunk/tail got 400 — `hasRecordingContinuationContext` + merge playable final with new chunks.
+- Bug 2: `queueAnalyzeCall` moved after `finalizeOrphanChunkSides`; debounce; re-queue on `POST /recording` when ended.
+- Bug 3: deploy.yml health poll up to 120s with `commit` check.
+- Tests: `test/round107-recording-regressions.test.js`.
+
 ## 2026-10-08 — round 106 recording finalize 502 / keep-alive
 
 - Branch: `cursor/recording-finalize-keepalive-761a`

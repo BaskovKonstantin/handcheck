@@ -152,6 +152,12 @@ function mergeChunksToFinal(callId, side, tailBuffer, durationMs) {
   return finalPath;
 }
 
+function hasRecordingContinuationContext(callId, side) {
+  if (listChunkFiles(callId, side).length > 0) return true;
+  const finalPath = path.join(callDir(callId), `${side}.webm`);
+  return isPlayableRecordingFile(finalPath);
+}
+
 function writeFinalRecording(callId, side, buffer, durationMs) {
   const finalPath = path.join(callDir(callId), `${side}.webm`);
   const hasTail = Boolean(buffer?.length);
@@ -162,7 +168,12 @@ function writeFinalRecording(callId, side, buffer, durationMs) {
   if (hasTail && isPlayableRecordingFile(finalPath) && chunkPaths.length === 0) {
     return finalPath;
   }
-  const parts = chunkPaths.map((p) => fs.readFileSync(p));
+  let parts;
+  if (chunkPaths.length > 0 && isPlayableRecordingFile(finalPath)) {
+    parts = [fs.readFileSync(finalPath), ...chunkPaths.map((p) => fs.readFileSync(p))];
+  } else {
+    parts = chunkPaths.map((p) => fs.readFileSync(p));
+  }
   if (buffer?.length) parts.push(buffer);
   if (!parts.length) {
     if (isPlayableRecordingFile(finalPath)) return finalPath;
@@ -202,6 +213,7 @@ module.exports = {
   appendChunk,
   mergeChunksToFinal,
   writeFinalRecording,
+  hasRecordingContinuationContext,
   listChunkFiles,
   totalChunkBytes,
   mergeBuffers,

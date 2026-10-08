@@ -32,15 +32,24 @@ function analyzeCall(callId) {
   ).run(callId, summary_text, JSON.stringify(domain_hits), consistency_note);
 }
 
+const analyzeDebounceMs = 150;
+const pendingAnalyze = new Map();
+
 function queueAnalyzeCall(callId) {
-  setImmediate(() => {
-    try {
-      analyzeCall(callId);
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error("analyzeCall failed", e);
-    }
-  });
+  const existing = pendingAnalyze.get(callId);
+  if (existing) clearTimeout(existing);
+  const timer = setTimeout(() => {
+    pendingAnalyze.delete(callId);
+    setImmediate(() => {
+      try {
+        analyzeCall(callId);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("analyzeCall failed", e);
+      }
+    });
+  }, analyzeDebounceMs);
+  pendingAnalyze.set(callId, timer);
 }
 
 module.exports = { analyzeCall, queueAnalyzeCall, hasRecordingFile };

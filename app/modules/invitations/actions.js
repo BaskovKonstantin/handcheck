@@ -11,7 +11,7 @@ function findActiveInvitation(db, needId, candidateId) {
   return db
     .prepare(
       `SELECT id, status FROM invitations
-       WHERE need_id = ? AND candidate_user_id = ? AND status IN ('sent', 'accepted')`
+       WHERE need_id = ? AND candidate_user_id = ? AND status IN ('sent', 'viewed', 'accepted')`
     )
     .get(needId, candidateId);
 }
@@ -70,7 +70,11 @@ function createInvitation(employerUserId, body, actionSource = "web") {
   if (review?.decision === "later") throw httpError(409, "candidate_deferred");
   assertCandidateInNeedPool(employerUserId, need, candidateId);
   const existing = findActiveInvitation(db, needId, candidateId);
-  if (existing) throw httpError(409, "invitation_duplicate");
+  if (existing) {
+    throw httpError(409, "invitation_duplicate", {
+      message: "Приглашение по этой потребности уже отправлено — дождитесь ответа кандидата",
+    });
+  }
   const id = newId();
   const src = actionSource === "mcp" ? "mcp" : "web";
   db.prepare(

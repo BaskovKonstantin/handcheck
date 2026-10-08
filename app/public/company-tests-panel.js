@@ -97,10 +97,11 @@
             const btn = action
               ? `<button type="button" class="btn-primary btn-sm" data-company-test-action="${esc(a.status)}" data-assignment-id="${esc(a.id)}">${action}</button>`
               : "";
+            const dueLabel = `до ${new Date(a.dueAt).toLocaleDateString("ru-RU")}`;
             return `<li class="company-tests-assign-row">
             <div class="company-tests-assign-main">
               <span><strong>${esc(a.companyName)}</strong> — ${esc(a.title)}</span>
-              <span class="invite-meta">${esc(label)} · до ${esc(new Date(a.dueAt).toLocaleDateString("ru-RU"))}</span>
+              <span class="invite-meta" data-company-test-status data-due-label="${esc(dueLabel)}">${esc(label)} · ${esc(dueLabel)}</span>
             </div>
             ${btn}
           </li>`;
@@ -118,11 +119,17 @@
     });
   }
 
-  function syncListActionForAssignment(assignmentId, hideStart) {
+  function syncListActionForAssignment(assignmentId, { hideStart, statusLabel } = {}) {
     document.querySelectorAll(`[data-assignment-id="${assignmentId}"]`).forEach((btn) => {
       if (!btn.matches("[data-company-test-action]")) return;
       if (hideStart) {
         btn.hidden = true;
+        const row = btn.closest(".company-tests-assign-row");
+        const meta = row?.querySelector("[data-company-test-status]");
+        if (meta && statusLabel) {
+          const duePart = meta.dataset.dueLabel || "";
+          meta.textContent = duePart ? `${statusLabel} · ${duePart}` : statusLabel;
+        }
         return;
       }
       const status = btn.dataset.companyTestAction;
@@ -145,12 +152,20 @@
         method: "POST",
         body: "{}",
       });
-      syncListActionForAssignment(assignmentId, true);
+      syncListActionForAssignment(assignmentId, {
+        hideStart: true,
+        statusLabel: "В процессе",
+      });
     }
     const state = await HandCheck.api(`/api/candidate/company-tests/${assignmentId}`);
     active.innerHTML = renderTakeUi(state);
     bindTakeUi(assignmentId, state);
-    if (state.status === "started") syncListActionForAssignment(assignmentId, true);
+    if (state.status === "started") {
+      syncListActionForAssignment(assignmentId, {
+        hideStart: true,
+        statusLabel: state.statusLabel || "В процессе",
+      });
+    }
   }
 
   function beginAssignment(id) {

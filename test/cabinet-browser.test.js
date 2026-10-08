@@ -2372,8 +2372,8 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
     await context.close();
   });
 
-  it("round81: candidates table has no inner horizontal scroll at 1280 and 1440", async () => {
-    for (const width of [1280, 1440]) {
+  it("round82: candidates table shows core columns without horizontal scroll at 1280–1600", async () => {
+    for (const width of [1280, 1440, 1600]) {
       const context = await browser.newContext({ viewport: { width, height: 900 } });
       const page = await context.newPage();
       await login(page, "cafe@demo.local");
@@ -2381,15 +2381,42 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       await page.waitForSelector(".candidates-table-wrap", { timeout: 30000 });
       const metrics = await page.evaluate(() => {
         const wrap = document.querySelector(".candidates-table-wrap");
-        const btn = document.querySelector(".candidates-table [data-invite]");
-        const wrapOk = wrap ? wrap.scrollWidth <= wrap.clientWidth + 1 : true;
-        const btnOk = btn
-          ? btn.getBoundingClientRect().right <= window.innerWidth && btn.getBoundingClientRect().width > 0
+        const ths = [...document.querySelectorAll(".candidates-table thead th")].map((th) =>
+          th.textContent.trim()
+        );
+        const visible = (cls) => {
+          const el = document.querySelector(`.candidates-table .${cls}`);
+          if (!el) return false;
+          const s = getComputedStyle(el);
+          return s.display !== "none" && el.getBoundingClientRect().width > 0;
+        };
+        const invite =
+          document.querySelector(".candidates-table [data-invite], .candidates-table .candidates-col-actions a, .candidates-table .candidates-col-actions button");
+        const inviteOk = invite
+          ? invite.getBoundingClientRect().right <= window.innerWidth && invite.getBoundingClientRect().width > 0
           : false;
-        return { wrapOk, btnOk };
+        return {
+          wrapOk: wrap ? wrap.scrollWidth <= wrap.clientWidth + 1 : true,
+          pageOk: document.documentElement.scrollWidth <= window.innerWidth + 1,
+          ths,
+          category: visible("col-category"),
+          stack: visible("col-stack"),
+          fsp: visible("col-fsp"),
+          status: visible("col-status"),
+          inviteOk,
+        };
       });
       assert.equal(metrics.wrapOk, true, `table wrap overflow at ${width}px`);
-      assert.equal(metrics.btnOk, true, `invite column not visible at ${width}px`);
+      assert.equal(metrics.pageOk, true, `page overflow at ${width}px`);
+      assert.ok(metrics.ths.includes("Имя"), `name header at ${width}: ${metrics.ths.join("|")}`);
+      assert.ok(metrics.ths.includes("Категория"), `category header at ${width}`);
+      assert.ok(metrics.ths.includes("Стек"), `stack header at ${width}`);
+      assert.ok(metrics.ths.includes("ФСП"), `fsp header at ${width}`);
+      assert.equal(metrics.category, true, `category column hidden at ${width}`);
+      assert.equal(metrics.stack, true, `stack column hidden at ${width}`);
+      assert.equal(metrics.fsp, true, `fsp column hidden at ${width}`);
+      assert.equal(metrics.status, true, `status column hidden at ${width}`);
+      assert.equal(metrics.inviteOk, true, `invite action not visible at ${width}`);
       await context.close();
     }
   });
@@ -2454,10 +2481,13 @@ describe("cabinet pages (browser, slow API)", { timeout: 300_000, skip: !runBrow
       const top0 = el.getBoundingClientRect().top;
       window.scrollBy(0, 500);
       const top1 = el.getBoundingClientRect().top;
-      return { top0, top1, position: getComputedStyle(el).position };
+      const bg = getComputedStyle(el).backgroundColor;
+      const shadow = getComputedStyle(el).boxShadow;
+      return { top0, top1, position: getComputedStyle(el).position, bg, shadow };
     });
     assert.equal(sticky?.position, "sticky");
     assert.ok(sticky.top1 <= sticky.top0 + 2, `sticky moved ${sticky.top0} -> ${sticky.top1}`);
+    assert.ok(sticky.shadow && sticky.shadow !== "none", "sticky search should have shadow at 390");
     await context.close();
   });
 

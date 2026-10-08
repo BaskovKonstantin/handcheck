@@ -15,6 +15,8 @@ const { getTemplate } = require("../app/modules/employer-tests/templates");
 const { insertItem } = require("../app/modules/employer-tests/service");
 const JURY_EMPLOYER = "jury@demo.local";
 const MARKER_INV = "jury-company-inv-";
+const MARKER_TEST = "jury-company-test-";
+const MARKER_ASSIGN = "jury-company-asg-";
 
 const CANDIDATES = [
   { email: "jury-backend@demo.local", spec: "backend", cat: "backend_middle", name: "Жюри Backend" },
@@ -59,15 +61,32 @@ function findNeedBySpec(db, employerId, spec) {
   let need = db
     .prepare(
       `SELECT id, title FROM employer_needs
-       WHERE employer_user_id = ? AND specialization = ? AND grade = 'middle'
-       ORDER BY active DESC, title LIMIT 1`
+       WHERE employer_user_id = ? AND specialization = ? AND grade = 'middle' AND title = ?
+       LIMIT 1`
+    )
+    .get(employerId, spec, title);
+  if (need) return need;
+
+  need = db
+    .prepare(
+      `SELECT n.id, n.title FROM employer_needs n
+       WHERE n.employer_user_id = ? AND n.specialization = ? AND n.grade = 'middle'
+         AND EXISTS (
+           SELECT 1 FROM employer_tests t
+           WHERE t.need_id = n.id AND t.status = 'published'
+         )
+       ORDER BY n.title DESC LIMIT 1`
     )
     .get(employerId, spec);
-  if (need && need.title !== title) {
-    db.prepare("UPDATE employer_needs SET title = ? WHERE id = ?").run(title, need.id);
-    need.title = title;
-  }
-  return need;
+  if (need) return need;
+
+  return db
+    .prepare(
+      `SELECT id, title FROM employer_needs
+       WHERE employer_user_id = ? AND specialization = ? AND grade = 'middle'
+       ORDER BY title LIMIT 1`
+    )
+    .get(employerId, spec);
 }
 
 function ensureNeed(db, employerId, spec) {
@@ -85,7 +104,11 @@ function ensureNeed(db, employerId, spec) {
 }
 
 function ensurePublishedTest(db, employerId, needId, spec) {
-  let test = db
+  const stableId = `${MARKER_TEST}${spec}`;
+  let test = db.prepare("SELECT id FROM employer_tests WHERE id = ?").get(stableId);
+  if (test) return test.id;
+
+  test = db
     .prepare(
       `SELECT id FROM employer_tests WHERE employer_user_id = ? AND need_id = ? AND status = 'published' LIMIT 1`
     )
@@ -94,7 +117,7 @@ function ensurePublishedTest(db, employerId, needId, spec) {
 
   const tplKey = TEMPLATE_BY_SPEC[spec];
   const tpl = getTemplate(tplKey);
-  const testId = newId();
+  const testId = stableId;
   const now = new Date().toISOString();
   db.prepare(
     `INSERT INTO employer_tests (id, employer_user_id, need_id, title, intro, status, created_at, updated_at)
@@ -176,14 +199,25 @@ function seedJuryCompanyTests(db) {
       inv = { id: invId, status: "accepted" };
     }
 
+    const assignId = `${MARKER_ASSIGN}${c.spec}`;
     const existingAssign = db
+      .prepare("SELECT id, status FROM employer_test_assignments WHERE id = ?")
+      .get(assignId);
+    if (existingAssign?.status === "submitted") continue;
+
+    const dup = db
       .prepare(
         `SELECT id FROM employer_test_assignments WHERE test_id = ? AND candidate_user_id = ? AND status = 'submitted' LIMIT 1`
       )
       .get(testId, cid);
-    if (existingAssign) continue;
+    if (dup && dup.id !== assignId) continue;
 
-    const assignId = newId();
+    if (existingAssign) {
+      db.prepare(
+        `UPDATE employer_test_assignments SET invitation_id = ?, test_id = ? WHERE id = ?`
+      ).run(inv.id, testId, assignId);
+      continue;
+    }
     const due = new Date();
     due.setDate(due.getDate() + 3);
     db.prepare(

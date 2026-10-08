@@ -826,6 +826,36 @@ textarea:focus {
   animation: sheet-in var(--dur) var(--ease-spring) both;
 }
 
+.assign-test-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+  max-height: min(50vh, 22rem);
+  overflow-y: auto;
+}
+
+button.assign-test-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+}
+
+button.assign-test-option:hover {
+  border-color: var(--clay);
+  background: color-mix(in srgb, var(--clay) 8%, var(--paper));
+}
+
 @keyframes backdrop-in {
   from {
     opacity: 0;
@@ -3928,10 +3958,18 @@ textarea {
   position: sticky;
   top: 0;
   z-index: 12;
-  background: color-mix(in srgb, var(--paper) 92%, transparent);
-  backdrop-filter: blur(8px);
+  background: var(--paper);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 6%, transparent);
   padding: 0.75rem 0 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+@media (min-width: 721px) {
+  .candidates-sticky {
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: none;
+  }
 }
 
 .candidates-search-row {
@@ -4054,10 +4092,7 @@ textarea {
 }
 
 @media (min-width: 900px) and (max-width: 1599px) {
-  .candidates-table .col-category,
-  .candidates-table .col-stack,
   .candidates-table .col-domain,
-  .candidates-table .col-fsp,
   .candidates-table .col-optional,
   .candidates-table .col-assigned {
     display: none;
@@ -4065,39 +4100,103 @@ textarea {
 
   .candidates-table th,
   .candidates-table td {
-    padding: 0.4rem 0.4rem;
-    font-size: 0.82rem;
+    padding: 0.35rem 0.35rem;
+    font-size: 0.8rem;
   }
-}
 
-@media (min-width: 900px) and (max-width: 1439px) {
   .candidates-body {
     grid-template-columns: 1fr;
   }
 
-  .candidates-filters {
+  .candidates-body:not(.filters-open) .candidates-filters {
+    display: none;
+  }
+
+  .candidates-body.filters-open .candidates-filters {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
     gap: 0.65rem;
+  }
+
+  .candidates-filters-toggle {
+    display: inline-flex;
   }
 }
 
-.candidates-table .col-status,
-.candidates-table .col-invite,
-.candidates-table .candidates-col-actions {
-  width: 6.5rem;
+@media (min-width: 1600px) {
+  .candidates-filters-toggle {
+    display: none;
+  }
+}
+
+@media (max-width: 899px) {
+  .candidates-filters-toggle {
+    display: none;
+  }
+}
+
+.candidates-table .col-status {
+  width: 5.5rem;
   white-space: nowrap;
 }
 
+.candidates-table .col-invite,
+.candidates-table .candidates-col-actions {
+  width: 2.75rem;
+  white-space: nowrap;
+  text-align: center;
+}
+
 .candidates-table td:nth-child(2) {
-  max-width: 7rem;
+  min-width: 5.5rem;
+  max-width: 9rem;
+}
+
+.candidates-name-sub {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--ink-muted);
+  margin-top: 0.15rem;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .candidates-table .chip-row-skills {
-  max-height: 2.6rem;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 11rem;
   overflow: hidden;
+}
+
+.candidates-table .chip-skill {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  flex-shrink: 0;
+}
+
+.chip-more {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 55%, var(--paper));
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+
+.btn-icon-only {
+  min-width: 2.25rem;
+  padding: 0.35rem 0.45rem;
+  line-height: 1;
+}
+
+.candidates-filters-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .candidates-col-check {

@@ -57,12 +57,17 @@ router.get("/tests", (req, res) => {
   }
   sql += " ORDER BY n.title, t.updated_at DESC";
   const rows = db.prepare(sql).all(...params);
+  const countStmt = db.prepare(
+    "SELECT COUNT(*) AS c FROM employer_test_items WHERE test_id = ?"
+  );
   const byNeed = new Map();
   for (const r of rows) {
     if (!byNeed.has(r.need_id)) {
       byNeed.set(r.need_id, { needId: r.need_id, needTitle: r.need_title, tests: [] });
     }
-    byNeed.get(r.need_id).tests.push(mapTestRow(r, r.need_title));
+    const mapped = mapTestRow(r, r.need_title);
+    mapped.questionCount = countStmt.get(r.id).c;
+    byNeed.get(r.need_id).tests.push(mapped);
   }
   res.json({ groups: [...byNeed.values()], templates: listTemplateMeta() });
 });

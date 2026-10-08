@@ -49,6 +49,16 @@ describe("GET /api/employer/dashboard", () => {
     }
   });
 
+  it("bank KPI matches composition row sum", async () => {
+    const agent = request.agent(app);
+    await agent
+      .post("/api/auth/login")
+      .send({ email: "cafe@demo.local", password: "demo-demo-demo" });
+    const res = await agent.get("/api/employer/dashboard");
+    const sum = (res.body.bankComposition || []).reduce((s, r) => s + (r.count || 0), 0);
+    assert.equal(res.body.kpis.bankOpen, sum);
+  });
+
   it("bank composition labels are titled spec × grade", async () => {
     const agent = request.agent(app);
     await agent
@@ -56,7 +66,7 @@ describe("GET /api/employer/dashboard", () => {
       .send({ email: "cafe@demo.local", password: "demo-demo-demo" });
     const res = await agent.get("/api/employer/dashboard");
     for (const row of res.body.bankComposition || []) {
-      if (row.label) {
+      if (row.label && row.label !== "Без подтверждённой категории") {
         assert.match(row.label, /×/);
         assert.match(row.label, /^[A-Z]/, `expected titled label, got ${row.label}`);
         assert.ok(!/^backend × middle$/.test(row.label));

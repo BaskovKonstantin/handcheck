@@ -177,6 +177,56 @@ describe("employer vacancy tests (constructor)", () => {
     assert.ok(started.body.items[0].openedAt);
   });
 
+  it("links assignment to invitationId and rejects duplicate open assign", async () => {
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const cafeId = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get().id;
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const need = db
+      .prepare("SELECT id FROM employer_needs WHERE employer_user_id = ? LIMIT 1")
+      .get(cafeId);
+    const invId = require("../app/lib/ids").newId();
+    db.prepare(
+      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+       VALUES (?, ?, ?, ?, 100000, 150000, 'test', 'email', 'accepted')`
+    ).run(invId, cafeId, need.id, anna.id);
+    const created = await agent.post("/api/employer/tests").send({
+      needId: need.id,
+      title: "Invite link test",
+      intro: "",
+    });
+    const testId = created.body.id;
+    await agent.post(`/api/employer/tests/${testId}/items`).send({
+      kind: "text",
+      prompt: "Q",
+      rubricKeys: { keywords: ["a"] },
+    });
+    await agent.post(`/api/employer/tests/${testId}/publish`);
+    const assign = await agent.post(`/api/employer/tests/${testId}/assign`).send({
+      candidateId: anna.id,
+      invitationId: invId,
+    });
+    assert.equal(assign.status, 201);
+    const row = db
+      .prepare("SELECT invitation_id FROM employer_test_assignments WHERE id = ?")
+      .get(assign.body.id);
+    assert.equal(row.invitation_id, invId);
+    const dup = await agent.post(`/api/employer/tests/${testId}/assign`).send({
+      candidateId: anna.id,
+      invitationId: invId,
+    });
+    assert.equal(dup.status, 409);
+    assert.equal(dup.body.error, "assignment_duplicate");
+  });
+
+  it("frontend template first question differs from backend", () => {
+    const { getTemplate } = require("../app/modules/employer-tests/templates");
+    const be = getTemplate("backend-api-basics").items[0].prompt;
+    const fe = getTemplate("frontend-http-api").items[0].prompt;
+    assert.notEqual(be, fe);
+    assert.match(fe, /CORS|fetch|origin/i);
+  });
+
   it("reorders items on draft", async () => {
     const { getDb } = require("../app/db");
     const db = getDb();

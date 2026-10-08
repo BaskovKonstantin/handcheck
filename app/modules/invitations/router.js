@@ -14,6 +14,25 @@ const { companyTestStatusLabel } = require("../../lib/company-test-status");
 const router = express.Router();
 router.use(requireAuth, requireConfirmedEmail, requireRole("employer"));
 
+function findCompanyTestAssignment(db, invitationRow) {
+  let assignment = db
+    .prepare(
+      `SELECT id, status FROM employer_test_assignments WHERE invitation_id = ? ORDER BY due_at DESC LIMIT 1`
+    )
+    .get(invitationRow.id);
+  if (!assignment) {
+    assignment = db
+      .prepare(
+        `SELECT a.id, a.status FROM employer_test_assignments a
+         JOIN employer_tests t ON t.id = a.test_id
+         WHERE a.candidate_user_id = ? AND t.need_id = ?
+         ORDER BY a.due_at DESC LIMIT 1`
+      )
+      .get(invitationRow.candidate_user_id, invitationRow.need_id);
+  }
+  return assignment;
+}
+
 router.post("/invitations", (req, res, next) => {
   try {
     const result = createInvitation(req.user.id, req.body || {}, "web");
@@ -43,11 +62,7 @@ router.get("/invitations", (req, res) => {
     .all(req.user.id, req.user.id);
   res.json({
     items: rows.map((r) => {
-      const assignment = getDb()
-        .prepare(
-          `SELECT id, status FROM employer_test_assignments WHERE invitation_id = ? ORDER BY due_at DESC LIMIT 1`
-        )
-        .get(r.id);
+      const assignment = findCompanyTestAssignment(getDb(), r);
       const item = {
         id: r.id,
         candidateId: r.candidate_user_id,

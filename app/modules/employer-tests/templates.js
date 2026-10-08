@@ -52,12 +52,13 @@ const EMPLOYER_TEST_TEMPLATES = {
     items: [
       {
         kind: "single",
-        prompt: "Какой HTTP-метод обычно используют для безопасного чтения ресурса без изменения состояния?",
+        prompt:
+          "Браузер блокирует fetch с фронтенда на другой origin без CORS-заголовков. Что должен вернуть сервер, чтобы разрешить запрос?",
         options: [
-          { id: "a", label: "GET" },
-          { id: "b", label: "POST" },
-          { id: "c", label: "DELETE" },
-          { id: "d", label: "PATCH" },
+          { id: "a", label: "Access-Control-Allow-Origin (и при необходимости другие CORS-заголовки)" },
+          { id: "b", label: "Только статус 200 без заголовков" },
+          { id: "c", label: "Set-Cookie с session id" },
+          { id: "d", label: "Content-Encoding: gzip" },
         ],
         answerKey: { correctIds: ["a"] },
         timeLimitSec: 90,

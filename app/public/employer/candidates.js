@@ -33,6 +33,33 @@ function statusLabel(row) {
   return "Новый";
 }
 
+function rowHasMarks(r) {
+  return Boolean(HandCheck.renderPasteInputMark(r.pasteInputMark) || HandCheck.renderAiUsageSection(r.aiUsage, { compact: true }));
+}
+
+function renderStackChips(stack) {
+  const esc = HandCheck.escapeHtml;
+  const items = stack || [];
+  if (!items.length) return "—";
+  const max = 2;
+  const visible = items.slice(0, max);
+  const extra = items.length - max;
+  const chips = visible.map((s) => `<span class="chip chip-skill">${esc(s)}</span>`).join("");
+  const more = extra > 0 ? `<span class="chip chip-more">+${extra}</span>` : "";
+  return `<div class="chip-row chip-row-skills">${chips}${more}</div>`;
+}
+
+function inviteActionHtml(r) {
+  const esc = HandCheck.escapeHtml;
+  if (r.reviewStatus === "invited") {
+    if (r.openInvitationId) {
+      return `<a class="btn-ghost btn-sm" href="/employer/invitations">Приглашён</a>`;
+    }
+    return `<button type="button" class="btn-ghost btn-sm" disabled>Приглашён</button>`;
+  }
+  return `<button type="button" class="btn-primary btn-sm btn-icon-only" data-invite="${esc(r.id)}" aria-label="Пригласить" title="Пригласить">✉</button>`;
+}
+
 function readState() {
   const p = new URLSearchParams(location.search);
   return {
@@ -182,7 +209,6 @@ function renderSearchChips(chips) {
     btn.onclick = () => {
       if (btn.dataset.remove === "stack") writeState({ stack: "", page: "1" });
       else {
-        const s = readState();
         writeState({ q: "", page: "1" });
         document.getElementById("search-input").value = "";
       }
@@ -191,33 +217,37 @@ function renderSearchChips(chips) {
   });
 }
 
-function rowHtml(r) {
+function rowHtml(r, showMarksCol) {
   const esc = HandCheck.escapeHtml;
-  const stack = (r.stack || []).map((s) => `<span class="chip chip-skill">${esc(s)}</span>`).join("");
-  const domain = (r.backgroundDomains || [])[0] || "—";
+  const domain = (r.backgroundDomains || [])[0] || "";
+  const domainSub = domain ? `<span class="candidates-name-sub">${esc(domain)}</span>` : "";
   const fsp = r.hasFsp ? '<span class="chip chip-fsp">ФСП</span>' : '<span class="muted">—</span>';
   const marks = `${HandCheck.renderPasteInputMark(r.pasteInputMark) || ""}${HandCheck.renderAiUsageSection(r.aiUsage, { compact: true }) || ""}`;
-  const date = r.assignedAt ? HandCheck.formatDateTimeMoscow(r.assignedAt).split(",")[0] : "—";
+  const date = r.assignedAt ? HandCheck.formatDateShortMoscow(r.assignedAt) : "—";
   const checked = selectedCompare.has(r.id) ? " checked" : "";
+  const marksCell = showMarksCol ? `<td class="candidates-col-marks col-optional">${marks || "—"}</td>` : "";
+  const domainCell = `<td class="col-domain">${domain ? esc(domain) : "—"}</td>`;
   return `<tr class="candidates-row" data-id="${esc(r.id)}" tabindex="0">
     <td class="candidates-col-check"><input type="checkbox" class="compare-check" data-id="${esc(r.id)}"${checked} aria-label="Сравнить" /></td>
-    <td><strong>${esc(r.displayName)}</strong></td>
+    <td><strong>${esc(r.displayName)}</strong>${domainSub}</td>
     <td class="col-category">${HandCheck.renderCategoryPill(r.categoryLabel, r.categoryStatus, r.gradeRelation)}</td>
-    <td class="col-stack"><div class="chip-row chip-row-skills">${stack || "—"}</div></td>
-    <td class="col-domain">${esc(domain)}</td>
+    <td class="col-stack">${renderStackChips(r.stack)}</td>
+    ${domainCell}
     <td class="col-fsp">${fsp}</td>
-    <td class="candidates-col-marks col-optional">${marks}</td>
+    ${marksCell}
     <td class="col-status"><span class="status-pill sent">${esc(statusLabel(r))}</span></td>
     <td class="col-assigned">${esc(date)}</td>
-    <td class="candidates-col-actions">
-      <button type="button" class="btn-primary btn-sm" data-invite="${esc(r.id)}">Пригласить</button>
-    </td>
+    <td class="candidates-col-actions col-invite">${inviteActionHtml(r)}</td>
   </tr>`;
 }
 
 function cardHtml(r) {
   const esc = HandCheck.escapeHtml;
   const stack = (r.stack || []).map((s) => `<span class="chip chip-skill">${esc(s)}</span>`).join("");
+  const inviteBtn =
+    r.reviewStatus === "invited"
+      ? `<a class="btn-ghost btn-sm" href="/employer/invitations">Приглашён</a>`
+      : `<button type="button" class="btn-primary btn-sm" data-invite="${esc(r.id)}">Пригласить</button>`;
   return `<article class="candidates-card" data-id="${esc(r.id)}">
     <div class="candidates-card-head">
       <input type="checkbox" class="compare-check" data-id="${esc(r.id)}"${selectedCompare.has(r.id) ? " checked" : ""} />
@@ -227,7 +257,7 @@ function cardHtml(r) {
     <div class="chip-row chip-row-skills">${stack}</div>
     ${HandCheck.renderPasteInputMark(r.pasteInputMark)}
     <p class="invite-meta">${esc(statusLabel(r))} · ${r.hasFsp ? "ФСП" : "без ФСП"}</p>
-    <button type="button" class="btn-primary btn-sm" data-invite="${esc(r.id)}">Пригласить</button>
+    ${inviteBtn}
   </article>`;
 }
 
@@ -242,14 +272,16 @@ function renderTable(items) {
     );
     return;
   }
-  const rows = items.map((r) => rowHtml(r)).join("");
+  const showMarksCol = items.some(rowHasMarks);
+  const rows = items.map((r) => rowHtml(r, showMarksCol)).join("");
   const cards = items.map((r) => cardHtml(r)).join("");
+  const marksHeader = showMarksCol ? `<th scope="col" class="col-optional">Метки</th>` : "";
   host.innerHTML = `
     <div class="candidates-table-wrap">
       <table class="candidates-table">
         <thead><tr>
           <th scope="col"></th><th scope="col">Имя</th><th scope="col" class="col-category">Категория</th><th scope="col" class="col-stack">Стек</th>
-          <th scope="col" class="col-domain">Домен</th><th scope="col" class="col-fsp">ФСП</th><th scope="col" class="col-optional">Метки</th><th scope="col" class="col-status">Статус</th>
+          <th scope="col" class="col-domain">Домен</th><th scope="col" class="col-fsp">ФСП</th>${marksHeader}<th scope="col" class="col-status">Статус</th>
           <th scope="col" class="col-assigned">В категории с</th><th scope="col" class="col-invite"></th>
         </tr></thead>
         <tbody>${rows}</tbody>
@@ -344,10 +376,14 @@ function openDrawer(id) {
     <ul class="deck-explain-lines">${explain}</ul>
     <h3 class="h3">Фразы по задачам</h3>
     <ul class="deck-explain-lines">${tasks}</ul>`;
+  const drawerInvite =
+    row.reviewStatus === "invited"
+      ? `<a class="btn-ghost" href="/employer/invitations">Приглашён</a>`
+      : `<button type="button" class="btn-primary" data-invite-drawer="1">Пригласить</button>`;
   document.getElementById("drawer-actions").innerHTML = `
     <button type="button" class="btn-ghost" data-decision="later">Отложить</button>
     <button type="button" class="btn-ghost" data-decision="rejected">Отказать</button>
-    <button type="button" class="btn-primary" data-invite-drawer="1">Пригласить</button>`;
+    ${drawerInvite}`;
   drawer.hidden = false;
   drawer.setAttribute("aria-hidden", "false");
   requestAnimationFrame(() => drawer.classList.add("open"));
@@ -405,9 +441,12 @@ function openInvite(candidateId) {
     return;
   }
   const row = cachedItems.find((r) => r.id === candidateId);
+  if (row?.reviewStatus === "invited") {
+    HandCheck.toast("Приглашение уже отправлено", "info");
+    return;
+  }
   const needRow = cachedNeeds.find((n) => n.id === need);
   inviteCandidateId = candidateId;
-  const esc = HandCheck.escapeHtml;
   const titleEl = document.getElementById("invite-sheet-title");
   const subEl = document.getElementById("invite-sheet-sub");
   if (titleEl) {
@@ -497,6 +536,14 @@ function renderPagination(meta) {
   }
 }
 
+function syncFiltersPanelUi() {
+  const body = document.querySelector(".candidates-body");
+  const toggle = document.getElementById("filters-toggle");
+  if (!body || !toggle) return;
+  const open = body.classList.contains("filters-open");
+  toggle.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
 async function loadCandidates() {
   const seq = ++loadSeq;
   const host = document.getElementById("candidates-table-host");
@@ -546,6 +593,15 @@ function bindStaticUi() {
   document.getElementById("sheet")?.addEventListener("click", (e) => {
     if (e.target.id === "sheet") document.getElementById("sheet").classList.add("hidden");
   });
+  const filtersToggle = document.getElementById("filters-toggle");
+  const body = document.querySelector(".candidates-body");
+  if (filtersToggle && body) {
+    filtersToggle.addEventListener("click", () => {
+      body.classList.toggle("filters-open");
+      syncFiltersPanelUi();
+    });
+    syncFiltersPanelUi();
+  }
 }
 
 HandCheck.bootCabinetPage("employer", async () => {

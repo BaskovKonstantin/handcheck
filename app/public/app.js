@@ -783,7 +783,7 @@ function bindLogout(btn) {
     setCachedMeEmail("");
     setCachedMeRole("");
     await api("/api/auth/logout", { method: "POST" });
-    window.location.href = "/auth";
+    window.location.href = "/";
   });
 }
 
@@ -883,7 +883,7 @@ async function refreshCabinetMeEmail(expectedRole) {
     return true;
   } catch {
     if (expectedRole) {
-      window.location.href = "/auth";
+      window.location.href = "/";
     }
     return false;
   }
@@ -896,8 +896,7 @@ function bootPublicPage(loadFn) {
     el.innerHTML = `<div class="site-header site-header-landing cabinet-header-v3">
       <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>HandCheck</a>
       <nav class="site-header-nav">
-        <a href="/auth">Войти</a>
-        <a class="btn-primary" href="/auth">Начать</a>
+        <a class="btn-primary" href="/">Войти</a>
       </nav>
     </div>`;
   }

@@ -1,5 +1,12 @@
 # Session notes
 
+## 2026-10-08 — login gate (no landing) + AlphaWave blue skin
+
+- `/` = login only; `/auth` → `/` (register stays at `/auth?mode=register`).
+- Quick demo: `POST /api/auth/demo-login` `{role}` → first confirmed `@demo.local` user.
+- UI inspired by alpha-wave.ai (dark grid/aurora/grain/corners/shine) with gold→blue accents.
+- Refs: `context/design-refs/alpha-wave-*.jpg`, `handcheck-login-desktop.jpg`.
+
 ## 2026-10-08 — OpenCode Zen LLM wiring
 
 - Approved scope: Zen → employer test generate, bank task drafts, call LLM summary (keyword fallback).

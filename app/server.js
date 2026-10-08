@@ -101,9 +101,16 @@ function createApp() {
   });
 
   const publicDir = path.join(__dirname, "public");
+  app.get("/auth", (req, res) => {
+    if (String(req.query.mode || "") === "register") {
+      return res.sendFile(path.join(publicDir, "auth.html"));
+    }
+    const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    return res.redirect(302, `/${q}`);
+  });
+
   const routes = [
     ["/", "index.html"],
-    ["/auth", "auth.html"],
     ["/candidate/today", "candidate/today.html"],
     ["/candidate/past", "candidate/past.html"],
     ["/candidate/tasks", "candidate/tasks.html"],

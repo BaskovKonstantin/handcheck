@@ -84,6 +84,27 @@ router.post("/confirm", (req, res, next) => {
   }
 });
 
+function issueSession(res, req, user) {
+  const db = getDb();
+  const sid = newId();
+  const expires = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
+  db.prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)").run(
+    sid,
+    user.id,
+    expires
+  );
+  setSessionCookie(res, sid, req);
+  return {
+    ok: true,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      email_confirmed_at: user.email_confirmed_at,
+    },
+  };
+}
+
 router.post("/login", (req, res, next) => {
   try {
     const email = String(req.body?.email || "").trim().toLowerCase();
@@ -93,23 +114,40 @@ router.post("/login", (req, res, next) => {
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
       throw httpError(401, "invalid_credentials");
     }
-    const sid = newId();
-    const expires = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
-    db.prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)").run(
-      sid,
-      user.id,
-      expires
-    );
-    setSessionCookie(res, sid, req);
-    res.json({
-      ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        email_confirmed_at: user.email_confirmed_at,
-      },
-    });
+    res.json(issueSession(res, req, user));
+  } catch (e) {
+    next(e);
+  }
+});
+
+/** DEMO_MODE only: first confirmed seed user for role (prefer @demo.local). */
+router.post("/demo-login", (req, res, next) => {
+  try {
+    if (!config.DEMO_MODE) {
+      throw httpError(403, "demo_disabled", {
+        message: "Быстрый демо-вход доступен только при DEMO_MODE",
+      });
+    }
+    const role = String(req.body?.role || "").trim();
+    if (role !== "candidate" && role !== "employer") {
+      throw httpError(400, "invalid_role", { message: "Укажите role: candidate или employer" });
+    }
+    const db = getDb();
+    const user = db
+      .prepare(
+        `SELECT * FROM users
+         WHERE role = ? AND email_confirmed_at IS NOT NULL
+         ORDER BY CASE WHEN email LIKE '%@demo.local' THEN 0 ELSE 1 END,
+                  datetime(created_at) ASC
+         LIMIT 1`
+      )
+      .get(role);
+    if (!user) {
+      throw httpError(404, "demo_user_missing", {
+        message: "Нет демо-пользователя для этой роли. Запустите seed.",
+      });
+    }
+    res.json(issueSession(res, req, user));
   } catch (e) {
     next(e);
   }

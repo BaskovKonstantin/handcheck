@@ -3,123 +3,135 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>HandCheck — категория по навыку</title>
+    <title>Вход — HandCheck</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body class="landing-page">
-    <header id="site-header"></header>
-    <section class="landing-hero" aria-labelledby="landing-title">
-      <div class="landing-hero-pattern" aria-hidden="true"></div>
-      <div class="landing-hero-inner">
-        <div class="landing-hero-copy">
-          <p class="hero-eyebrow">Найм без рейтингов и фото</p>
-          <h1 id="landing-title" class="display-title display-title-on-dark">
-            Категория по навыку.<br />Приглашение с вилкой.
-          </h1>
-          <p class="hero-lede hero-lede-on-dark">
-            Профиль и тест задают категорию. Работодатель приглашает с вилкой зарплаты — без баллов в
-            интерфейсе и без публичных контактов до согласия.
-          </p>
-          <div class="hero-cta-row">
-            <a class="btn-primary btn-lg" href="/auth">Начать бесплатно</a>
-            <a class="btn-on-dark-ghost" href="/auth?role=employer">Для работодателей</a>
-          </div>
-        </div>
-        <div class="landing-mockup" aria-hidden="true">
-          <div class="landing-mockup-label">Колода работодателя</div>
-          <div class="landing-mockup-card">
-            <div class="landing-mockup-stack"></div>
-            <div class="landing-mockup-face">
-              <div class="deck-card-head">
-                <div class="avatar-monogram">А</div>
-                <div>
-                  <h2 class="deck-name">Анна</h2>
-                  <span class="category-pill">Backend × Middle</span>
-                </div>
-              </div>
-              <div class="chip-row">
-                <span class="chip chip-domain">backend-разработчик · HoReCa</span>
-              </div>
-              <div class="chip-row chip-row-skills">
-                <span class="chip chip-skill">node</span>
-                <span class="chip chip-skill">typescript</span>
-              </div>
-              <ul class="deck-phrases">
-                <li>Короткие ответы по API сданы</li>
-                <li>Рабочая задача доведена до конца</li>
-              </ul>
-            </div>
-          </div>
-          <div class="landing-mockup-actions">
-            <span class="mock-pill mock-pill-ghost">Отказать</span>
-            <span class="mock-pill mock-pill-ghost">Отложить</span>
-            <span class="mock-pill mock-pill-clay">Пригласить</span>
-          </div>
-        </div>
-      </div>
-    </section>
-    <main class="column landing-main">
-      <div class="stats stats-expressive" id="stats"></div>
-      <h2 class="section-title">Как это работает</h2>
-      <div class="steps steps-icons">
-        <div class="step-card">
-          <span class="step-icon step-icon-forest" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4 0-7 2-7 4v1h14v-1c0-2-3-4-7-4z" fill="currentColor"/></svg>
-          </span>
-          <div>
-            <strong>Профиль и бэкграунд</strong>
-            <p class="invite-meta">Опыт в домене влияет на подбор, не на «рейтинг».</p>
-          </div>
-        </div>
-        <div class="step-card">
-          <span class="step-icon step-icon-clay" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M5 5h14v2H5V5zm0 6h14v2H5v-2zm0 6h10v2H5v-2z" fill="currentColor"/></svg>
-          </span>
-          <div>
-            <strong>Короткие ответы и рабочая задача</strong>
-            <p class="invite-meta">Категория после теста — без баллов в интерфейсе.</p>
-          </div>
-        </div>
-        <div class="step-card">
-          <span class="step-icon step-icon-ink" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M4 8l8 5 8-5v10H4V8zm16-2H4l8 5 8-5z" fill="currentColor"/></svg>
-          </span>
-          <div>
-            <strong>Приглашения от компаний</strong>
-            <p class="invite-meta">Вилка зарплаты и контакты только после согласия.</p>
-          </div>
-        </div>
-      </div>
-      <p class="landing-footer-cta">
-        <a class="btn-primary btn-lg" href="/auth">Создать аккаунт</a>
+  <body class="login-gate-page">
+    <div class="aw-bg" aria-hidden="true">
+      <div class="aw-grid"></div>
+      <div class="aw-aurora aw-aurora-a"></div>
+      <div class="aw-aurora aw-aurora-b"></div>
+      <div class="aw-grain"></div>
+      <span class="aw-corner aw-corner-tl"></span>
+      <span class="aw-corner aw-corner-tr"></span>
+      <span class="aw-corner aw-corner-bl"></span>
+      <span class="aw-corner aw-corner-br"></span>
+    </div>
+
+    <main class="login-gate" aria-labelledby="login-title">
+      <a class="logo login-gate-logo" href="/" id="logo">HandCheck</a>
+
+      <p class="aw-pill">
+        <span class="aw-pill-dot" aria-hidden="true"></span>
+        HANDCHECK · КАТЕГОРИЯ ПО НАВЫКУ
       </p>
-      <p class="invite-meta" style="text-align:center;margin-top:1rem">
+
+      <h1 class="login-gate-title" id="login-title">
+        Тест, который <span class="aw-accent">считается.</span><br />
+        Приглашение с <span class="aw-accent">вилкой.</span>
+      </h1>
+      <p class="login-gate-lede">
+        Быстрый демо-вход в кабинет. Контакты скрыты до принятия приглашения.
+      </p>
+
+      <div class="login-gate-quick" id="quick-wrap">
+        <button type="button" class="aw-btn aw-btn-primary login-gate-btn" id="btn-employer">
+          <span>Войти как работодатель</span>
+          <span class="aw-btn-shine" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="aw-btn aw-btn-ghost login-gate-btn" id="btn-candidate">
+          Войти как соискатель
+        </button>
+      </div>
+
+      <details class="login-gate-manual">
+        <summary>Вход по email</summary>
+        <div class="login-gate-panel">
+          <label>Email <input type="email" id="email" autocomplete="username" /></label>
+          <label>Пароль <input type="password" id="password" autocomplete="current-password" /></label>
+          <p class="field-error" id="err" hidden></p>
+          <button class="aw-btn aw-btn-primary" type="button" id="btn-login">Войти</button>
+        </div>
+      </details>
+
+      <p class="field-error" id="quick-err" hidden></p>
+      <p class="login-gate-footer">
         <a href="/privacy">Уведомление по 152-ФЗ</a>
       </p>
     </main>
+
     <script src="/app.js"></script>
     <script>
-      document.getElementById("site-header").innerHTML = `
-        <div class="site-header site-header-landing cabinet-header-v3">
-          <a class="logo logo-on-dark" href="/">${HandCheck.LOGO_MARK}<span>HandCheck</span></a>
-          <nav class="site-nav">
-            <a href="/auth?role=candidate">Кандидатам</a>
-            <a href="/auth?role=employer">Работодателям</a>
-            <a href="/auth">Войти</a>
-            <a class="btn-primary" href="/auth">Начать</a>
-          </nav>
-        </div>`;
-      fetch("/api/stats")
-        .then((r) => r.json())
-        .then((s) => {
-          const fmt = (v, demo) =>
-            demo ? `${v || 2} <span class="stat-label">в демо</span>` : String(v);
-          document.getElementById("stats").innerHTML = `
-            <div class="stat stat-forest"><div class="stat-value">${fmt(s.categories, s.categoriesDemo)}</div><div class="stat-label">категорий подтверждено</div></div>
-            <div class="stat stat-clay"><div class="stat-value">${fmt(s.openCandidates, s.openCandidatesDemo)}</div><div class="stat-label">кандидатов открыты к приглашениям</div></div>
-            <div class="stat stat-ink"><div class="stat-value">${fmt(s.invitations, s.invitationsDemo)}</div><div class="stat-label">приглашений</div></div>`;
-        });
+      document.getElementById("logo").innerHTML = `${HandCheck.LOGO_MARK}<span>HandCheck</span>`;
+
+      function cacheEmail(email, role) {
+        try {
+          if (email) sessionStorage.setItem("hc_me_email", email);
+          if (role) sessionStorage.setItem("hc_me_role", role);
+        } catch {
+          /* ignore */
+        }
+      }
+
+      function goCabinet(role) {
+        location.href = role === "employer" ? "/employer/overview" : "/candidate/today";
+      }
+
+      function showQuickErr(msg) {
+        const el = document.getElementById("quick-err");
+        el.hidden = !msg;
+        el.textContent = msg || "";
+      }
+
+      async function demoLogin(role) {
+        showQuickErr("");
+        const btnEmp = document.getElementById("btn-employer");
+        const btnCand = document.getElementById("btn-candidate");
+        btnEmp.disabled = true;
+        btnCand.disabled = true;
+        try {
+          const j = await HandCheck.api("/api/auth/demo-login", {
+            method: "POST",
+            body: JSON.stringify({ role }),
+          });
+          cacheEmail(j.user?.email, j.user?.role);
+          goCabinet(j.user.role);
+        } catch (e) {
+          showQuickErr(HandCheck.formatApiError(e) || "Демо-вход недоступен");
+          btnEmp.disabled = false;
+          btnCand.disabled = false;
+        }
+      }
+
+      document.getElementById("btn-employer").onclick = () => demoLogin("employer");
+      document.getElementById("btn-candidate").onclick = () => demoLogin("candidate");
+
+      document.getElementById("btn-login").onclick = async () => {
+        const err = document.getElementById("err");
+        err.hidden = true;
+        try {
+          const email = document.getElementById("email").value.trim();
+          const j = await HandCheck.api("/api/auth/login", {
+            method: "POST",
+            body: JSON.stringify({
+              email,
+              password: document.getElementById("password").value,
+            }),
+          });
+          cacheEmail(j.user?.email || email, j.user?.role);
+          goCabinet(j.user.role);
+        } catch (e) {
+          err.hidden = false;
+          err.textContent = HandCheck.formatApiError(e);
+        }
+      };
+
+      HandCheck.api("/api/me")
+        .then((me) => {
+          if (me?.user?.role) goCabinet(me.user.role);
+        })
+        .catch(() => {});
     </script>
   </body>
 </html>

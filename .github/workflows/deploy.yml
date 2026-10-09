@@ -41,6 +41,8 @@ jobs:
           cp -f docs/Documentation-HandCheck.pdf app/public/downloads/Documentation-HandCheck.pdf
           cp -f docs/presentation/HandCheck-ФСП-2026.pdf app/public/downloads/HandCheck-FSP-2026-presentation.pdf
           cp -f docs/presentation/HandCheck-ФСП-2026.pptx app/public/downloads/HandCheck-FSP-2026-presentation.pptx
+          cp -f docs/presentation/HandCheck-overview.pdf app/public/downloads/HandCheck-overview.pdf
+          cp -f docs/presentation/HandCheck-overview.pptx app/public/downloads/HandCheck-overview.pptx
 
           bash bin/handcheck-deploy-disk.sh precheck
           bash bin/handcheck-deploy-disk.sh tag-rollback

@@ -18,3 +18,7 @@ docs/presentation/template-fsp-2026.pptx
 # Артефакты для /downloads: собираются при деплое из docs/, в репозитории дубли не нужны
 app/public/downloads/
 __pycache__/
+
+# Мусор от LibreOffice при конвертации презентаций в PDF
+.~lock.*
+lu*.tmp

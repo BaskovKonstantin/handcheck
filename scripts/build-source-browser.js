@@ -30,6 +30,11 @@ const SKIP_DIRS = new Set([
   "template-fsp-2026.pptx",
 ]);
 
+// Ничего секретного: точечные файлы, скрытые файлы и каталоги, базы и логи
+// в публичную страницу не попадают даже по имени.
+const SKIP_FILES = new Set([".env", "session.secret"]);
+const SKIP_SUFFIXES = [".sqlite", ".sqlite-wal", ".sqlite-shm", ".log", ".tar.gz", ".key", ".pem"];
+
 const TEXT_EXT = new Set([
   ".js", ".json", ".md", ".html", ".css", ".yml", ".yaml", ".sql", ".txt", ".sh", ".py", ".mjs",
 ]);
@@ -56,7 +61,10 @@ const HIGHLIGHT = [
 function walk(dir, rel = "") {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name.startsWith(".")) continue;
     if (SKIP_DIRS.has(entry.name)) continue;
+    if (SKIP_FILES.has(entry.name)) continue;
+    if (SKIP_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) continue;
     const abs = path.join(dir, entry.name);
     const relPath = rel ? `${rel}/${entry.name}` : entry.name;
     if (entry.isDirectory()) out.push(...walk(abs, relPath));

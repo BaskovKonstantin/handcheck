@@ -37,9 +37,9 @@
   <h1>HandCheck — исходный код</h1>
   <p>Сайт подбора ИТ-специалистов: категорию подтверждает батарея заданий, приглашение инициирует работодатель, контакты открываются только после согласия.</p>
   <div class="stats">
-    <div class="stat"><b>554</b><span>файлов</span></div>
+    <div class="stat"><b>536</b><span>файлов</span></div>
     <div class="stat"><b>302</b><span>текстовых</span></div>
-    <div class="stat"><b>266 171</b><span>строк</span></div>
+    <div class="stat"><b>548 224</b><span>строк</span></div>
     <div class="stat"><b>2026-10-09</b><span>сборка страницы</span></div>
   </div>
   <a class="dl" href="../handcheck-source.tar.gz" download>Скачать весь репозиторий (tar.gz, 19 МБ)</a>
@@ -53,15 +53,13 @@
       <div class="row">📄 <a href="#file-app/db/battery-catalog/helpers.js">helpers.js</a> <span class="dim">app/db/battery-catalog</span></div>
       <div class="row">📄 <a href="#file-app/db/battery-catalog/index.js">index.js</a> <span class="dim">app/db/battery-catalog</span></div>
       <div class="row">📄 <a href="#file-app/db/battery-catalog/qa.js">qa.js</a> <span class="dim">app/db/battery-catalog</span></div></details>
-    <div class="row">🗎 <a href="#file-app/db/.gitkeep">.gitkeep</a> <span class="dim">app/db</span></div>
     <div class="row">📄 <a href="#file-app/db/index.js">index.js</a> <span class="dim">app/db</span></div>
     <div class="row">📄 <a href="#file-app/db/migrate.js">migrate.js</a> <span class="dim">app/db</span></div>
     <div class="row">📄 <a href="#file-app/db/patches.js">patches.js</a> <span class="dim">app/db</span></div>
     <div class="row">📄 <a href="#file-app/db/schema.sql">schema.sql</a> <span class="dim">app/db</span></div>
     <div class="row">📄 <a href="#file-app/db/seed.js">seed.js</a> <span class="dim">app/db</span></div>
     <div class="row">📄 <a href="#file-app/db/task-battery-content.js">task-battery-content.js</a> <span class="dim">app/db</span></div></details>
-  <details open><summary>📁 lib/</summary>    <div class="row">🗎 <a href="#file-app/lib/.gitkeep">.gitkeep</a> <span class="dim">app/lib</span></div>
-    <div class="row">📄 <a href="#file-app/lib/ai-usage-summary.js">ai-usage-summary.js</a> <span class="dim">app/lib</span></div>
+  <details open><summary>📁 lib/</summary>    <div class="row">📄 <a href="#file-app/lib/ai-usage-summary.js">ai-usage-summary.js</a> <span class="dim">app/lib</span></div>
     <div class="row">📄 <a href="#file-app/lib/api-token.js">api-token.js</a> <span class="dim">app/lib</span></div>
     <div class="row">📄 <a href="#file-app/lib/assessment-answer.js">assessment-answer.js</a> <span class="dim">app/lib</span></div>
     <div class="row">📄 <a href="#file-app/lib/assessment-auto-expire.js">assessment-auto-expire.js</a> <span class="dim">app/lib</span></div>
@@ -133,40 +131,31 @@
     <div class="row">📄 <a href="#file-app/lib/validation.js">validation.js</a> <span class="dim">app/lib</span></div>
     <div class="row">📄 <a href="#file-app/lib/webm-ffmpeg.js">webm-ffmpeg.js</a> <span class="dim">app/lib</span></div>
     <div class="row">📄 <a href="#file-app/lib/webm.js">webm.js</a> <span class="dim">app/lib</span></div></details>
-  <details open><summary>📁 middleware/</summary>    <div class="row">🗎 <a href="#file-app/middleware/.gitkeep">.gitkeep</a> <span class="dim">app/middleware</span></div>
-    <div class="row">📄 <a href="#file-app/middleware/auth.js">auth.js</a> <span class="dim">app/middleware</span></div>
+  <details open><summary>📁 middleware/</summary>    <div class="row">📄 <a href="#file-app/middleware/auth.js">auth.js</a> <span class="dim">app/middleware</span></div>
     <div class="row">📄 <a href="#file-app/middleware/errors.js">errors.js</a> <span class="dim">app/middleware</span></div>
     <div class="row">📄 <a href="#file-app/middleware/mcp-rate-limit.js">mcp-rate-limit.js</a> <span class="dim">app/middleware</span></div>
     <div class="row">📄 <a href="#file-app/middleware/reject-oversized-body.js">reject-oversized-body.js</a> <span class="dim">app/middleware</span></div>
     <div class="row">📄 <a href="#file-app/middleware/require-role.js">require-role.js</a> <span class="dim">app/middleware</span></div>
     <div class="row">📄 <a href="#file-app/middleware/session-same-origin.js">session-same-origin.js</a> <span class="dim">app/middleware</span></div></details>
-  <details open><summary>📁 modules/</summary>    <details open><summary>📁 assessment/</summary>      <div class="row">🗎 <a href="#file-app/modules/assessment/.gitkeep">.gitkeep</a> <span class="dim">app/modules/assessment</span></div>
-      <div class="row">📄 <a href="#file-app/modules/assessment/router.js">router.js</a> <span class="dim">app/modules/assessment</span></div>
+  <details open><summary>📁 modules/</summary>    <details open><summary>📁 assessment/</summary>      <div class="row">📄 <a href="#file-app/modules/assessment/router.js">router.js</a> <span class="dim">app/modules/assessment</span></div>
       <div class="row">📄 <a href="#file-app/modules/assessment/service.js">service.js</a> <span class="dim">app/modules/assessment</span></div></details>
-    <details open><summary>📁 auth/</summary>      <div class="row">🗎 <a href="#file-app/modules/auth/.gitkeep">.gitkeep</a> <span class="dim">app/modules/auth</span></div>
-      <div class="row">📄 <a href="#file-app/modules/auth/router.js">router.js</a> <span class="dim">app/modules/auth</span></div></details>
+    <details open><summary>📁 auth/</summary>      <div class="row">📄 <a href="#file-app/modules/auth/router.js">router.js</a> <span class="dim">app/modules/auth</span></div></details>
     <details open><summary>📁 calls/</summary>      <div class="row">📄 <a href="#file-app/modules/calls/analyze-call.js">analyze-call.js</a> <span class="dim">app/modules/calls</span></div>
       <div class="row">📄 <a href="#file-app/modules/calls/router.js">router.js</a> <span class="dim">app/modules/calls</span></div>
       <div class="row">📄 <a href="#file-app/modules/calls/signaling.js">signaling.js</a> <span class="dim">app/modules/calls</span></div></details>
-    <details open><summary>📁 candidates/</summary>      <div class="row">🗎 <a href="#file-app/modules/candidates/.gitkeep">.gitkeep</a> <span class="dim">app/modules/candidates</span></div>
-      <div class="row">📄 <a href="#file-app/modules/candidates/router.js">router.js</a> <span class="dim">app/modules/candidates</span></div></details>
-    <details open><summary>📁 catalog/</summary>      <div class="row">🗎 <a href="#file-app/modules/catalog/.gitkeep">.gitkeep</a> <span class="dim">app/modules/catalog</span></div></details>
+    <details open><summary>📁 candidates/</summary>      <div class="row">📄 <a href="#file-app/modules/candidates/router.js">router.js</a> <span class="dim">app/modules/candidates</span></div></details>
     <details open><summary>📁 deck/</summary>      <div class="row">📄 <a href="#file-app/modules/deck/router.js">router.js</a> <span class="dim">app/modules/deck</span></div></details>
     <details open><summary>📁 employer-tests/</summary>      <div class="row">📄 <a href="#file-app/modules/employer-tests/candidate-router.js">candidate-router.js</a> <span class="dim">app/modules/employer-tests</span></div>
       <div class="row">📄 <a href="#file-app/modules/employer-tests/router.js">router.js</a> <span class="dim">app/modules/employer-tests</span></div>
       <div class="row">📄 <a href="#file-app/modules/employer-tests/service.js">service.js</a> <span class="dim">app/modules/employer-tests</span></div>
       <div class="row">📄 <a href="#file-app/modules/employer-tests/templates.js">templates.js</a> <span class="dim">app/modules/employer-tests</span></div>
       <div class="row">📄 <a href="#file-app/modules/employer-tests/validation.js">validation.js</a> <span class="dim">app/modules/employer-tests</span></div></details>
-    <details open><summary>📁 employers/</summary>      <div class="row">🗎 <a href="#file-app/modules/employers/.gitkeep">.gitkeep</a> <span class="dim">app/modules/employers</span></div>
-      <div class="row">📄 <a href="#file-app/modules/employers/dashboard.js">dashboard.js</a> <span class="dim">app/modules/employers</span></div>
+    <details open><summary>📁 employers/</summary>      <div class="row">📄 <a href="#file-app/modules/employers/dashboard.js">dashboard.js</a> <span class="dim">app/modules/employers</span></div>
       <div class="row">📄 <a href="#file-app/modules/employers/router.js">router.js</a> <span class="dim">app/modules/employers</span></div></details>
-    <details open><summary>📁 fsp/</summary>      <div class="row">🗎 <a href="#file-app/modules/fsp/.gitkeep">.gitkeep</a> <span class="dim">app/modules/fsp</span></div></details>
     <details open><summary>📁 integrations/</summary>      <div class="row">📄 <a href="#file-app/modules/integrations/router.js">router.js</a> <span class="dim">app/modules/integrations</span></div></details>
-    <details open><summary>📁 invitations/</summary>      <div class="row">🗎 <a href="#file-app/modules/invitations/.gitkeep">.gitkeep</a> <span class="dim">app/modules/invitations</span></div>
-      <div class="row">📄 <a href="#file-app/modules/invitations/actions.js">actions.js</a> <span class="dim">app/modules/invitations</span></div>
+    <details open><summary>📁 invitations/</summary>      <div class="row">📄 <a href="#file-app/modules/invitations/actions.js">actions.js</a> <span class="dim">app/modules/invitations</span></div>
       <div class="row">📄 <a href="#file-app/modules/invitations/router.js">router.js</a> <span class="dim">app/modules/invitations</span></div></details>
-    <details open><summary>📁 matching/</summary>      <div class="row">🗎 <a href="#file-app/modules/matching/.gitkeep">.gitkeep</a> <span class="dim">app/modules/matching</span></div>
-      <div class="row">📄 <a href="#file-app/modules/matching/candidates-list.js">candidates-list.js</a> <span class="dim">app/modules/matching</span></div>
+    <details open><summary>📁 matching/</summary>      <div class="row">📄 <a href="#file-app/modules/matching/candidates-list.js">candidates-list.js</a> <span class="dim">app/modules/matching</span></div>
       <div class="row">📄 <a href="#file-app/modules/matching/explain.js">explain.js</a> <span class="dim">app/modules/matching</span></div>
       <div class="row">📄 <a href="#file-app/modules/matching/open-bank.js">open-bank.js</a> <span class="dim">app/modules/matching</span></div>
       <div class="row">📄 <a href="#file-app/modules/matching/pool.js">pool.js</a> <span class="dim">app/modules/matching</span></div>
@@ -178,18 +167,15 @@
     <details open><summary>📁 needs/</summary>      <div class="row">📄 <a href="#file-app/modules/needs/router.js">router.js</a> <span class="dim">app/modules/needs</span></div></details>
     <details open><summary>📁 stats/</summary>      <div class="row">📄 <a href="#file-app/modules/stats/router.js">router.js</a> <span class="dim">app/modules/stats</span></div></details>
     <details open><summary>📁 tasks/</summary>      <div class="row">📄 <a href="#file-app/modules/tasks/router.js">router.js</a> <span class="dim">app/modules/tasks</span></div></details>
-    <details open><summary>📁 vacancies/</summary>      <div class="row">🗎 <a href="#file-app/modules/vacancies/.gitkeep">.gitkeep</a> <span class="dim">app/modules/vacancies</span></div></details>
     <div class="row">📄 <a href="#file-app/modules/README.md">README.md</a> <span class="dim">app/modules</span></div></details>
-  <details open><summary>📁 public/</summary>    <details open><summary>📁 candidate/</summary>      <div class="row">🗎 <a href="#file-app/public/candidate/.gitkeep">.gitkeep</a> <span class="dim">app/public/candidate</span></div>
-      <div class="row">📄 <a href="#file-app/public/candidate/calls.html">calls.html</a> <span class="dim">app/public/candidate</span></div>
+  <details open><summary>📁 public/</summary>    <details open><summary>📁 candidate/</summary>      <div class="row">📄 <a href="#file-app/public/candidate/calls.html">calls.html</a> <span class="dim">app/public/candidate</span></div>
       <div class="row">📄 <a href="#file-app/public/candidate/integrations.html">integrations.html</a> <span class="dim">app/public/candidate</span></div>
       <div class="row">📄 <a href="#file-app/public/candidate/invitations.html">invitations.html</a> <span class="dim">app/public/candidate</span></div>
       <div class="row">📄 <a href="#file-app/public/candidate/past.html">past.html</a> <span class="dim">app/public/candidate</span></div>
       <div class="row">📄 <a href="#file-app/public/candidate/profile.html">profile.html</a> <span class="dim">app/public/candidate</span></div>
       <div class="row">📄 <a href="#file-app/public/candidate/tasks.html">tasks.html</a> <span class="dim">app/public/candidate</span></div>
       <div class="row">📄 <a href="#file-app/public/candidate/today.html">today.html</a> <span class="dim">app/public/candidate</span></div></details>
-    <details open><summary>📁 employer/</summary>      <div class="row">🗎 <a href="#file-app/public/employer/.gitkeep">.gitkeep</a> <span class="dim">app/public/employer</span></div>
-      <div class="row">📄 <a href="#file-app/public/employer/calls.html">calls.html</a> <span class="dim">app/public/employer</span></div>
+    <details open><summary>📁 employer/</summary>      <div class="row">📄 <a href="#file-app/public/employer/calls.html">calls.html</a> <span class="dim">app/public/employer</span></div>
       <div class="row">📄 <a href="#file-app/public/employer/candidates.html">candidates.html</a> <span class="dim">app/public/employer</span></div>
       <div class="row">📄 <a href="#file-app/public/employer/candidates.js">candidates.js</a> <span class="dim">app/public/employer</span></div>
       <div class="row">📄 <a href="#file-app/public/employer/deck.html">deck.html</a> <span class="dim">app/public/employer</span></div>
@@ -591,10 +577,6 @@
   <div class="row">📄 <a href="#file-test/search-query.test.js">search-query.test.js</a> <span class="dim">test</span></div>
   <div class="row">📄 <a href="#file-test/seed-jury-company-tests.test.js">seed-jury-company-tests.test.js</a> <span class="dim">test</span></div>
   <div class="row">📄 <a href="#file-test/seed-jury-pack.test.js">seed-jury-pack.test.js</a> <span class="dim">test</span></div></details>
-<div class="row">🗎 <a href="#file-.env">.env</a> <span class="dim"></span></div>
-<div class="row">🗎 <a href="#file-.env.bak-cooldown">.env.bak-cooldown</a> <span class="dim"></span></div>
-<div class="row">🗎 <a href="#file-.env.example">.env.example</a> <span class="dim"></span></div>
-<div class="row">🗎 <a href="#file-.gitignore">.gitignore</a> <span class="dim"></span></div>
 <div class="row">📄 <a href="#file-AGENTS.md">AGENTS.md</a> <span class="dim"></span></div>
 <div class="row">📄 <a href="#file-docker-compose.yml">docker-compose.yml</a> <span class="dim"></span></div>
 <div class="row">🗎 <a href="#file-Dockerfile">Dockerfile</a> <span class="dim"></span></div>
@@ -605,7 +587,7 @@
     </div>
     <table>
       <tr><th>Расширение</th><th>Файлов</th></tr>
-      <tr><td>.js</td><td>232</td></tr><tr><td>.png</td><td>186</td></tr><tr><td>.md</td><td>26</td></tr><tr><td>.woff2</td><td>25</td></tr><tr><td>.html</td><td>23</td></tr><tr><td>(без расширения)</td><td>19</td></tr><tr><td>.json</td><td>8</td></tr><tr><td>.jpg</td><td>8</td></tr><tr><td>.webm</td><td>8</td></tr><tr><td>.sh</td><td>4</td></tr><tr><td>.css</td><td>2</td></tr><tr><td>.pdf</td><td>2</td></tr><tr><td>.py</td><td>2</td></tr><tr><td>.bak-cooldown</td><td>1</td></tr><tr><td>.example</td><td>1</td></tr><tr><td>.sql</td><td>1</td></tr><tr><td>.svg</td><td>1</td></tr><tr><td>.yml</td><td>1</td></tr><tr><td>.txt</td><td>1</td></tr><tr><td>.pptx</td><td>1</td></tr><tr><td>.yaml</td><td>1</td></tr><tr><td>.mjs</td><td>1</td></tr>
+      <tr><td>.js</td><td>232</td></tr><tr><td>.png</td><td>186</td></tr><tr><td>.md</td><td>26</td></tr><tr><td>.woff2</td><td>25</td></tr><tr><td>.html</td><td>23</td></tr><tr><td>.json</td><td>8</td></tr><tr><td>.jpg</td><td>8</td></tr><tr><td>.webm</td><td>8</td></tr><tr><td>.sh</td><td>4</td></tr><tr><td>(без расширения)</td><td>3</td></tr><tr><td>.css</td><td>2</td></tr><tr><td>.pdf</td><td>2</td></tr><tr><td>.py</td><td>2</td></tr><tr><td>.sql</td><td>1</td></tr><tr><td>.svg</td><td>1</td></tr><tr><td>.yml</td><td>1</td></tr><tr><td>.txt</td><td>1</td></tr><tr><td>.pptx</td><td>1</td></tr><tr><td>.yaml</td><td>1</td></tr><tr><td>.mjs</td><td>1</td></tr>
     </table>
   </aside>
   <main>

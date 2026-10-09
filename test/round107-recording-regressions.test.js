@@ -177,6 +177,80 @@ describe("round107 recording regressions", () => {
     assert.doesNotMatch(row.summary_text, /stale single-side/i);
   });
 
+  it("late chunk merged on duration-only finalize after orphan merge; chunks removed", async () => {
+    const { app } = freshApp();
+    const { getDb } = require("../app/db");
+    const db = getDb();
+    const cafe = db.prepare("SELECT id FROM users WHERE email = 'cafe@demo.local'").get();
+    const anna = db.prepare("SELECT id FROM users WHERE email = 'anna@demo.local'").get();
+    const need = db.prepare("SELECT id FROM employer_needs WHERE employer_user_id = ?").get(cafe.id);
+    const { newId } = require("../app/lib/ids");
+    const invId = newId();
+    db.prepare(
+      `INSERT INTO invitations (id, employer_user_id, need_id, candidate_user_id, salary_from, salary_to, offer_text, contact_channel, status)
+       VALUES (?, ?, ?, ?, 100000, 120000, 'r107 duration-only late chunk', 'email', 'accepted')`
+    ).run(invId, cafe.id, need.id, anna.id);
+    const callId = newId();
+    db.prepare(
+      `INSERT INTO calls (id, invitation_id, status, started_at, consent_at_candidate, consent_at_employer) VALUES (?, ?, 'live', datetime('now'), datetime('now'), datetime('now'))`
+    ).run(callId, invId);
+    const cafeAgent = request.agent(app);
+    const annaAgent = request.agent(app);
+    await cafeAgent.post("/api/auth/login").send({ email: "cafe@demo.local", password: "demo-demo-demo" });
+    await annaAgent.post("/api/auth/login").send({ email: "anna@demo.local", password: "demo-demo-demo" });
+
+    await annaAgent
+      .post(`/api/calls/${callId}/recording-chunk`)
+      .attach("file", fakeEbml(12_000), "c1.webm");
+    await annaAgent
+      .post(`/api/calls/${callId}/recording-chunk`)
+      .attach("file", fakeMediaRecorderContinuation(9_000), "c2.webm");
+
+    await cafeAgent.post(`/api/calls/${callId}/end`);
+    await new Promise((r) => setTimeout(r, 80));
+
+    const store = require("../app/lib/recording-store");
+    const orphanSize = fs.statSync(path.join(store.callDir(callId), "candidate.webm")).size;
+    assert.ok(orphanSize >= MIN_PLAYABLE_RECORDING_BYTES);
+
+    const lateChunk = await annaAgent
+      .post(`/api/calls/${callId}/recording-chunk`)
+      .attach("file", fakeMediaRecorderContinuation(7_000), "late.webm");
+    assert.equal(lateChunk.status, 200, lateChunk.body?.error || lateChunk.text);
+    assert.equal(store.listChunkFiles(callId, "candidate").length, 1);
+
+    const fin1 = await annaAgent.post(`/api/calls/${callId}/recording`).field("durationMs", "45000");
+    assert.equal(fin1.status, 200);
+    const afterMerge = fs.statSync(path.join(store.callDir(callId), "candidate.webm")).size;
+    assert.ok(afterMerge > orphanSize);
+    assert.equal(store.listChunkFiles(callId, "candidate").length, 0);
+
+    const fin2 = await annaAgent.post(`/api/calls/${callId}/recording`).field("durationMs", "45000");
+    assert.equal(fin2.status, 200);
+    assert.equal(fs.statSync(path.join(store.callDir(callId), "candidate.webm")).size, afterMerge);
+  });
+
+  it("orphan final accepts first tail-only finalize then ignores duplicate tail", () => {
+    const dataDir = path.join(os.tmpdir(), `hc-r107-tail-only-${process.pid}-${Date.now()}`);
+    process.env.CALLS_DIR = path.join(dataDir, "calls");
+    for (const key of Object.keys(require.cache)) {
+      if (key.includes("/app/")) delete require.cache[key];
+    }
+    const store = require("../app/lib/recording-store");
+    const callId = `00000000-0000-4000-8000-${String(Date.now()).slice(-12)}`;
+    store.appendChunk(callId, "candidate", fakeEbml(12_000));
+    store.mergeChunksToFinal(callId, "candidate", Buffer.alloc(0), 30_000);
+    const before = fs.statSync(path.join(store.callDir(callId), "candidate.webm")).size;
+    const tail = fakeCluster(6_000);
+    const path1 = store.writeFinalRecording(callId, "candidate", tail, 40_000);
+    assert.ok(path1);
+    const afterFirst = fs.statSync(path1).size;
+    assert.ok(afterFirst > before);
+    const path2 = store.writeFinalRecording(callId, "candidate", tail, 40_000);
+    assert.equal(path2, path1);
+    assert.equal(fs.statSync(path1).size, afterFirst);
+  });
+
   it("hasRecordingContinuationContext treats orphan final as continuation", () => {
     const dataDir = path.join(os.tmpdir(), `hc-r107-ctx-${process.pid}-${Date.now()}`);
     process.env.CALLS_DIR = path.join(dataDir, "calls");

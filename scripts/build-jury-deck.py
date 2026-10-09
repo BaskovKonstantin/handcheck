@@ -28,6 +28,23 @@ TEMPLATE = os.path.join(ROOT, "docs", "presentation", "template-fsp-2026.pptx")
 METRICS = os.path.join(ROOT, "context", "metrics-assessment.json")
 SHOTS = os.path.join(ROOT, "handcheck-ui", "presentation")
 OUT = os.path.join(ROOT, "docs", "presentation", "HandCheck-ФСП-2026.pptx")
+ASSETS = os.path.join(ROOT, "context", "presentation-assets")
+
+# Состав команды. Правила ФСП прямо разрешают удалить лишние карточки на слайде
+# «Команда», если участников меньше. Чтобы добавить участника — допишите словарь
+# в список и пересоберите деку. «‹вписать›» — поля, которые нельзя угадать:
+# замените их перед сдачей (Ctrl+F по слову «вписать»).
+TEAM = [
+    {
+        "name": "Константин Басков",
+        "role": "Капитан · продукт, дизайн и разработка",
+        "nick": "@BaskovKonstantin",
+        "phone": "‹вписать›",
+        "place": "Собственный продукт · baski.pro",
+        "about": "Node.js 20 + Express + SQLite, деплой на собственном сервере",
+    },
+]
+CITY = "‹вписать›"
 
 PURPLE = RGBColor = None  # placeholder, real color set below
 
@@ -206,6 +223,250 @@ def caption(slide, left, top, width, text, size=9, color=None):
     return box
 
 
+def _font(size, bold=True):
+    """Шрифт для генерируемых картинок команды (Montserrat, иначе DejaVu)."""
+    from PIL import ImageFont
+
+    candidates = [
+        # системный Montserrat нужен LibreOffice для рендера PDF
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", None),
+    ]
+    for path, variation in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            f = ImageFont.truetype(path, size)
+            if variation:
+                f.set_variation_by_name(variation)
+            return f
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def _gradient_bg(size, c1=(0x2A, 0x05, 0x4A), c2=(0x6A, 0x1B, 0xA8)):
+    """Вертикальный градиент фирменного фиолетового."""
+    from PIL import Image
+
+    w, h = size
+    img = Image.new("RGB", (1, h))
+    for y in range(h):
+        t = y / max(h - 1, 1)
+        img.putpixel((0, y), tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3)))
+    return img.resize((w, h))
+
+
+def _grid(img, step=64, color=(255, 255, 255, 10)):
+    from PIL import Image, ImageDraw
+
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    for x in range(0, img.size[0], step):
+        d.line([(x, 0), (x, img.size[1])], fill=color, width=1)
+    for y in range(0, img.size[1], step):
+        d.line([(0, y), (img.size[0], y)], fill=color, width=1)
+    img.alpha_composite(layer)
+
+
+def initials(name):
+    parts = [p for p in name.replace("  ", " ").split() if p]
+    return (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
+
+
+def team_banner_png(members, path):
+    """Баннер на место «фото команды» — плейсхолдер шаблона без картинки."""
+    from PIL import Image, ImageDraw
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    w, h = 1680, 774
+    img = _gradient_bg((w, h)).convert("RGBA")
+    _grid(img)
+    d = ImageDraw.Draw(img)
+    accent = (255, 0, 83)
+
+    if len(members) == 1:
+        d = _draw_member_row(d, members[0], 90, 150, 150, h)
+    else:
+        d = _draw_member_row(d, members[0], 90, 90, 130, h)
+        _draw_member_row(d, members[1], 90, 470, 130, h)
+    d.rectangle([0, h - 14, int(w * 0.34), h], fill=accent)
+    img.convert("RGB").save(path)
+    return path
+
+
+def _draw_member_row(d, member, x, y, dia, h):
+    from PIL import ImageDraw
+
+    f_name = _font(64)
+    f_role = _font(34)
+    d.ellipse([x, y, x + dia, y + dia], fill=(0x5B, 0x14, 0xA8), outline=accent_px(), width=6)
+    f_init = _font(int(dia * 0.42))
+    init = initials(member["name"])
+    bb = d.textbbox((0, 0), init, font=f_init)
+    d.text((x + (dia - (bb[2] - bb[0])) / 2 - bb[0], y + (dia - (bb[3] - bb[1])) / 2 - bb[1]),
+           init, font=f_init, fill=(255, 255, 255))
+    tx = x + dia + 50
+    d.text((tx, y + dia * 0.18), member["name"], font=f_name, fill=(255, 255, 255))
+    d.text((tx, y + dia * 0.18 + 84), member["role"], font=f_role, fill=(233, 214, 255))
+    d.text((tx, y + dia * 0.18 + 140), member.get("about", ""), font=f_role, fill=(206, 190, 236))
+    return d
+
+
+def accent_px():
+    return (255, 0, 83)
+
+
+def avatar_png(member, path):
+    """Круглый аватар с инициалами — в карточку участника команды."""
+    from PIL import Image, ImageDraw
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    size = 480
+    img = _gradient_bg((size, size), (0x4A, 0x0E, 0x84), (0x7A, 0x1F, 0xC0)).convert("RGBA")
+    _grid(img, step=40)
+    d = ImageDraw.Draw(img)
+    f = _font(210)
+    init = initials(member["name"])
+    bb = d.textbbox((0, 0), init, font=f)
+    d.text(((size - (bb[2] - bb[0])) / 2 - bb[0], (size - (bb[3] - bb[1])) / 2 - bb[1]),
+           init, font=f, fill=(255, 255, 255))
+    img.convert("RGB").save(path)
+    return path
+
+
+def style_chart(chart, number_format="0.00", label_size=10, legend=True,
+                legend_position="bottom", show_values=True, text_color=None):
+    """Сделать график читаемым: подписи значений, текст осей и легенды контрастом."""
+    from pptx.enum.chart import XL_LABEL_POSITION, XL_LEGEND_POSITION, XL_TICK_LABEL_POSITION
+
+    fg = text_color or INK
+    positions = {
+        "bottom": XL_LEGEND_POSITION.BOTTOM,
+        "right": XL_LEGEND_POSITION.RIGHT,
+    }
+    try:
+        chart.font.size = Pt(9)
+        chart.font.color.rgb = fg
+    except Exception:
+        pass
+    chart.has_legend = legend
+    if legend:
+        chart.legend.position = positions[legend_position]
+        chart.legend.include_in_layout = False
+        chart.legend.font.size = Pt(9)
+        chart.legend.font.color.rgb = fg
+    for plot in chart.plots:
+        if not show_values:
+            # Убрать подписи, зашитые в шаблон (в том числе «7 %» у кольцевой диаграммы).
+            ns = "{http://schemas.openxmlformats.org/drawingml/2006/chart}dLbls"
+            stale = [el for el in chart._chartSpace.iter(ns)]
+            for el in stale:
+                el.getparent().remove(el)
+            continue
+        plot.has_data_labels = True
+        dl = plot.data_labels
+        dl.show_value = True
+        dl.show_category_name = False
+        dl.show_series_name = False
+        dl.show_legend_key = False
+        dl.number_format = number_format
+        dl.number_format_is_linked = False
+        dl.font.size = Pt(label_size)
+        dl.font.bold = True
+        dl.font.color.rgb = fg
+        for pos in (XL_LABEL_POSITION.OUTSIDE_END, XL_LABEL_POSITION.CENTER):
+            try:
+                dl.position = pos
+                break
+            except Exception:
+                continue
+    try:
+        va = chart.value_axis
+        va.has_major_gridlines = False
+        va.visible = False
+    except Exception:
+        pass
+    try:
+        ca = chart.category_axis
+        ca.has_major_gridlines = False
+        ca.tick_labels.font.size = Pt(9)
+        ca.tick_labels.font.color.rgb = fg
+        ca.tick_label_position = XL_TICK_LABEL_POSITION.LOW
+    except Exception:
+        pass
+    return chart
+
+
+def team_card_groups(slide):
+    """Сгруппировать фигуры карточек участников по прямоугольнику карточки."""
+    from pptx.util import Emu
+
+    cards = [sh for sh in slide.shapes
+             if abs(Emu(sh.width).inches - 2.40) < 0.05 and abs(Emu(sh.height).inches - 5.29) < 0.05]
+    cards.sort(key=lambda sh: sh.left)
+
+    skip = set()
+    for sh in slide.shapes:
+        name = sh.name.lower()
+        if "заголовок" in name or "номер слайда" in name:
+            skip.add(sh.shape_id)
+        elif Emu(sh.top).inches < 1.0 and Emu(sh.height).inches < 1.0:
+            skip.add(sh.shape_id)  # плашка заголовка слайда
+
+    groups = []
+    for card in cards:
+        members = [card]
+        seen = {card.shape_id}
+        for sh in slide.shapes:
+            if sh.shape_id in seen or sh.shape_id in skip:
+                continue
+            if card.left - 1000 <= sh.left <= card.left + card.width:
+                members.append(sh)
+                seen.add(sh.shape_id)
+        groups.append(members)
+    return groups
+
+
+def fill_team_slide(slide):
+    """Заполнить слайд «Команда» и удалить лишние карточки (правило ФСП)."""
+    from pptx.util import Emu
+
+    groups = team_card_groups(slide)
+    keep = groups[: len(TEAM)]
+    for group in groups[len(TEAM):]:
+        for sh in group:
+            sh._element.getparent().remove(sh._element)
+
+    pitch = 2.52
+    total = len(keep) * 2.40 + (len(keep) - 1) * 0.12
+    start = (13.333 - total) / 2
+    for i, group in enumerate(keep):
+        member = TEAM[i]
+        left = int(Inches(start + i * pitch))
+        for sh in group:
+            sh.left = left + int(sh.left - min(g.left for g in group))
+        name_tb = next((sh for sh in group if sh.has_text_frame and "Имя Фамилия" in text_of(sh)), None)
+        role_tb = next((sh for sh in group
+                        if sh.has_text_frame and "Роль в команде" in text_of(sh)), None)
+        if name_tb is not None:
+            set_shape_lines(name_tb, [member["name"]], size=13, bold=True, color=BRAND)
+        if role_tb is not None:
+            set_shape_lines(role_tb,
+                            [f"Роль: {member['role']}",
+                             f"Ник: {member['nick']}",
+                             f"Телефон: {member['phone']}",
+                             f"Место: {member['place']}"],
+                            size=9, color=INK)
+        photo = next((sh for sh in group if sh.is_placeholder
+                      and sh.shape_type is not None and "Рисунок" in sh.name), None)
+        if photo is not None:
+            png = avatar_png(member, os.path.join(ASSETS, f"avatar-{i}.png"))
+            place_image(slide, png, (Emu(photo.left).inches, Emu(photo.top).inches,
+                                     Emu(photo.width).inches, Emu(photo.height).inches),
+                        crop_fill=False)
+            photo._element.getparent().remove(photo._element)
+
+
 def _rename_slide_part(prs, slide):
     """Выдать новому слайду уникальное имя части.
 
@@ -313,13 +574,18 @@ def main():
     s = slides[1]
     set_lines(ph_by_idx(s, 0).text_frame, ["Категорию даёт батарея"], size=22, bold=True, color=BRAND)
     photo = ph_by_idx(s, 10)
-    if photo is not None and photo.has_text_frame:
-        set_lines(photo.text_frame, ["[ фото команды ]"], size=12, color=GREY)
+    if photo is not None:
+        banner = team_banner_png(TEAM, os.path.join(ASSETS, "team-banner.png"))
+        box = (Emu(photo.left).inches, Emu(photo.top).inches,
+               Emu(photo.width).inches, Emu(photo.height).inches)
+        photo._element.getparent().remove(photo._element)
+        place_image(s, banner, box, crop_fill=False)
+    captain = TEAM[0]
     set_shape_lines(shape_by_text(s, "Капитан: ФИО"),
-                    ["Капитан: [ФИО, специальность]",
-                     "Кол-во участников: [__] человек",
-                     "Краткое описание: [место работы / учёбы участников]",
-                     "Город и регион: [город]"],
+                    [f"Капитан: {captain['name']}",
+                     f"Кол-во участников: {len(TEAM)}",
+                     f"Краткое описание: {captain['place']}",
+                     f"Город и регион: {CITY}"],
                     size=12, color=INK)
     set_shape_lines(shape_by_text(s, "В чем суть вашего решения"),
                     ["Соискатель проходит опрос и батарею — получает категорию "
@@ -334,14 +600,7 @@ def main():
     # ---------- 3. Команда (заполнить участников) ----------
     s = slides[2]
     set_pill_title(s, "Команда")
-    for tb in [sh for sh in s.shapes if sh.has_text_frame and "Имя Фамилия" in text_of(sh)]:
-        set_shape_lines(tb, ["Имя Фамилия"], size=12, bold=True, color=BRAND)
-    for tb in [sh for sh in s.shapes if sh.has_text_frame and "Роль в команде" in text_of(sh)]:
-        set_shape_lines(tb, ["Роль: [роль в команде]",
-                             "Ник: [@telegram]",
-                             "Телефон: [+7 …]",
-                             "Место работы/учёбы: [место]"],
-                        size=9, color=INK)
+    fill_team_slide(s)
 
     # ---------- 4. Краткая история ----------
     s = slides[3]
@@ -538,6 +797,8 @@ def main():
     data.categories = ["Сильные ответы", "Слабые ответы", "Cutoff junior", "Cutoff middle", "Cutoff senior"]
     data.add_series("test_score", (strong, weak, cutoffs["junior"], cutoffs["middle"], cutoffs["senior"]))
     chart.replace_data(data)
+    style_chart(chart, number_format="0.00", legend=False, show_values=True,
+                text_color=rgb("F2ECFF"), label_size=11)
     set_lines(ph_by_idx(s, 21).text_frame, ["Порог подтверждения категории"], size=14, bold=True, color=BRAND)
     set_lines(ph_by_idx(s, 18).text_frame,
               [f"Сильные ответы {strong:.2f} проходят cutoff middle {cutoffs['middle']}, "
@@ -558,9 +819,10 @@ def main():
     chart2 = next(sh.chart for sh in s.shapes if sh.has_chart)
     data2 = CategoryChartData()
     data2.categories = ["Регистрация", "Тест и категория", "Приватность", "Потребность",
-                        "Подбор и приглашения", "Доп. функционал"]
+                        "Подбор и приглашения", "Доп. проверки"]
     data2.add_series("Проверок", (7, 7, 2, 3, 13, 9))
     chart2.replace_data(data2)
+    style_chart(chart2, number_format="0", legend=False, show_values=True)
     auto_points = [
         ("Функциональный аудит", "41 проверка на стенде: регистрация → батарея → категория → подборка → приглашение → контакты"),
         ("Прод-режим", "8 читающих проверок на развёрнутом стенде без записи в базу"),
@@ -578,9 +840,12 @@ def main():
     set_pill_title(s, "Покрытие ТЗ", size=15)
     chart3 = next(sh.chart for sh in s.shapes if sh.has_chart)
     data3 = CategoryChartData()
-    data3.categories = ["Реализовано и проверено", "Желательно (не блокер)", "Вне кода — концепция"]
-    data3.add_series("Пункты", (40, 2, 3))
+    data3.categories = ["Реализовано и проверено — 40", "Желательно (не блокер) — 2",
+                        "Вне кода, концепция — 3"]
+    data3.add_series("Пункты ТЗ", (40, 2, 3))
     chart3.replace_data(data3)
+    style_chart(chart3, number_format="0", legend=True, legend_position="bottom",
+                show_values=False)
     coverage = [
         ("Механика подбора", "need → match → invite → accept → раскрытие контактов — 10 из 10 пунктов"),
         ("Тест и категории", "опрос, формы, cutoff, кулдаун, пересдача — 8 из 8 пунктов"),
@@ -648,9 +913,9 @@ def main():
         "Одна фраза о сути — дальше раскрываем механику и доказательства.",
         "Суть решения: соискатель сам попадает в категорию по результату теста, работодатель ищет "
         "категорию, а не вакансии. Уникальность — в обратной механике и скрытых контактах. "
-        "Здесь же вписать ФИО капитана, состав команды, город.",
-        "Здесь вписать участников команды: имя, роль, ник, телефон, место работы или учёбы. "
-        "Если участников меньше пяти, лишние карточки удалить.",
+        "Здесь же вписаны ФИО капитана, состав команды и город.",
+        "Участники команды в карточках: имя, роль, ник, телефон, место работы или учёбы. "
+        "Карточки лишних участников удалены — так требуют правила ФСП.",
         "Три блока: почему выбрали задачу, что оказалось сложным (устойчивость теста), как проверяли "
         "себя (автотесты, процедура валидации, сквозной аудит).",
         "Техническая суть: стек и банк из 162 заданий. Маркетинговая: что получает рекрутер "
@@ -686,6 +951,30 @@ def main():
 
     prs.save(OUT)
     print(f"Сохранено: {OUT} ({len(prs.slides._sldIdLst)} слайдов)")
+    export_pdf_and_publish()
+
+
+def export_pdf_and_publish():
+    """Собрать PDF из PPTX и обновить публичные файлы в app/public/downloads."""
+    import shutil
+
+    pdf = OUT.replace(".pptx", ".pdf")
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        subprocess.run([soffice, "--headless", "--convert-to", "pdf",
+                        "--outdir", os.path.dirname(OUT), OUT],
+                       check=False, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=900)
+        print(f"Сохранено: {pdf}" if os.path.exists(pdf) else "PDF не собрался")
+    else:
+        print("LibreOffice не найден — PDF собран не будет")
+
+    downloads = os.path.join(ROOT, "app", "public", "downloads")
+    for src, dst in ((OUT, "HandCheck-FSP-2026-presentation.pptx"),
+                     (pdf, "HandCheck-FSP-2026-presentation.pdf")):
+        if os.path.isdir(downloads) and os.path.exists(src):
+            shutil.copyfile(src, os.path.join(downloads, dst))
+            print(f"Опубликовано: downloads/{dst}")
 
 
 if __name__ == "__main__":

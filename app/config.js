@@ -71,8 +71,8 @@ module.exports = {
     if (process.env.LLM_API_KEY) return "https://opencode.ai/zen/v1";
     return "";
   })(),
-  LLM_MODEL: process.env.LLM_MODEL || "glm-5.3-flash",
-  LLM_FALLBACK_MODELS: String(process.env.LLM_FALLBACK_MODELS || "space-bunny-free,deepseek-v4.1-flash")
+  LLM_MODEL: process.env.LLM_MODEL || "space-bunny-free",
+  LLM_FALLBACK_MODELS: String(process.env.LLM_FALLBACK_MODELS || "glm-5.3-flash")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean),

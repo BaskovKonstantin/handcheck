@@ -2,13 +2,25 @@
 
 Skills-first IT hiring (FSP 2026 special track). Category from test battery; employers invite with salary band; contacts hidden until accept.
 
-**Live:** https://handcheck.baski.pro
+**Live:** https://handcheck.baski.pro · Git: `git@github.com-handcheck:BaskovKonstantin/handcheck.git` · Деплой: push в `main` → self-hosted runner → Docker Compose
+
+## Что это
+
+Опрос + тест → категория (специализация × грейд) → работодатель сам приглашает кандидата
+с вилкой ЗП. Контакты кандидата скрыты до `accept`. Не витрина вакансий.
 
 ## Docs
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/TZ.md](./docs/TZ.md) | Сжатое ТЗ ФСП (источник требований) |
+| [docs/FUNCTIONAL-COVERAGE.md](./docs/FUNCTIONAL-COVERAGE.md) | Покрытие ТЗ по пунктам + функциональный аудит |
+| [docs/PRESENTATION.md](./docs/PRESENTATION.md) | Презентация проекта и тезисы питча |
 | [docs/IMPLEMENTATION-PLAN-rev5.md](./docs/IMPLEMENTATION-PLAN-rev5.md) | Canonical rev.5 spec |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Структура репо, домены, фазы |
+| [docs/DATA-MODEL.md](./docs/DATA-MODEL.md) | Таблицы и приватность |
+| [docs/VALIDATION.md](./docs/VALIDATION.md) | Как доказываем качество теста и подбора |
+| [docs/MCP.md](./docs/MCP.md) | MCP-интеграция для ИИ-клиентов |
 | [docs/design.md](./docs/design.md) | Palette clay/forest, motion |
 | [docs/UX.md](./docs/UX.md) | Routes and copy |
 | [docs/JURY-DEMO.md](./docs/JURY-DEMO.md) | Jury click-path and ranking checks |
@@ -30,9 +42,23 @@ Demo logins (when `DEMO_MODE=1`, password from `.env.example`):
 ## Quality gates
 
 ```bash
-npm test
-npm run validate
+npm test          # unit + integration tests
+npm run validate  # quality of assessment, matching and privacy on seed data
 ```
+
+Functional audit against a running instance (writes only to its own DB — run it against
+a throwaway `DB_PATH`, not the jury database):
+
+```bash
+# full mode on a clean local DB
+PORT=8899 DB_PATH=/tmp/hc-audit.sqlite DEMO_MODE=1 npm start &
+BASE_URL=http://127.0.0.1:8899 node scripts/functional-audit.js
+
+# read-only mode against production
+BASE_URL=https://handcheck.baski.pro AUDIT_MODE=readonly node scripts/functional-audit.js
+```
+
+Latest reports live in [`context/audits/`](./context/audits).
 
 ## Docker
 

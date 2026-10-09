@@ -1,5 +1,15 @@
 # Session notes
 
+## 2026-10-09 — round 109: аудит функционала, LLM на space-bunny-free, починенный /api/assessment/generate
+
+- LLM: `LLM_MODEL=space-bunny-free` (проверен — 2.1 с, JSON валиден), fallback `glm-5.3-flash` (сейчас отдаёт «Insufficient account funds»). Прописано в `app/config.js`, `.env`, `.env.example`.
+- **Баг**: `POST /api/assessment/generate` был мёртв — `tasks/router` стоял после `assessment/router`, а тот гейтит всё под `requireRole("candidate")`, плюс у tasks `requireNotCandidate` → 403 любой ролью. Роутер заданий перенесён выше в `app/server.js`.
+- Новый `scripts/functional-audit.js`: 41 проверка на чистой БД (регистрация → батарея → категория → подбор → приглашение → accept → контакты → колода → тест работодателя → MCP → LLM), режим `AUDIT_MODE=readonly` для прода (8 проверок, только чтение).
+- Свежий кандидат не может «набить» категорию скриптом — ниже cutoff получается `unconfirmed`, поэтому подбор/приглашения аудит гоняет на демо-аккаунтах с подтверждённой категорией.
+- Отчёты: `context/audits/2026-10-09-{full-local,prod-readonly}.{md,json}`.
+- Документация: `docs/FUNCTIONAL-COVERAGE.md` (покрытие ТЗ по пунктам), `docs/PRESENTATION.md` (питч и слайды), README обновлён, из `ARCHITECTURE.md` убрана несуществующая строка `GET /api/meta`.
+- Локально `npm rebuild better-sqlite3` под Node 22 (ABI 127).
+
 ## 2026-10-09 — round 108: симметричные кнопки демо-входа
 
 - `#btn-candidate` переведён на `aw-btn aw-btn-primary` + `.aw-btn-shine` — обе кнопки быстрого входа выглядят одинаково.

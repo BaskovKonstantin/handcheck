@@ -72,8 +72,10 @@ function createApp() {
   app.use("/api/employer", require("./modules/deck/router"));
   app.use("/api/employer", require("./modules/invitations/router"));
   app.use("/api/employer", require("./modules/employer-tests/router"));
-  app.use("/api/assessment", require("./modules/assessment/router"));
+  // tasks/router must come BEFORE assessment/router: the latter gates every
+  // request on requireRole("candidate"), which used to shadow POST /generate.
   app.use("/api/assessment", require("./modules/tasks/router"));
+  app.use("/api/assessment", require("./modules/assessment/router"));
   app.use("/api/calls", require("./modules/calls/router"));
   app.use("/api/integrations", require("./modules/integrations/router"));
   app.get("/api/privacy-notice", (_req, res) => {

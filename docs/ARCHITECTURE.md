@@ -166,7 +166,6 @@ UI и matching **обязаны** корректно работать при п�
 | POST | `/api/employer/invitations` | invitations | |
 | GET | `/api/employer/invitations` | invitations | |
 | GET | `/api/health` | server | уже есть |
-| GET | `/api/meta` | server | уже есть |
 
 Старые stub-роуты в `server.js` заменить модульными, сохранив `/api/health`.
 

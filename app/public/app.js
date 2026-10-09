@@ -811,8 +811,22 @@ function paintCabinetHeader(el, meEmail) {
   bindLogout(document.getElementById("logout-btn-header"));
 }
 
+function ensureCabinetAtmosphere() {
+  if (document.getElementById("cabinet-aw-bg")) return;
+  const bg = document.createElement("div");
+  bg.id = "cabinet-aw-bg";
+  bg.className = "cabinet-aw-bg";
+  bg.setAttribute("aria-hidden", "true");
+  bg.innerHTML = `
+    <div class="cabinet-aw-grid"></div>
+    <div class="cabinet-aw-aurora cabinet-aw-aurora-a"></div>
+    <div class="cabinet-aw-aurora cabinet-aw-aurora-b"></div>`;
+  document.body.prepend(bg);
+}
+
 function ensureCabinetChrome(links, role, meEmail) {
   document.body.classList.add("has-cabinet-chrome", `cabinet-${role}`);
+  ensureCabinetAtmosphere();
   let aside = document.getElementById("cabinet-aside");
   if (!aside) {
     aside = document.createElement("aside");

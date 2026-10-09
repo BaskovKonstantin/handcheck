@@ -1,5 +1,19 @@
 # Session notes
 
+## 2026-10-09 — round 108: симметричные кнопки демо-входа
+
+- `#btn-candidate` переведён на `aw-btn aw-btn-primary` + `.aw-btn-shine` — обе кнопки быстрого входа выглядят одинаково.
+- Тест: `test/round108-dark-cabinets-login.test.js` (симметрия кнопок + тёмные кабинеты).
+- Локально `npm rebuild better-sqlite3` под Node 22 (ABI 127) — до этого 16 падений из-за ABI 137. Осталось 9 падений, они есть и на чистом HEAD (миграции/rubric), не регрессия.
+
+## 2026-10-09 — full dark AlphaWave cabinets
+
+- `body.has-cabinet-chrome` / `call-room-page`: remap CSS vars to dark paper/card + blue clay/forest.
+- Atmosphere: `#cabinet-aw-bg` grid + aurora via `ensureCabinetAtmosphere()` in `app.js`.
+- Bugfix: do **not** set `position: relative` on `.cabinet-aside` (broke `position: fixed` → main at y=900).
+- Hot-copy path in container: `/app/app/public/*` (not `/app/public`).
+- Refs: `context/design-refs/cabinet-dark-{overview,deck,today}.jpg`.
+
 ## 2026-10-08 — AlphaWave animations on login
 
 - Ported keyframes: aurora-drift-a/b, grain-shift, ken-burns, hero-rise, hero-fade-up, hero-shine, shine-slide, marquee-x, ping (blue accents).

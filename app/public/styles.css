@@ -375,6 +375,179 @@ a {
 body.has-cabinet-chrome,
 body.call-room-page {
   overflow-x: clip;
+  /* AlphaWave full dark theme (blue accents) */
+  --paper: #040405;
+  --card: #0c0d0e;
+  --ink: #e8eaec;
+  --ink-muted: #9ba1a6;
+  --muted: #9ba1a6;
+  --line: rgba(232, 234, 236, 0.12);
+  --forest: #7eb6ff;
+  --forest-soft: rgba(91, 157, 255, 0.14);
+  --forest-glow: rgba(91, 157, 255, 0.22);
+  --accent-secondary: #93c5fd;
+  --accent-secondary-soft: rgba(147, 197, 253, 0.14);
+  --clay: #5b9dff;
+  --clay-hover: #7eb6ff;
+  --clay-glow: rgba(91, 157, 255, 0.38);
+  --on-clay: #040405;
+  --signal-warn-bg: rgba(245, 158, 11, 0.14);
+  --signal-warn-ink: #fbbf24;
+  --signal-warn-line: rgba(251, 191, 36, 0.4);
+  --grade-exact: #5b9dff;
+  --grade-lower: #f59e0b;
+  --grade-higher: #93c5fd;
+  --bar-track: linear-gradient(to right, #1a1d22, #2a3038);
+  --bar-exact: linear-gradient(to right, #2b6fd6, #5b9dff);
+  --bar-lower: linear-gradient(to right, #b45309, #f59e0b);
+  --bar-higher: linear-gradient(to right, #3b82f6, #93c5fd);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --danger: #f87171;
+  color-scheme: dark;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body.has-cabinet-chrome .cabinet-aw-bg,
+body.call-room-page .cabinet-aw-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+body.has-cabinet-chrome .cabinet-aw-grid,
+body.call-room-page .cabinet-aw-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(232, 234, 236, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 234, 236, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 20%, #000 20%, transparent 75%);
+  opacity: 0.7;
+}
+
+body.has-cabinet-chrome .cabinet-aw-aurora,
+body.call-room-page .cabinet-aw-aurora {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+
+body.has-cabinet-chrome .cabinet-aw-aurora-a,
+body.call-room-page .cabinet-aw-aurora-a {
+  width: min(55vw, 480px);
+  height: min(55vw, 480px);
+  left: -8%;
+  top: -12%;
+  background: radial-gradient(circle, rgba(91, 157, 255, 0.35), transparent 68%);
+  animation: aurora-drift-a 22s ease-in-out infinite;
+}
+
+body.has-cabinet-chrome .cabinet-aw-aurora-b,
+body.call-room-page .cabinet-aw-aurora-b {
+  width: min(45vw, 400px);
+  height: min(45vw, 400px);
+  right: -6%;
+  bottom: 10%;
+  background: radial-gradient(circle, rgba(43, 111, 214, 0.28), transparent 70%);
+  animation: aurora-drift-b 26s ease-in-out infinite;
+}
+
+body.has-cabinet-chrome .site-header,
+body.has-cabinet-chrome .cabinet-header,
+body.has-cabinet-chrome .cabinet-aside,
+body.has-cabinet-chrome .cabinet-tabs,
+body.call-room-page .site-header,
+body.call-room-page .cabinet-header {
+  background: rgba(12, 13, 14, 0.82);
+  backdrop-filter: blur(14px);
+  border-color: var(--line);
+}
+
+/* Keep aside/tabs positioning from layout media queries; only lift content above aurora. */
+body.has-cabinet-chrome .cabinet-content,
+body.call-room-page .cabinet-content {
+  position: relative;
+  z-index: 1;
+}
+
+body.has-cabinet-chrome .btn-ghost:hover {
+  background: rgba(91, 157, 255, 0.1);
+}
+
+body.has-cabinet-chrome .logo .logo-mark,
+body.call-room-page .logo .logo-mark {
+  color: var(--clay);
+}
+
+body.has-cabinet-chrome .cabinet-page-hero,
+body.has-cabinet-chrome .overview-hero {
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+
+body.has-cabinet-chrome .overview-hero {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--clay) 42%, #0c0d0e),
+    color-mix(in srgb, var(--forest) 28%, #040405)
+  );
+  color: var(--ink);
+}
+
+body.has-cabinet-chrome .overview-hero .lede {
+  color: color-mix(in srgb, var(--ink) 78%, transparent);
+}
+
+body.has-cabinet-chrome .cabinet-aside .cabinet-nav-link:hover {
+  background: rgba(91, 157, 255, 0.08);
+  color: var(--ink);
+}
+
+body.has-cabinet-chrome .cabinet-aside .cabinet-nav-link.active {
+  background: rgba(91, 157, 255, 0.16);
+  color: var(--clay);
+  box-shadow: inset 0 0 0 1px rgba(91, 157, 255, 0.28);
+}
+
+body.has-cabinet-chrome .stat-tile,
+body.has-cabinet-chrome .panel,
+body.has-cabinet-chrome .invite-card,
+body.has-cabinet-chrome .filter-bar,
+body.has-cabinet-chrome .overview-need-card {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.has-cabinet-chrome .cabinet-more-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+body.has-cabinet-chrome input,
+body.has-cabinet-chrome select,
+body.has-cabinet-chrome textarea {
+  background: rgba(4, 4, 5, 0.85);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+body.has-cabinet-chrome input::placeholder,
+body.has-cabinet-chrome textarea::placeholder {
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.has-cabinet-chrome .cabinet-aw-aurora-a,
+  body.has-cabinet-chrome .cabinet-aw-aurora-b,
+  body.call-room-page .cabinet-aw-aurora-a,
+  body.call-room-page .cabinet-aw-aurora-b {
+    animation: none !important;
+  }
 }
 
 @keyframes section-in {
@@ -2279,7 +2452,7 @@ body.has-cabinet-chrome main {
   width: 3.25rem;
   height: 3.25rem;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--forest-soft), #fff);
+  background: linear-gradient(135deg, var(--forest-soft), var(--card));
   color: var(--forest);
   font-weight: 700;
   font-size: 1.1rem;
@@ -3104,13 +3277,13 @@ body.has-cabinet-chrome main {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--card, #fffcf8);
+  background: var(--card);
   border-radius: 16px 16px 0 0;
   padding: 1rem 1rem 2rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  box-shadow: 0 -8px 32px rgba(26, 35, 50, 0.12);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45);
 }
 .cabinet-more-btn {
   border: none;
@@ -3350,7 +3523,7 @@ body.deck-page main.column {
   }
 
   .deck-act-reject {
-    background: #fff;
+    background: var(--card);
     color: var(--danger);
     border: 2px solid color-mix(in srgb, var(--danger) 35%, var(--line));
   }

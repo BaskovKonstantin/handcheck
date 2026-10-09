@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const config = require("../config");
@@ -131,13 +132,38 @@ function clearChunkFiles(callId, side) {
   }
 }
 
+function tailMarkerPath(callId, side) {
+  return path.join(callDir(callId), `${side}.finalize-tail.sha256`);
+}
+
+function tailSha256(buffer) {
+  return crypto.createHash("sha256").update(buffer).digest("hex");
+}
+
+function wasTailAlreadyMerged(callId, side, buffer) {
+  if (!buffer?.length) return false;
+  try {
+    const markerPath = tailMarkerPath(callId, side);
+    if (!fs.existsSync(markerPath)) return false;
+    return fs.readFileSync(markerPath, "utf8").trim() === tailSha256(buffer);
+  } catch {
+    return false;
+  }
+}
+
+function recordMergedTail(callId, side, buffer) {
+  if (!buffer?.length) return;
+  fs.writeFileSync(tailMarkerPath(callId, side), tailSha256(buffer), "utf8");
+}
+
 function mergeChunksToFinal(callId, side, tailBuffer, durationMs) {
   const finalPath = path.join(callDir(callId), `${side}.webm`);
   const hasTail = Boolean(tailBuffer?.length);
-  if (!hasTail && isPlayableRecordingFile(finalPath)) {
+  const chunkPaths = listChunkFiles(callId, side);
+  if (!hasTail && isPlayableRecordingFile(finalPath) && chunkPaths.length === 0) {
     return finalPath;
   }
-  const parts = listChunkFiles(callId, side).map((p) => fs.readFileSync(p));
+  const parts = chunkPaths.map((p) => fs.readFileSync(p));
   if (tailBuffer?.length) parts.push(tailBuffer);
   if (!parts.length) {
     if (isPlayableRecordingFile(finalPath)) return finalPath;
@@ -161,22 +187,40 @@ function hasRecordingContinuationContext(callId, side) {
 function writeFinalRecording(callId, side, buffer, durationMs) {
   const finalPath = path.join(callDir(callId), `${side}.webm`);
   const hasTail = Boolean(buffer?.length);
-  if (!hasTail && isPlayableRecordingFile(finalPath)) {
-    return finalPath;
-  }
   const chunkPaths = listChunkFiles(callId, side);
-  if (hasTail && isPlayableRecordingFile(finalPath) && chunkPaths.length === 0) {
+  const playable = isPlayableRecordingFile(finalPath);
+
+  if (!hasTail && playable && chunkPaths.length === 0) {
     return finalPath;
   }
+
+  if (hasTail && playable && chunkPaths.length === 0) {
+    if (wasTailAlreadyMerged(callId, side, buffer)) {
+      return finalPath;
+    }
+    const prev = fs.readFileSync(finalPath);
+    const merged = finalizeMergedWebm([prev, buffer], durationMs);
+    if (!merged || merged.length < MIN_PLAYABLE_RECORDING_BYTES) {
+      return playable ? finalPath : null;
+    }
+    if (merged.length <= prev.length) {
+      return finalPath;
+    }
+    fs.writeFileSync(finalPath, merged);
+    recordMergedTail(callId, side, buffer);
+    clearChunkFiles(callId, side);
+    return finalPath;
+  }
+
   let parts;
-  if (chunkPaths.length > 0 && isPlayableRecordingFile(finalPath)) {
+  if (chunkPaths.length > 0 && playable) {
     parts = [fs.readFileSync(finalPath), ...chunkPaths.map((p) => fs.readFileSync(p))];
   } else {
     parts = chunkPaths.map((p) => fs.readFileSync(p));
   }
   if (buffer?.length) parts.push(buffer);
   if (!parts.length) {
-    if (isPlayableRecordingFile(finalPath)) return finalPath;
+    if (playable) return finalPath;
     return null;
   }
   const merged = finalizeMergedWebm(parts, durationMs);
@@ -193,6 +237,7 @@ function writeFinalRecording(callId, side, buffer, durationMs) {
     return null;
   }
   fs.writeFileSync(finalPath, merged);
+  if (buffer?.length) recordMergedTail(callId, side, buffer);
   clearChunkFiles(callId, side);
   return finalPath;
 }

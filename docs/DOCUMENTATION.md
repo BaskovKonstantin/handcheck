@@ -33,6 +33,28 @@
 | [../README.md](../README.md) | быстрый старт и ссылки |
 | [../context/audits/](../context/audits) | отчёты функционального аудита |
 
+## Как поддерживать документацию
+
+```bash
+python3 scripts/build-documentation-pdf.py        # все docs/*.md → docs/Documentation-HandCheck.pdf
+node scripts/functional-audit.js                   # отчёты в context/audits/
+METRICS_JSON=context/metrics-assessment.json node scripts/assessment-metrics.js
+```
+
+Сводный PDF собирается из 13 разделов в порядке: индекс → покрытие ТЗ → ТЗ → архитектура →
+тестирование → подбор → валидация → интеграция ФСП → API → модель данных → деплой → MCP → демо.
+
+## Ссылки для жюри (в репозитории)
+
+| Что | Файл в репозитории |
+|---|---|
+| Индекс документации | [docs/DOCUMENTATION.md](./DOCUMENTATION.md) |
+| Сводная документация одним файлом | [docs/Documentation-HandCheck.pdf](./Documentation-HandCheck.pdf) |
+| Презентация (PDF / PPTX) | [docs/presentation/HandCheck-ФСП-2026.pdf](./presentation/HandCheck-ФСП-2026.pdf) · [pptx](./presentation/HandCheck-ФСП-2026.pptx) |
+| Короткая презентация (13 слайдов) | [docs/presentation/HandCheck-overview.pdf](./presentation/HandCheck-overview.pdf) |
+| Полный текст ТЗ ФСП | [docs/presentation/ТЗ-ФСП-2026.txt](./presentation/ТЗ-ФСП-2026.txt) |
+| Скриншоты интерфейса | [handcheck-ui/presentation/](../handcheck-ui/presentation) |
+
 ## Ссылки для жюри
 
 | Что | Ссылка |

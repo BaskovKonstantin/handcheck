@@ -50,6 +50,29 @@
 
 Подробно: [docs/MATCHING.md](docs/MATCHING.md), [docs/VALIDATION.md](docs/VALIDATION.md).
 
+## Документация проекта
+
+Всё лежит в [`docs/`](docs/DOCUMENTATION.md). Обязательные разделы по ТЗ ФСП:
+
+| Раздел ТЗ | Документ |
+|---|---|
+| Функциональная и компонентная архитектура | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| Механика тестирования и обоснование устойчивости | [`docs/TESTING.md`](docs/TESTING.md) |
+| Механика подбора и логика категоризации | [`docs/MATCHING.md`](docs/MATCHING.md) |
+| Процедура валидации и её результаты | [`docs/VALIDATION.md`](docs/VALIDATION.md) |
+| Схема интеграции с реестром ФСП | [`docs/FSP-INTEGRATION.md`](docs/FSP-INTEGRATION.md) |
+| Описание API | [`docs/API.md`](docs/API.md) + [`openapi.yaml`](openapi.yaml) |
+| Библиотеки, сборка, развёртывание, запуск | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) |
+| Покрытие ТЗ по пунктам | [`docs/FUNCTIONAL-COVERAGE.md`](docs/FUNCTIONAL-COVERAGE.md) |
+| Сжатое ТЗ ФСП (источник требований) | [`docs/TZ.md`](docs/TZ.md) |
+
+Остальное: [`DATA-MODEL.md`](docs/DATA-MODEL.md), [`UX.md`](docs/UX.md),
+[`MCP.md`](docs/MCP.md), [`JURY-DEMO.md`](docs/JURY-DEMO.md), [`PRESENTATION.md`](docs/PRESENTATION.md),
+[`design.md`](docs/design.md), спецификация [`IMPLEMENTATION-PLAN-rev5.md`](docs/IMPLEMENTATION-PLAN-rev5.md).
+
+Всё это же одним файлом — [`docs/Documentation-HandCheck.pdf`](docs/Documentation-HandCheck.pdf)
+(47 страниц, пересобирается командой ниже).
+
 ## Быстрый старт
 
 ```bash
@@ -103,6 +126,9 @@ npm run validate                                     # качество тест
 BASE_URL=http://127.0.0.1:8899 node scripts/functional-audit.js                # 41 проверка end-to-end
 BASE_URL=https://handcheck.baski.pro AUDIT_MODE=readonly node scripts/functional-audit.js   # 8 проверок на проде
 METRICS_JSON=context/metrics-assessment.json node scripts/assessment-metrics.js # числа для отчёта
+
+# пересобрать сводную документацию в PDF (нужны python-markdown и LibreOffice)
+python3 scripts/build-documentation-pdf.py
 ```
 
 Отчёты и метрики: [context/audits](context/audits), [context/metrics-assessment.json](context/metrics-assessment.json).

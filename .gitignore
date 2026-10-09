@@ -11,3 +11,6 @@ dist/
 handcheck-ui/mcp-integrations/*.sqlite
 handcheck-ui/mcp-integrations/session.secret
 session.secret
+
+# Официальный шаблон презентации ФСП (34 МБ) — берётся из материалов хакатона
+docs/presentation/template-fsp-2026.pptx

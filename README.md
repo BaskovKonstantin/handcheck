@@ -13,13 +13,19 @@ Skills-first IT hiring (FSP 2026 special track). Category from test battery; emp
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md) | Индекс документации — с чего начать |
 | [docs/TZ.md](./docs/TZ.md) | Сжатое ТЗ ФСП (источник требований) |
 | [docs/FUNCTIONAL-COVERAGE.md](./docs/FUNCTIONAL-COVERAGE.md) | Покрытие ТЗ по пунктам + функциональный аудит |
+| [docs/TESTING.md](./docs/TESTING.md) | Механика тестирования и устойчивость подхода |
+| [docs/MATCHING.md](./docs/MATCHING.md) | Механика подбора и логика категоризации |
+| [docs/VALIDATION.md](./docs/VALIDATION.md) | Процедура валидации и её результаты |
+| [docs/FSP-INTEGRATION.md](./docs/FSP-INTEGRATION.md) | Схема интеграции с реестром ФСП |
+| [docs/API.md](./docs/API.md) | Описание API (плюс [openapi.yaml](./openapi.yaml)) |
+| [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) | Сборка, развёртывание, запуск, библиотеки |
 | [docs/PRESENTATION.md](./docs/PRESENTATION.md) | Презентация проекта и тезисы питча |
-| [docs/IMPLEMENTATION-PLAN-rev5.md](./docs/IMPLEMENTATION-PLAN-rev5.md) | Canonical rev.5 spec |
+| [docs/presentation/](./docs/presentation) | Презентация ФСП в pptx и pdf |
 | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Структура репо, домены, фазы |
 | [docs/DATA-MODEL.md](./docs/DATA-MODEL.md) | Таблицы и приватность |
-| [docs/VALIDATION.md](./docs/VALIDATION.md) | Как доказываем качество теста и подбора |
 | [docs/MCP.md](./docs/MCP.md) | MCP-интеграция для ИИ-клиентов |
 | [docs/design.md](./docs/design.md) | Palette clay/forest, motion |
 | [docs/UX.md](./docs/UX.md) | Routes and copy |

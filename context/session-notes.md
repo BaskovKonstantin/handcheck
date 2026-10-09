@@ -97,3 +97,13 @@
 - API: `GET /api/employer/candidates`, `GET /api/employer/dashboard`
 - UI: `/employer/candidates`, `/employer/overview`
 - Jury seed: `DEMO_MODE=1 DB_PATH=/data/handcheck.sqlite node scripts/seed-jury-pack.js`
+
+## 2026-10-09 — round 110: презентация ФСП в официальном шаблоне + документация по ТЗ
+
+- Принят полный ТЗ ФСП-2026 (PDF оператора) → `docs/presentation/ТЗ-ФСП-2026.txt`; сжатое ТЗ в `docs/TZ.md` ему соответствует.
+- Новая документация под пункты ТЗ: `docs/TESTING.md`, `docs/MATCHING.md`, `docs/FSP-INTEGRATION.md`, `docs/API.md`, `docs/DEPLOYMENT.md`, переписан `docs/VALIDATION.md`, дополнен `docs/ARCHITECTURE.md` (функциональная + компонентная архитектура), `docs/DOCUMENTATION.md` — индекс.
+- Презентация: 18 слайдов в официальном шаблоне ФСП, `docs/presentation/HandCheck-ФСП-2026.{pptx,pdf}`, сборщик `scripts/build-jury-deck.py` (чистит служебные «Образец текста» из макетов, подставляет числа из `context/metrics-assessment.json`).
+- Плейсхолдеры для людей оставлены: ФИО капитана, состав команды, роли, контакты (слайды 2–4).
+- Новые числа: `scripts/assessment-metrics.js` — cutoff 0.55/0.68/0.78, формы A/B 0.812/0.812 (Δ=0), сильные 0.734, слабые 0.000, 9 батарей / 162 задания, 9/9 ячеек с обеими формами.
+- Пробелы по полному ТЗ: автогенерация PDF-профиля кандидата, периодические короткие задания, сетевой адаптер ФСП (концепция есть), вакансии, OCR. Записаны в `docs/FUNCTIONAL-COVERAGE.md`.
+- `docs/Documentation-HandCheck.pdf` (47 страниц) собирается из markdown скриптом `scripts/build-documentation-pdf.py`.

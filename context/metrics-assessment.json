@@ -1,0 +1,190 @@
+{
+  "generatedAt": "2026-10-09T14:37:12.496Z",
+  "cutoffs": {
+    "junior": 0.55,
+    "middle": 0.68,
+    "senior": 0.78
+  },
+  "formEquivalence": {
+    "scoreA": 0.812,
+    "scoreB": 0.812,
+    "delta": 0,
+    "threshold": 0.15,
+    "pass": true
+  },
+  "answerQuality": {
+    "strong": 0.734,
+    "weak": 0,
+    "gap": 0.734,
+    "strongVerdict": "подтверждён",
+    "weakVerdict": "не подтверждён",
+    "strongOnJuniorForm": 0.494
+  },
+  "perGrade": [
+    {
+      "grade": "junior",
+      "cutoff": 0.55,
+      "strong": 0.494,
+      "weak": 0
+    },
+    {
+      "grade": "middle",
+      "cutoff": 0.68,
+      "strong": 0.734,
+      "weak": 0
+    },
+    {
+      "grade": "senior",
+      "cutoff": 0.78,
+      "strong": 0.434,
+      "weak": 0
+    }
+  ],
+  "battery": [
+    {
+      "cell": "backend × junior",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "backend × middle",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "backend × senior",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "frontend × junior",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "frontend × middle",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "frontend × senior",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "qa × junior",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "qa × middle",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    },
+    {
+      "cell": "qa × senior",
+      "tasks": 18,
+      "quick": 16,
+      "work": 2,
+      "formA": 9,
+      "formB": 9
+    }
+  ],
+  "batteryCells": 9,
+  "totalPublishedTasks": 162,
+  "formSpread": {
+    "backend×junior": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "backend×middle": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "backend×senior": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "frontend×junior": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "frontend×middle": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "frontend×senior": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "qa×junior": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "qa×middle": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    },
+    "qa×senior": {
+      "starts": 6,
+      "formKeys": [
+        "A",
+        "B"
+      ]
+    }
+  },
+  "leakageResistance": {
+    "startsPerCell": 6,
+    "cellsChecked": 9,
+    "cellsWithBothForms": 9,
+    "pass": true
+  }
+}

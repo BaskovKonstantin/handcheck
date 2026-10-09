@@ -53,6 +53,77 @@ async function waitForHealth(timeoutMs = 20000) {
   throw new Error("стенд не поднялся");
 }
 
+
+async function api(path, opts = {}) {
+  const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+  const res = await fetch(`${BASE}${path}`, { method: opts.method || "POST", headers, body: opts.body ? JSON.stringify(opts.body) : undefined, redirect: "manual" });
+  const text = await res.text();
+  try {
+    return { status: res.status, json: text ? JSON.parse(text) : null };
+  } catch {
+    return { status: res.status, json: null };
+  }
+}
+
+/** Наполняет стенд реальными статусами: приглашения, accept, decline, тест работодателя. */
+async function preseed() {
+  const login = async (email) => {
+    const res = await fetch(`${BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: PASS }),
+    });
+    return (res.headers.getSetCookie?.() || []).map((c) => c.split(";")[0]).find((c) => c.startsWith("handcheck_sid=")) || "";
+  };
+  const call = (cookie, method, path, body) =>
+    api(path, { method, body, headers: { Cookie: cookie, "x-demo-admin": "1" } });
+
+  const emp = await login("cafe@demo.local");
+  const anna = await login("anna@demo.local");
+  const boris = await login("boris@demo.local");
+
+  const needs = await call(emp, "GET", "/api/employer/needs");
+  const need = needs.json?.items?.[0];
+  if (!need) return;
+
+  const bank = await call(emp, "GET", "/api/employer/candidates?spec=backend");
+  const annaId = (bank.json?.items || []).find((c) => /Анна/i.test(c.displayName || ""))?.id;
+  const borisId = (bank.json?.items || []).find((c) => /Борис/i.test(c.displayName || ""))?.id;
+
+  const invAnna = await call(emp, "POST", "/api/employer/invitations", {
+    needId: need.id, candidateId: annaId, salaryFrom: 120000, salaryTo: 180000,
+    offerText: "Приглашаем в команду: бэкенд на Node.js", contactChannel: "telegram",
+  });
+  const invBoris = await call(emp, "POST", "/api/employer/invitations", {
+    needId: need.id, candidateId: borisId, salaryFrom: 100000, salaryTo: 150000,
+    offerText: "Второе приглашение: интеграции и API", contactChannel: "email",
+  });
+  if (invAnna.json?.invitationId || invAnna.json?.id) {
+    await call(anna, "POST", `/api/candidate/invitations/${invAnna.json.invitationId || invAnna.json.id}/accept`, {});
+  }
+  if (invBoris.json?.invitationId || invBoris.json?.id) {
+    await call(boris, "POST", `/api/candidate/invitations/${invBoris.json.invitationId || invBoris.json.id}/decline`, {});
+  }
+
+  // короткий тест работодателя для принявшего приглашение
+  const test = await call(emp, "POST", "/api/employer/tests", {
+    needId: need.id, title: "Скрининг: API и очереди", intro: "Два вопроса на стек потребности",
+  });
+  const testId = test.json?.id;
+  if (!testId) return;
+  await call(emp, "POST", `/api/employer/tests/${testId}/items`, {
+    kind: "single", prompt: "Что выберет Node.js для очереди задач?",
+    options: [{ id: "o1", label: "event loop" }, { id: "o2", label: "thread pool" }],
+    answerKey: { correctIds: ["o1"] },
+  });
+  await call(emp, "POST", `/api/employer/tests/${testId}/items`, {
+    kind: "text", prompt: "Опишите схему хранения профиля кандидата",
+    rubricKeys: { keywords: ["таблица", "индекс", "кандидат"] },
+  });
+  await call(emp, "POST", `/api/employer/tests/${testId}/publish`, {});
+  await call(emp, "POST", `/api/employer/tests/${testId}/assign`, { candidateId: annaId });
+}
+
 async function login(page, email) {
   await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
   const emailInput = page.locator("#email");
@@ -91,6 +162,7 @@ async function main() {
   let browser;
   try {
     await waitForHealth();
+    await preseed();
     browser = await chromium.launch({
       headless: true,
       executablePath: "/usr/bin/google-chrome",

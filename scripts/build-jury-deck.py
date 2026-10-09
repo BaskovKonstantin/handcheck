@@ -20,6 +20,7 @@ import sys
 
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
+from pptx.enum.text import PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -184,6 +185,100 @@ def set_pill_title(slide, title, size=17):
     return False
 
 
+def add_notes(slide, text):
+    """Заметки докладчика к слайду."""
+    slide.notes_slide.notes_text_frame.text = text
+
+
+def caption(slide, left, top, width, text, size=9, color=None):
+    """Подпись под картинкой."""
+    from pptx.util import Inches as _Inches
+
+    box = slide.shapes.add_textbox(_Inches(left), _Inches(top), _Inches(width), _Inches(0.4))
+    tf = box.text_frame
+    tf.word_wrap = True
+    p = tf.paragraphs[0]
+    p.text = text
+    for target in [p.font] + [r.font for r in p.runs]:
+        target.size = Pt(size)
+        target.italic = True
+        target.color.rgb = color or GREY
+    return box
+
+
+def _rename_slide_part(prs, slide):
+    """Выдать новому слайду уникальное имя части.
+
+    После удаления слайдов из шаблона счётчик python-pptx может выдать имя,
+    которое уже занято, и файл собирается с дублями (LibreOffice его не открывает).
+    """
+    from pptx.opc.packuri import PackURI
+
+    used = set()
+    for part in prs.part.package.iter_parts():
+        name = str(part.partname)
+        m = re.fullmatch(r"/ppt/slides/slide(\d+)\.xml", name)
+        if m:
+            used.add(int(m.group(1)))
+    nxt = max(used or {0}) + 1
+    slide.part.partname = PackURI(f"/ppt/slides/slide{nxt}.xml")
+
+
+def photo_layout(prs):
+    for layout in prs.slide_layouts:
+        if layout.name == "Фотографии":
+            return layout
+    raise SystemExit("В шаблоне нет макета «Фотографии»")
+
+
+def new_photo_slide(prs, title, body_lines, photos, notes_text, body_size=12):
+    """Новый слайд на макете «Фотографии»: текст слева, картинки справа с подписями.
+
+    python-pptx клонирует из макета только плейсхолдер заголовка, поэтому текст
+    и картинки создаются напрямую по геометрии исходного макета.
+    """
+    layout = photo_layout(prs)
+    slide = prs.slides.add_slide(layout)
+    _rename_slide_part(prs, slide)
+
+    title_ph = None
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx == 0:
+            title_ph = ph
+    if title_ph is not None:
+        set_lines(title_ph.text_frame, [title], size=15, bold=True, color=rgb("FFFFFF"))
+    else:
+        box = slide.shapes.add_textbox(Inches(0.7), Inches(0.5), Inches(5.3), Inches(0.5))
+        set_lines(box.text_frame, [title], size=15, bold=True, color=rgb("FFFFFF"))
+
+    body = slide.shapes.add_textbox(Inches(0.7), Inches(1.3), Inches(5.3), Inches(5.0))
+    set_lines(body.text_frame, body_lines, size=body_size, color=rgb("E8EAEC"), space_after=8)
+
+    boxes = [(6.9, 1.25, 6.0, 3.45), (6.9, 5.15, 6.0, 1.75)]
+    for (shot, cap), (l, t, w, h) in zip(photos, boxes):
+        place_image(slide, os.path.join(SHOTS, shot), (l, t, w, h))
+        caption(slide, l, t + h + 0.05, w, cap, color=rgb("CFC8DC"))
+
+    add_notes(slide, notes_text)
+    return slide
+
+
+def renumber(slide, number):
+    """Проставить номер слайда: в шаблоне это текст, а не поле."""
+    for ph in slide.placeholders:
+        if ph.has_text_frame and "номер слайда" in ph.name.lower():
+            set_lines(ph.text_frame, [str(number)], size=10, color=GREY, align=PP_ALIGN.RIGHT)
+
+
+def reorder(prs, wanted):
+    """Переставить слайды: wanted — список текущих индексов в новом порядке."""
+    id_list = prs.slides._sldIdLst
+    current = list(id_list)
+    for pos, src in enumerate(wanted):
+        id_list.remove(current[src])
+        id_list.append(current[src])
+
+
 def main():
     if not os.path.exists(TEMPLATE):
         sys.exit(f"Нет шаблона: {TEMPLATE}")
@@ -330,6 +425,9 @@ def main():
               size=13, color=INK, space_after=8)
     drop_placeholder(s, 10)
     place_image(s, os.path.join(SHOTS, "02-employer-deck.png"), (6.85, 1.55, 6.3, 3.94), crop_fill=False)
+    caption(s, 6.85, 5.56, 6.3,
+            "Карточка колоды: категория «Backend × Middle», домен потребности и обоснование. "
+            "Телефона и email в карточке нет — они появятся только после accept.")
 
     # ---------- 9. Сквозной сценарий (5 пунктов) ----------
     s = slides[8]
@@ -399,8 +497,12 @@ def main():
     for idx, shot in ((10, "08-candidate-today.png"), (11, "09-candidate-invitations.png"), (12, "10-candidate-tasks.png")):
         drop_placeholder(s, idx)
     place_image(s, os.path.join(SHOTS, "08-candidate-today.png"), (8.1, 1.1, 4.8, 3.4))
-    place_image(s, os.path.join(SHOTS, "09-candidate-invitations.png"), (8.1, 4.8, 4.8, 2.0))
+    caption(s, 8.1, 4.54, 4.8, "«Сегодня»: подтверждённая категория, cooldown пересдачи, счётчик приглашений")
+    place_image(s, os.path.join(SHOTS, "09-candidate-invitations.png"), (8.1, 5.0, 4.8, 2.0))
+    caption(s, 8.1, 7.04, 4.8, "Входящее приглашение с вилкой ЗП: принять или отклонить")
     place_image(s, os.path.join(SHOTS, "10-candidate-tasks.png"), (0.4, 3.5, 7.4, 3.3))
+    caption(s, 0.4, 6.84, 7.4,
+            "Батарея: выбор специализации и грейда, выбор формы A/B, серверный таймер, черновик ответа")
 
     # ---------- 14. Архитектура ----------
     s = slides[13]
@@ -504,6 +606,83 @@ def main():
     ]
     for i, idx in enumerate([26, 31, 32]):
         set_lines(ph_by_idx(s, idx).text_frame, [finals[i][0], "", finals[i][1]], size=14, color=INK)
+
+    # ---------- 19–20. Два новых слайда со скриншотами ----------
+    s_emp_list = new_photo_slide(
+        prs,
+        "Работодатель: подборка и приглашения",
+        ["Список совпадений — та же категория, но в виде таблицы: стек, домен, статус решения.",
+         "",
+         "Фильтры по стеку и ФСП сужают выдачу и не ломают уже полученную подборку.",
+         "",
+         "Приглашение отправляется с вилкой ЗП и без вакансии; у второго кандидата — "
+         "статус «Отказался», его контакты работодателю не показываются."],
+        [("03-employer-list.png", "Список совпадений по потребности «Автоматизация работы официанта»"),
+         ("06-employer-invitations.png", "Исходящие приглашения: sent / accepted / declined. Контакты только у accepted")],
+        "Показываем два списка: подборку с категориями и приглашения со статусами. "
+        "Обращаю внимание жюри, что у declined-кандидата контактов нет.",
+    )
+
+    s_mobile = new_photo_slide(
+        prs,
+        "Вход и мобильная версия",
+        ["Демо открывается прямо с главной: две кнопки быстрого входа — работодатель и соискатель.",
+         "",
+         "Интерфейс свёрстан под мобильный экран: тест проходится с телефона, карточки и таблицы "
+         "перестраиваются в один столбец.",
+         "",
+         "Это тот же стек — без отдельной мобильной разработки."],
+        [("01-login-gate.png", "Экран входа: быстрый демо-вход и форма входа по email"),
+         ("13-candidate-today-mobile.png", "Кабинет кандидата на ширине 390 px")],
+        "Показываю, что демо не требует регистрации: одна кнопка — и ты в кабинете. "
+        "Второй экран — мобильная вёрстка, она проверена скриншотами.",
+    )
+
+    # ---------- Порядок: новые слайды с экранами после 8 и 14 ----------
+    # индексы: 0..17 — исходные 18 слайдов, 18 — «подборка и приглашения», 19 — «вход и мобильная»
+    reorder(prs, [0, 1, 2, 3, 4, 5, 6, 7, 18, 8, 9, 10, 11, 12, 13, 19, 14, 15, 16, 17])
+
+    # ---------- Заметки докладчика ----------
+    NOTES = [
+        "HandCheck: категорию подтверждает батарея заданий, приглашение инициирует работодатель. "
+        "Одна фраза о сути — дальше раскрываем механику и доказательства.",
+        "Суть решения: соискатель сам попадает в категорию по результату теста, работодатель ищет "
+        "категорию, а не вакансии. Уникальность — в обратной механике и скрытых контактах. "
+        "Здесь же вписать ФИО капитана, состав команды, город.",
+        "Здесь вписать участников команды: имя, роль, ник, телефон, место работы или учёбы. "
+        "Если участников меньше пяти, лишние карточки удалить.",
+        "Три блока: почему выбрали задачу, что оказалось сложным (устойчивость теста), как проверяли "
+        "себя (автотесты, процедура валидации, сквозной аудит).",
+        "Техническая суть: стек и банк из 162 заданий. Маркетинговая: что получает рекрутер "
+        "и что получает кандидат.",
+        "Четыре шага механики — это и есть демонстрационный сценарий жюри.",
+        "Проблема: резюме не подтверждает навык, релевантность выдачи низка у обеих сторон.",
+        "Живой экран кабинета работодателя: колода, категория, объяснение и полное отсутствие контактов.",
+        "Два списка работодателя: подборка и приглашения. Подчеркнуть, что у отказавшегося "
+        "кандидата контактов нет, а фильтры не ломают выдачу.",
+        "Пять шагов сквозного сценария — тот же маршрут, который жюри повторит у себя.",
+        "Почему подход устойчив: банк вместо одной выдачи, две равноценные формы, cutoff по грейду, "
+        "серверные дедлайны и кулдаун пересдачи. Подробности — в docs/TESTING.md.",
+        "Обратная механика подбора: категория, подборка с обоснованием, приглашение с вилкой.",
+        "Приватность как механика: согласия, скрытые контакты, роли, изоляция токенов ИИ-клиентов.",
+        "Кабинет кандидата: статус категории, приглашение с вилкой, батарея с таймером.",
+        "Вход и мобильная версия: демо-вход в одно нажатие и рабочая вёрстка под 390 px.",
+        "Архитектура: модульный монолит, 17 доменных модулей, одна база SQLite, статический UI.",
+        "Валидация теста: измеренные числа — формы A и B дают одинаковый балл, сильные ответы "
+        "проходят cutoff, слабые нет, обе формы выдаются в каждой ячейке.",
+        "Что проверяется автоматически: 41 функциональная проверка по шести блокам, "
+        "процедура валидации теста и подбора, сквозные тесты приватности.",
+        "Покрытие ТЗ: 40 пунктов проверено, 2 желательных не сделаны, 3 вынесены за рамки кода. "
+        "Честность здесь работает лучше, чем попытка закрыть всё.",
+        "Итог: что работает, какие ограничения честно названы и куда посмотреть — прототип, "
+        "документация и исходники по ссылкам ниже.",
+    ]
+    for slide, note in zip(list(prs.slides), NOTES):
+        if not slide.has_notes_slide or not slide.notes_slide.notes_text_frame.text.strip():
+            add_notes(slide, note)
+
+    for n, slide in enumerate(list(prs.slides), start=1):
+        renumber(slide, n)
 
     prs.save(OUT)
     print(f"Сохранено: {OUT} ({len(prs.slides._sldIdLst)} слайдов)")

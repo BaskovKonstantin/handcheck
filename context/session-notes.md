@@ -21,7 +21,7 @@
 - `body.has-cabinet-chrome` / `call-room-page`: remap CSS vars to dark paper/card + blue clay/forest.
 - Atmosphere: `#cabinet-aw-bg` grid + aurora via `ensureCabinetAtmosphere()` in `app.js`.
 - Bugfix: do **not** set `position: relative` on `.cabinet-aside` (broke `position: fixed` → main at y=900).
-- Hot-copy path in container: `/app/app/public/*` (not `/app/public`).
+- Статика в контейнере разворачивается в `app/public/*`; артефакты для ссылок `/downloads/*` копируются при деплое.
 - Refs: `context/design-refs/cabinet-dark-{overview,deck,today}.jpg`.
 
 ## 2026-10-08 — AlphaWave animations on login

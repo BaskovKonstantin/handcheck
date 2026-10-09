@@ -14,3 +14,7 @@ session.secret
 
 # Официальный шаблон презентации ФСП (34 МБ) — берётся из материалов хакатона
 docs/presentation/template-fsp-2026.pptx
+
+# Артефакты для /downloads: собираются при деплое из docs/, в репозитории дубли не нужны
+app/public/downloads/
+__pycache__/

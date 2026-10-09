@@ -5,9 +5,12 @@ const PRIVACY_POLICY_VERSION = "2026-10-07";
 
 const PRIVACY_POLICY_PATH = "/privacy";
 
-const DEFAULT_OPERATOR_NAME = "Басков Константин Дмитриевич";
-const DEFAULT_OPERATOR_INN = "781456789012";
-const DEFAULT_OPERATOR_EMAIL = "privacy@baski.pro";
+// Данные оператора задаются только через переменные окружения
+// (PRIVACY_OPERATOR_NAME / PRIVACY_OPERATOR_INN / PRIVACY_OPERATOR_EMAIL).
+// В исходниках их нет намеренно: репозиторий публичный.
+const DEFAULT_OPERATOR_NAME = "";
+const DEFAULT_OPERATOR_INN = "";
+const DEFAULT_OPERATOR_EMAIL = "";
 
 function operatorName() {
   const v = String(process.env.PRIVACY_OPERATOR_NAME || "").trim();

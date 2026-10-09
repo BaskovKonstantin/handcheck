@@ -59,7 +59,7 @@ describe("round45 findings (unit)", () => {
     assert.match(wf, /handcheck-deploy-disk\.sh tag-rollback/);
     assert.match(wf, /handcheck-deploy-disk\.sh post-prune/);
     const script = fs.readFileSync(path.join(__dirname, "../bin/handcheck-deploy-disk.sh"), "utf8");
-    assert.match(script, /Недостаточно места на konBas/);
+    assert.match(script, /Недостаточно места на сервере/);
     assert.doesNotMatch(script, /prune --volumes/);
   });
 
@@ -75,7 +75,7 @@ describe("round45 findings (unit)", () => {
       },
     });
     assert.equal(r.status, 42);
-    assert.match(r.stdout + r.stderr, /Недостаточно места на konBas/i);
+    assert.match(r.stdout + r.stderr, /Недостаточно места на сервере/i);
   });
 
   it(

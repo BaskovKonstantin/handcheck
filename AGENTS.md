@@ -19,9 +19,9 @@ Live: https://handcheck.baski.pro
 - Node 20 + Express (`app/server.js` → модули в `app/modules/*`)
 - SQLite (`better-sqlite3`) when persistence starts
 - Static UI in `app/public/`
-- Docker Compose on konBas (`127.0.0.1:8810`)
+- Docker Compose on the server (`127.0.0.1:8810`)
 - Caddy `handcheck.baski.pro`
-- Deploy: push `main` → self-hosted runner labels `handcheck`, `konbas`
+- Deploy: push `main` → self-hosted runner with label `handcheck`
 
 ## How to implement
 

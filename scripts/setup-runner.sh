@@ -2,7 +2,7 @@
 set -euo pipefail
 
 TOKEN="$1"
-DIR=/home/kon/actions-runners/handcheck
+DIR="${RUNNER_DIR:-${HOME}/actions-runners/handcheck}"
 mkdir -p "$DIR"
 cd "$DIR"
 
@@ -18,8 +18,8 @@ if [ ! -f .runner ]; then
   ./config.sh --unattended \
     --url https://github.com/BaskovKonstantin/handcheck \
     --token "$TOKEN" \
-    --name konbas-handcheck \
-    --labels handcheck,konbas,self-hosted \
+    --name "${RUNNER_NAME:-handcheck-runner}" \
+    --labels "${RUNNER_LABELS:-handcheck,self-hosted}" \
     --work _work \
     --replace
 fi

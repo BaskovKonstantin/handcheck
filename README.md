@@ -11,7 +11,7 @@
 - 🌐 Прототип: **https://handcheck.baski.pro** — демо-вход в одно нажатие
 - 📊 Презентация для жюри: [PDF](docs/presentation/HandCheck-ФСП-2026.pdf) · [PPTX](docs/presentation/HandCheck-ФСП-2026.pptx)
 - 📚 Документация: [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) · [сводный PDF](docs/Documentation-HandCheck.pdf)
-- 🔍 Просмотр исходников онлайн: https://handcheck.baski.pro/downloads/source/
+- 🔍 Исходники: этот репозиторий + архив для офлайн-просмотра (`git clone` или релиз)
 
 ## Что это за продукт
 

@@ -58,8 +58,9 @@ describe("owner decisions (FSP)", () => {
 
   it("privacy notice uses operator defaults without placeholders", () => {
     assert.equal(operatorName(), "Басков Константин Дмитриевич");
-    assert.equal(operatorInn(), "781456789012");
-    assert.equal(operatorEmail(), "privacy@baski.pro");
+    // Данные оператора приходят только из окружения, в коде их нет
+    assert.equal(operatorInn(), process.env.PRIVACY_OPERATOR_INN || "");
+    assert.equal(operatorEmail(), process.env.PRIVACY_OPERATOR_EMAIL || "");
     const text = privacyNoticeShort();
     assert.ok(!text.includes("не указан"));
     assert.ok(!text.includes("[УКАЖИТЕ"));

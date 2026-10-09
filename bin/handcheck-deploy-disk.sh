@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Disk guard for konBas HandCheck deploy (safe cleanup; never touches volumes).
+# Disk guard for HandCheck deploy (safe cleanup; never touches volumes).
 set -euo pipefail
 
 MODE="${1:-precheck}"
@@ -39,8 +39,8 @@ fail_low_space() {
   local docker_kb="$2"
   local root_gb=$((root_kb / 1024 / 1024))
   local docker_gb=$((docker_kb / 1024 / 1024))
-  echo "ERROR: Недостаточно места на konBas: / ≈ ${root_gb} ГБ свободно, Docker data ≈ ${docker_gb} ГБ (нужно ≥ ${THRESHOLD_GB} ГБ)."
-  echo "ERROR: Not enough free disk on konBas (need at least ${THRESHOLD_GB} GB on / and Docker root)."
+  echo "ERROR: Недостаточно места на сервере: / ≈ ${root_gb} ГБ свободно, Docker data ≈ ${docker_gb} ГБ (нужно ≥ ${THRESHOLD_GB} ГБ)."
+  echo "ERROR: Not enough free disk on the server (need at least ${THRESHOLD_GB} GB on / and Docker root)."
   exit 42
 }
 

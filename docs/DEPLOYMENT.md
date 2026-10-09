@@ -51,7 +51,7 @@ curl -fsS http://127.0.0.1:8810/api/health
 ## 4. Развёртывание
 
 ```text
-push в main → self-hosted runner (метки handcheck, konbas) → docker compose up -d --build
+push в main → self-hosted runner (метка handcheck) → docker compose up -d --build
             → health-опрос до 120 с с проверкой GIT_COMMIT
 ```
 

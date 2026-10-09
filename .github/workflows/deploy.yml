@@ -1,4 +1,4 @@
-name: Deploy HandCheck to konBas
+name: Deploy HandCheck
 
 on:
   push:
@@ -6,14 +6,21 @@ on:
       - main
   workflow_dispatch:
 
+# Публичный репозиторий: доверяем только событиям основного репозитория.
+# Форк не должен запускать код на self-hosted раннере оператора.
+permissions:
+  contents: read
+
 concurrency:
   group: handcheck-production
   cancel-in-progress: true
 
 jobs:
   deploy:
-    name: Deploy on konBas
-    runs-on: [self-hosted, handcheck, konbas]
+    name: Deploy production
+    if: github.repository == 'BaskovKonstantin/handcheck' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Только метка проекта: имя машины намеренно не используется.
+    runs-on: [self-hosted, handcheck]
     steps:
       - name: Pull and rebuild (preserve /data volume and server .env)
         working-directory: /srv/homeserver/apps/handcheck
@@ -28,6 +35,12 @@ jobs:
 
           git fetch origin main
           git reset --hard origin/main
+
+          # Файлы для ссылок из формы сдачи (/downloads/...): дубли в репозитории не храним
+          mkdir -p app/public/downloads
+          cp -f docs/Documentation-HandCheck.pdf app/public/downloads/Documentation-HandCheck.pdf
+          cp -f docs/presentation/HandCheck-ФСП-2026.pdf app/public/downloads/HandCheck-FSP-2026-presentation.pdf
+          cp -f docs/presentation/HandCheck-ФСП-2026.pptx app/public/downloads/HandCheck-FSP-2026-presentation.pptx
 
           bash bin/handcheck-deploy-disk.sh precheck
           bash bin/handcheck-deploy-disk.sh tag-rollback

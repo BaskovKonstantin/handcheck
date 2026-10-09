@@ -187,6 +187,13 @@ def set_pill_title(slide, title, size=17):
 def main():
     if not os.path.exists(TEMPLATE):
         sys.exit(f"Нет шаблона: {TEMPLATE}")
+    # Источники чисел в тексте слайдов (проверить перед сдачей, если аудит изменится):
+    #   41 и 8 проверок      → context/audits/*.md (scripts/functional-audit.js)
+    #   162 задания, 9 барей, 9/9 ячеек, cutoff, Δ форм, 0.734/0.000
+    #                        → context/metrics-assessment.json (scripts/assessment-metrics.js)
+    #   0.60/0.15/0.10/0.15  → app/lib/ranking.js
+    #   30 дней кулдауна     → app/config.js GRADE_COOLDOWN_DAYS
+    #   40 / 2 / 3 пунктов ТЗ→ docs/FUNCTIONAL-COVERAGE.md
     metrics = {}
     if os.path.exists(METRICS):
         metrics = json.load(open(METRICS))

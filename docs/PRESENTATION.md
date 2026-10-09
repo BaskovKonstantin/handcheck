@@ -14,7 +14,7 @@
 ## Как пересобрать
 
 ```bash
-/tmp/pptxenv/bin/python scripts/build-jury-deck.py     # python-pptx + Pillow
+~/.venvs/pptx/bin/python scripts/build-jury-deck.py       # python-pptx + Pillow
 ```
 
 Скрипт берёт числа из `context/metrics-assessment.json`, скриншоты — из
@@ -76,3 +76,27 @@
 
 Если команда больше одного человека: допишите словарь в `TEAM` и пересоберите —
 карточки создадутся сами, лишние удалятся, баннер на слайде 2 перерисуется.
+---
+
+# Короткая публичная презентация
+
+`docs/presentation/HandCheck-overview.pptx` / `.pdf` — 13 слайдов: обязательные слайды
+7–11 шаблона ФСП в исходном дизайне плюс восемь слайдов HandCheck в рекомендательной
+зоне (концепция и архитектура, технологии, два слайда «Пример работы» со скриншотами
+кабинетов, сценарий, приватность, валидация, итог).
+
+| Файл | Что это |
+|---|---|
+| `docs/presentation/HandCheck-overview.pptx` | файл презентации |
+| `docs/presentation/HandCheck-overview.pdf` | та же дека в PDF (собирается автоматически) |
+| `scripts/build-overview-deck.py` | сборщик; хелперы берёт из `build-jury-deck.py` |
+| `https://handcheck.baski.pro/downloads/HandCheck-overview.pdf` | публичная ссылка |
+
+```bash
+~/.venvs/pptx/bin/python scripts/build-overview-deck.py
+```
+
+Венв `python-pptx` переехал из `/tmp/pptxenv` в `~/.venvs/pptx`: старый путь стирался
+при перезагрузке, и оба сборщика переставали запускаться.
+
+Поля `‹вписать›` (телефон, город) — те же, что и в жюри-деке: см. раздел выше.
